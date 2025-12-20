@@ -20,9 +20,10 @@ from typing import Tuple, Optional
 # Configuration
 # ============================================
 REPO_ROOT = Path(__file__).parent
+PARENT_DIR = REPO_ROOT.parent  # Store models in parent directory (persistent across repo deletions)
 LIB_DIR = REPO_ROOT / "lib"
-MODELS_DIR = REPO_ROOT / "models"
-DEMO_DATA_DIR = REPO_ROOT / "demo_data"
+MODELS_DIR = PARENT_DIR / "models"  # Models persist when repo is deleted
+DEMO_DATA_DIR = REPO_ROOT / "demo_data"  # Demo data stays with repo
 
 # Google Drive paths (for Colab)
 DRIVE_ROOT = Path("/content/drive/MyDrive")

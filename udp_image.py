@@ -20,6 +20,8 @@ import cv2
 import numpy as np
 
 REPO_ROOT = Path(__file__).parent
+PARENT_DIR = REPO_ROOT.parent
+MODELS_DIR = PARENT_DIR / "models"  # Models stored in parent directory
 
 def main():
     parser = argparse.ArgumentParser(description="UDP Image Demo - Quick verification")
@@ -41,7 +43,13 @@ def main():
     # Initialize YOLO
     print("📦 Loading YOLO detector...")
     from ultralytics import YOLO
-    yolo_path = REPO_ROOT / config["detection"]["model_path"]
+    
+    # Look for model in parent/models directory first, fallback to repo
+    yolo_filename = config["detection"]["model_path"]
+    yolo_path = MODELS_DIR / "yolo" / yolo_filename
+    if not yolo_path.exists():
+        yolo_path = REPO_ROOT / yolo_filename
+    
     yolo = YOLO(str(yolo_path))
     print(f"   ✅ Loaded {yolo_path.name}")
     

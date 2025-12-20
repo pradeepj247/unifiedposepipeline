@@ -23,6 +23,8 @@ import numpy as np
 from tqdm import tqdm
 
 REPO_ROOT = Path(__file__).parent
+PARENT_DIR = REPO_ROOT.parent
+MODELS_DIR = PARENT_DIR / "models"  # Models stored in parent directory
 
 def main():
     parser = argparse.ArgumentParser(description="UDP Video Demo - Comprehensive testing")
@@ -46,7 +48,18 @@ def main():
     print("📦 Initializing Detection Module")
     print("=" * 70)
     from ultralytics import YOLO
-    yolo_path = REPO_ROOT / config["detection"]["model_path"]
+    
+    # Look for model in parent/models directory first, fallback to repo
+    yolo_config_path = config["detection"]["model_path"]
+    if "/" in yolo_config_path:
+        yolo_filename = yolo_config_path.split("/")[-1]
+    else:
+        yolo_filename = yolo_config_path
+    
+    yolo_path = MODELS_DIR / "yolo" / yolo_filename
+    if not yolo_path.exists():
+        yolo_path = REPO_ROOT / yolo_config_path
+    
     yolo = YOLO(str(yolo_path))
     print(f"✅ YOLO loaded: {yolo_path.name}")
     print(f"   Confidence threshold: {config['detection']['confidence_threshold']}")
