@@ -220,7 +220,11 @@ def step_6_setup_directories():
     print("📁 Creating directories...")
     for directory in dirs:
         directory.mkdir(parents=True, exist_ok=True)
-        print(f"   ✓ {directory.relative_to(REPO_ROOT)}/")
+        # Print relative to PARENT_DIR for models, REPO_ROOT for others
+        if directory.is_relative_to(PARENT_DIR):
+            print(f"   ✓ {directory.relative_to(PARENT_DIR)}/")
+        else:
+            print(f"   ✓ {directory}/")
     
     print("✅ Directory structure created")
 
