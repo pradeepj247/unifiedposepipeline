@@ -8,7 +8,7 @@ detection:
 
 # Pose estimation configuration (RTMPose)
 pose_estimation:
-  model_type: rtmpose-l  # Large model for quality
+  mode: performance  # Options: lightweight, balanced, performance
   backend: onnxruntime
   device: cuda  # or cpu
 

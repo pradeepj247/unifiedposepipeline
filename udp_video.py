@@ -59,11 +59,11 @@ def main():
     from rtmlib import Body, draw_skeleton
     
     pose_model = Body(
-        pose=config["pose_estimation"]["model_type"],
+        mode=config["pose_estimation"]["mode"],
         backend=config["pose_estimation"]["backend"],
         device=config["pose_estimation"]["device"]
     )
-    print(f"✅ RTMPose loaded: {config['pose_estimation']['model_type']}")
+    print(f"✅ RTMPose loaded (mode: {config['pose_estimation']['mode']})")
     print(f"   Backend: {config['pose_estimation']['backend']}")
     print(f"   Device: {config['pose_estimation']['device']}")
     

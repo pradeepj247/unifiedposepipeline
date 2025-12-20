@@ -8,7 +8,7 @@ detection:
 
 # Pose estimation configuration (RTMPose)
 pose_estimation:
-  model_type: rtmpose-m  # Using medium for balance
+  mode: balanced  # Options: lightweight, balanced, performance
   backend: onnxruntime
   device: cuda  # or cpu
 
