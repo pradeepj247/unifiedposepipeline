@@ -51,11 +51,12 @@ def main():
     from rtmlib import Body
     
     pose_model = Body(
-        mode=config["pose_estimation"]["mode"],
+        pose=config["pose_estimation"]["pose_model_url"],
+        pose_input_size=tuple(config["pose_estimation"]["pose_input_size"]),
         backend=config["pose_estimation"]["backend"],
         device=config["pose_estimation"]["device"]
     )
-    print(f"   ✅ Loaded RTMPose (mode: {config['pose_estimation']['mode']})")
+    print(f"   ✅ Loaded RTMPose")
     
     # Load image
     print("\n📸 Processing image...")

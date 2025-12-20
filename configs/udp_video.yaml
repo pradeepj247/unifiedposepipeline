@@ -8,7 +8,8 @@ detection:
 
 # Pose estimation configuration (RTMPose)
 pose_estimation:
-  mode: performance  # Options: lightweight, balanced, performance
+  pose_model_url: https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-l_simcc-body7_pt-body7_420e-384x288-3f5a1437_20230504.zip
+  pose_input_size: [288, 384]
   backend: onnxruntime
   device: cuda  # or cpu
 
