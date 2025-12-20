@@ -43,41 +43,20 @@ def main():
     print("UDP VIDEO DEMO - Comprehensive Testing")
     print("🎬" * 35 + "\n")
     
-    # Initialize YOLO
+    # Initialize RTMLib Body (detector + pose estimator)
     print("=" * 70)
-    print("📦 Initializing Detection Module")
-    print("=" * 70)
-    from ultralytics import YOLO
-    
-    # Look for model in parent/models directory first, fallback to repo
-    yolo_config_path = config["detection"]["model_path"]
-    if "/" in yolo_config_path:
-        yolo_filename = yolo_config_path.split("/")[-1]
-    else:
-        yolo_filename = yolo_config_path
-    
-    yolo_path = MODELS_DIR / "yolo" / yolo_filename
-    if not yolo_path.exists():
-        yolo_path = REPO_ROOT / yolo_config_path
-    
-    yolo = YOLO(str(yolo_path))
-    print(f"✅ YOLO loaded: {yolo_path.name}")
-    print(f"   Confidence threshold: {config['detection']['confidence_threshold']}")
-    
-    # Initialize RTMLib
-    print("\n" + "=" * 70)
-    print("📦 Initializing Pose Estimation Module")
+    print("📦 Initializing RTMLib Body Pipeline")
     print("=" * 70)
     sys.path.insert(0, str(REPO_ROOT / "lib"))
     from rtmlib import Body, draw_skeleton
     
-    pose_model = Body(
+    body = Body(
         pose=config["pose_estimation"]["pose_model_url"],
         pose_input_size=tuple(config["pose_estimation"]["pose_input_size"]),
         backend=config["pose_estimation"]["backend"],
         device=config["pose_estimation"]["device"]
     )
-    print(f"✅ RTMPose loaded")
+    print(f"✅ RTMLib Body pipeline loaded")
     print(f"   Backend: {config['pose_estimation']['backend']}")
     print(f"   Device: {config['pose_estimation']['device']}")
     
@@ -144,31 +123,19 @@ def main():
         
         frame_start = time.time()
         
-        # Detect persons
-        det_start = time.time()
-        results = yolo(frame, classes=[0], verbose=False)
-        boxes = []
-        for result in results:
-            for box in result.boxes:
-                conf = box.conf[0].cpu().numpy()
-                if conf >= config["detection"]["confidence_threshold"]:
-                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                    boxes.append([int(x1), int(y1), int(x2), int(y2)])
-        det_time = time.time() - det_start
-        stats["persons_detected"] += len(boxes)
+        # Run detection + pose estimation
+        det_pose_start = time.time()
+        keypoints, scores = body(frame)
+        det_pose_time = time.time() - det_pose_start
         
-        # Estimate poses
+        num_persons = len(keypoints)
+        stats["persons_detected"] += num_persons
+        stats["poses_estimated"] += num_persons
+        
+        # Draw results
         result_frame = frame.copy()
-        if boxes:
-            pose_start = time.time()
-            keypoints, scores = pose_model(frame, boxes)
-            pose_time = time.time() - pose_start
-            stats["poses_estimated"] += len(keypoints)
-            
-            # Draw results
-            for box in boxes:
-                cv2.rectangle(result_frame, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
-            result_frame = draw_skeleton(result_frame, keypoints, scores, kpt_thr=0.3)
+        if num_persons > 0:
+            result_frame = draw_skeleton(result_frame, keypoints, scores, kpt_thr=0.5)
             
             # Save to JSON if requested
             if save_json:
@@ -176,10 +143,9 @@ def main():
                     "frame_id": frame_idx,
                     "persons": []
                 }
-                for i, (box, kpts, scrs) in enumerate(zip(boxes, keypoints, scores)):
+                for i, (kpts, scrs) in enumerate(zip(keypoints, scores)):
                     person_data = {
                         "person_id": i,
-                        "bbox": box,
                         "keypoints": kpts.tolist(),
                         "scores": scrs.tolist()
                     }
