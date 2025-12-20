@@ -1,0 +1,27 @@
+# UDP Video Demo Configuration  
+# Comprehensive testing - processes video with full statistics
+
+# Detection configuration (YOLO)
+detection:
+  model_path: models/yolo/yolov8s.pt  # Small model for balance
+  confidence_threshold: 0.5
+
+# Pose estimation configuration (RTMPose)
+pose_estimation:
+  model_type: rtmpose-l  # Large model for quality
+  backend: onnxruntime
+  device: cuda  # or cpu
+
+# Input - video file
+input:
+  path: demo_data/videos/dance.mp4
+
+# Output
+output:
+  path: demo_data/outputs/video_result.mp4
+  save_json: true  # Export keypoints to JSON
+  json_path: demo_data/outputs/video_keypoints.json
+
+# Processing parameters
+processing:
+  max_frames: 100  # Limit frames for testing (set to null for full video)

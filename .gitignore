@@ -1,0 +1,39 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data and models (downloaded during setup)
+models/
+demo_data/
+outputs/
+*.pth
+*.pt
+*.onnx
+
+# Logs
+*.log
+*.txt
+
+# Temporary files
+temp/
+tmp/

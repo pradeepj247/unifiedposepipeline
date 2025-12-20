@@ -1,0 +1,35 @@
+# ============================================
+# UDP Configuration - ViTPose Demo
+# ============================================
+
+# Detection configuration (YOLO)
+detection:
+  type: yolo
+  model_path: models/yolo/yolov8s.pt
+  confidence_threshold: 0.5
+
+# Pose estimation configuration (ViTPose)
+pose_estimation:
+  type: vitpose
+  model_name: vitpose-b
+  model_path: models/vitpose/vitpose-b-coco.pth
+  config_path: configs/vitpose_b_coco.py
+  dataset: coco  # coco, coco_wholebody, mpii, aic, ap10k, apt36k
+
+# Input configuration
+input:
+  type: auto  # auto, image, video
+  path: demo_data/images/sample.jpg
+
+# Output configuration
+output:
+  path: demo_data/outputs/vitpose_result.jpg
+  draw_bbox: true
+  draw_keypoints: true
+  save_json: false  # Save keypoints as JSON
+
+# Processing parameters
+processing:
+  max_frames: null  # null = all frames, or specify number
+  batch_size: 1
+  device: cuda  # cuda or cpu

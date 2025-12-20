@@ -1,0 +1,34 @@
+# ============================================
+# UDP Configuration - RTMPose Demo
+# ============================================
+
+# Detection configuration (YOLO)
+detection:
+  type: yolo
+  model_path: models/yolo/yolov8s.pt
+  confidence_threshold: 0.5
+
+# Pose estimation configuration (RTMPose)
+pose_estimation:
+  type: rtmlib  # rtmlib or rtmpose (same thing)
+  model_type: rtmpose-l  # rtmpose-m, rtmpose-l, rtmpose-x
+  backend: onnxruntime  # onnxruntime or openvino
+  device: cuda  # cuda or cpu
+
+# Input configuration
+input:
+  type: auto  # auto, image, video
+  path: demo_data/videos/dance.mp4
+
+# Output configuration
+output:
+  path: demo_data/outputs/rtmlib_result.mp4
+  draw_bbox: true
+  draw_keypoints: true
+  save_json: false
+
+# Processing parameters
+processing:
+  max_frames: 100  # Process first 100 frames
+  batch_size: 1
+  device: cuda

@@ -1,0 +1,21 @@
+# UDP Image Demo Configuration
+# Quick verification test - processes single image
+
+# Detection configuration (YOLO)
+detection:
+  model_path: yolov8s.pt  # Will auto-download on first use
+  confidence_threshold: 0.5
+
+# Pose estimation configuration (RTMPose)
+pose_estimation:
+  model_type: rtmpose-m  # Using medium for balance
+  backend: onnxruntime
+  device: cuda  # or cpu
+
+# Input - single image
+input:
+  path: demo_data/images/sample.jpg
+
+# Output
+output:
+  path: demo_data/outputs/image_result.jpg
