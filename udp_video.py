@@ -43,20 +43,41 @@ def main():
     print("UDP VIDEO DEMO - Comprehensive Testing")
     print("🎬" * 35 + "\n")
     
-    # Initialize RTMLib Body (detector + pose estimator)
+    # Stage 1: Initialize YOLO detector
     print("=" * 70)
-    print("📦 Initializing RTMLib Body Pipeline")
+    print("📦 Stage 1: Initializing YOLO Detector")
+    print("=" * 70)
+    from ultralytics import YOLO
+    
+    yolo_config_path = config["detection"]["model_path"]
+    if "/" in yolo_config_path:
+        yolo_filename = yolo_config_path.split("/")[-1]
+    else:
+        yolo_filename = yolo_config_path
+    
+    yolo_path = MODELS_DIR / "yolo" / yolo_filename
+    if not yolo_path.exists():
+        yolo_path = REPO_ROOT / yolo_config_path
+    
+    yolo = YOLO(str(yolo_path))
+    print(f"✅ YOLO loaded: {yolo_path.name}")
+    print(f"   Confidence threshold: {config['detection']['confidence_threshold']}")
+    
+    # Stage 2: Initialize RTMPose (pose only, no detector)
+    print("\n" + "=" * 70)
+    print("📦 Stage 2: Initializing RTMPose Estimator")
     print("=" * 70)
     sys.path.insert(0, str(REPO_ROOT / "lib"))
-    from rtmlib import Body, draw_skeleton
+    from rtmlib.tools import RTMPose
+    from rtmlib import draw_skeleton
     
-    body = Body(
-        pose=config["pose_estimation"]["pose_model_url"],
-        pose_input_size=tuple(config["pose_estimation"]["pose_input_size"]),
+    pose_model = RTMPose(
+        onnx_model=config["pose_estimation"]["pose_model_url"],
+        model_input_size=tuple(config["pose_estimation"]["pose_input_size"]),
         backend=config["pose_estimation"]["backend"],
         device=config["pose_estimation"]["device"]
     )
-    print(f"✅ RTMLib Body pipeline loaded")
+    print(f"✅ RTMPose loaded")
     print(f"   Backend: {config['pose_estimation']['backend']}")
     print(f"   Device: {config['pose_estimation']['device']}")
     
@@ -123,18 +144,32 @@ def main():
         
         frame_start = time.time()
         
-        # Run detection + pose estimation
-        det_pose_start = time.time()
-        keypoints, scores = body(frame)
-        det_pose_time = time.time() - det_pose_start
+        # Stage 1: Detect persons with YOLO
+        det_start = time.time()
+        results = yolo(frame, classes=[0], verbose=False)
+        boxes = []
+        for result in results:
+            for box in result.boxes:
+                if box.conf[0] >= config["detection"]["confidence_threshold"]:
+                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                    boxes.append([int(x1), int(y1), int(x2), int(y2)])
+        det_time = time.time() - det_start
         
-        num_persons = len(keypoints)
+        num_persons = len(boxes)
         stats["persons_detected"] += num_persons
-        stats["poses_estimated"] += num_persons
         
-        # Draw results
+        # Stage 2: Estimate poses with RTMPose
         result_frame = frame.copy()
-        if num_persons > 0:
+        if boxes:
+            pose_start = time.time()
+            keypoints, scores = pose_model(frame, bboxes=boxes)
+            pose_time = time.time() - pose_start
+            stats["poses_estimated"] += len(keypoints)
+            
+            # Draw bounding boxes
+            for box in boxes:
+                cv2.rectangle(result_frame, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+            # Draw skeleton
             result_frame = draw_skeleton(result_frame, keypoints, scores, kpt_thr=0.5)
             
             # Save to JSON if requested
@@ -143,9 +178,10 @@ def main():
                     "frame_id": frame_idx,
                     "persons": []
                 }
-                for i, (kpts, scrs) in enumerate(zip(keypoints, scores)):
+                for i, (box, kpts, scrs) in enumerate(zip(boxes, keypoints, scores)):
                     person_data = {
                         "person_id": i,
+                        "bbox": box,
                         "keypoints": kpts.tolist(),
                         "scores": scrs.tolist()
                     }

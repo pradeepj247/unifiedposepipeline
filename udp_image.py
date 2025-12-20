@@ -40,18 +40,31 @@ def main():
     print("UDP IMAGE DEMO - Quick Verification")
     print("🎯" * 35 + "\n")
     
-    # Initialize RTMLib Body (handles detection + pose)
-    print("📦 Loading RTMLib Body (detector + pose estimator)...")
-    sys.path.insert(0, str(REPO_ROOT / "lib"))
-    from rtmlib import Body, draw_skeleton
+    # Stage 1: Initialize YOLO detector
+    print("📦 Stage 1: Loading YOLO detector...")
+    from ultralytics import YOLO
     
-    body = Body(
-        pose=config["pose_estimation"]["pose_model_url"],
-        pose_input_size=tuple(config["pose_estimation"]["pose_input_size"]),
+    yolo_filename = config["detection"]["model_path"]
+    yolo_path = MODELS_DIR / "yolo" / yolo_filename
+    if not yolo_path.exists():
+        yolo_path = REPO_ROOT / yolo_filename
+    
+    yolo = YOLO(str(yolo_path))
+    print(f"   ✅ Loaded {yolo_path.name}")
+    
+    # Stage 2: Initialize RTMPose (pose only, no detector)
+    print("\n📦 Stage 2: Loading RTMPose estimator...")
+    sys.path.insert(0, str(REPO_ROOT / "lib"))
+    from rtmlib.tools import RTMPose
+    from rtmlib import draw_skeleton
+    
+    pose_model = RTMPose(
+        onnx_model=config["pose_estimation"]["pose_model_url"],
+        model_input_size=tuple(config["pose_estimation"]["pose_input_size"]),
         backend=config["pose_estimation"]["backend"],
         device=config["pose_estimation"]["device"]
     )
-    print(f"   ✅ Loaded RTMLib Body pipeline")
+    print(f"   ✅ Loaded RTMPose")
     
     # Load image
     print("\n📸 Processing image...")
@@ -62,15 +75,31 @@ def main():
         return 1
     print(f"   ✓ Loaded {input_path.name} ({image.shape[1]}x{image.shape[0]})")
     
-    # Run detection + pose estimation
+    # Detect persons with YOLO
     t0 = time.time()
-    keypoints, scores = body(image)
+    results = yolo(image, classes=[0], verbose=False)
+    boxes = []
+    for result in results:
+        for box in result.boxes:
+            if box.conf[0] >= config["detection"]["confidence_threshold"]:
+                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                boxes.append([int(x1), int(y1), int(x2), int(y2)])
     t1 = time.time()
-    print(f"   ✓ Detected and estimated {len(keypoints)} persons ({(t1-t0)*1000:.1f} ms)")
+    print(f"   ✓ Detected {len(boxes)} persons ({(t1-t0)*1000:.1f} ms)")
     
-    # Draw results
-    if len(keypoints) > 0:
+    # Estimate poses with RTMPose
+    if boxes:
+        t2 = time.time()
+        keypoints, scores = pose_model(image, bboxes=boxes)
+        t3 = time.time()
+        print(f"   ✓ Estimated {len(keypoints)} poses ({(t3-t2)*1000:.1f} ms)")
+        
+        # Draw results
         result_image = image.copy()
+        # Draw bounding boxes
+        for box in boxes:
+            cv2.rectangle(result_image, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+        # Draw skeleton
         result_image = draw_skeleton(result_image, keypoints, scores, kpt_thr=0.5)
     else:
         print(f"   ⚠️  No persons detected")
