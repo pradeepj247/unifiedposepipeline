@@ -6,12 +6,23 @@ detection:
   model_path: yolov8s.pt  # Will auto-download on first use
   confidence_threshold: 0.5
 
-# Pose estimation configuration (RTMPose)
+# Pose estimation configuration
 pose_estimation:
-  pose_model_url: https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7_420e-256x192-e48f03d0_20230504.zip
-  pose_input_size: [192, 256]
-  backend: onnxruntime
-  device: cuda  # or cpu
+  method: vitpose  # Options: rtmpose, vitpose
+  
+  # RTMPose settings (used when method=rtmpose)
+  rtmpose:
+    pose_model_url: https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7_420e-256x192-e48f03d0_20230504.zip
+    pose_input_size: [192, 256]
+    backend: onnxruntime
+    device: cuda  # or cpu
+  
+  # ViTPose settings (used when method=vitpose)
+  vitpose:
+    model_path: models/vitpose/vitpose-b.pth
+    model_name: b  # Options: s, b, l, h
+    dataset: coco
+    device: cuda  # or cpu
 
 # Input - single image
 input:

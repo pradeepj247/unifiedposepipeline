@@ -1,11 +1,11 @@
 """
 UDP Image Demo - Quick image processing test
 
-Bare-bones demo for quick verification:
-- Load single image
-- Detect person with YOLO
-- Estimate pose with RTMPose
-- Save annotated result
+Configurable demo supporting multiple pose estimation methods:
+- RTMPose: Fast ONNX-based pose estimation
+- ViTPose: High-accuracy transformer-based pose estimation
+
+Both methods use YOLOv8s for person detection.
 
 Usage:
     python udp_image.py --config configs/udp_image.yaml
@@ -18,13 +18,205 @@ import yaml
 import time
 import cv2
 import numpy as np
+import matplotlib.colors
 
 REPO_ROOT = Path(__file__).parent
 PARENT_DIR = REPO_ROOT.parent
 MODELS_DIR = PARENT_DIR / "models"  # Models stored in parent directory
 
+# COCO skeleton edges (pre-defined for performance)
+COCO_EDGES = [
+    (0, 1), (0, 2), (2, 4), (1, 3), (6, 8), (8, 10),
+    (5, 7), (7, 9), (5, 11), (11, 13), (13, 15), (6, 12),
+    (12, 14), (14, 16), (5, 6), (11, 12)
+]
+
+# Pre-compute rainbow colors for skeleton edges (performance optimization)
+EDGE_COLORS = [
+    tuple([int(c * 255) for c in matplotlib.colors.hsv_to_rgb([i/float(len(COCO_EDGES)), 1.0, 1.0])])
+    for i in range(len(COCO_EDGES))
+]
+
+
+def detect_persons_yolo(image, yolo, confidence_threshold):
+    """
+    Stage 1: Detect persons using YOLOv8s
+    
+    Args:
+        image: Input image (BGR)
+        yolo: YOLO model instance
+        confidence_threshold: Minimum confidence for detection
+    
+    Returns:
+        boxes: List of bounding boxes [[x1, y1, x2, y2], ...]
+        det_time: Detection time in milliseconds
+    """
+    t0 = time.time()
+    results = yolo(image, classes=[0], verbose=False)
+    boxes = []
+    for result in results:
+        for box in result.boxes:
+            if box.conf[0] >= confidence_threshold:
+                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                boxes.append([int(x1), int(y1), int(x2), int(y2)])
+    det_time = (time.time() - t0) * 1000
+    return boxes, det_time
+
+
+def estimate_poses_rtmpose(image, boxes, config):
+    """
+    Stage 2a: Estimate poses using RTMPose
+    
+    Args:
+        image: Input image (BGR)
+        boxes: List of bounding boxes from detection
+        config: RTMPose configuration dict
+    
+    Returns:
+        keypoints: Array of keypoints (N x 17 x 2)
+        scores: Array of confidence scores (N x 17)
+        pose_time: Pose estimation time in milliseconds
+    """
+    sys.path.insert(0, str(REPO_ROOT / "lib"))
+    from rtmlib.tools import RTMPose
+    
+    # Initialize RTMPose
+    pose_model = RTMPose(
+        onnx_model=config["pose_model_url"],
+        model_input_size=tuple(config["pose_input_size"]),
+        backend=config["backend"],
+        device=config["device"]
+    )
+    
+    # Run pose estimation
+    t0 = time.time()
+    keypoints, scores = pose_model(image, bboxes=boxes)
+    pose_time = (time.time() - t0) * 1000
+    
+    return keypoints, scores, pose_time
+
+
+def estimate_poses_vitpose(image, boxes, config):
+    """
+    Stage 2b: Estimate poses using ViTPose
+    
+    Args:
+        image: Input image (BGR)
+        boxes: List of bounding boxes from detection
+        config: ViTPose configuration dict
+    
+    Returns:
+        keypoints: Array of keypoints (N x 17 x 3) - last dim is confidence
+        scores: Array of confidence scores (N x 17)
+        pose_time: Pose estimation time in milliseconds
+    """
+    sys.path.insert(0, str(REPO_ROOT / "lib"))
+    from vitpose.pose_only import VitPoseOnly
+    
+    # Initialize ViTPose
+    model_path = PARENT_DIR / config["model_path"]
+    pose_model = VitPoseOnly(
+        model=str(model_path),
+        model_name=config["model_name"],
+        dataset=config["dataset"],
+        device=config["device"]
+    )
+    
+    # Convert BGR to RGB for ViTPose
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # Run pose estimation for each bbox
+    t0 = time.time()
+    all_keypoints = []
+    all_scores = []
+    
+    for bbox in boxes:
+        kpts = pose_model.inference_bbox(image_rgb, bbox)
+        if len(kpts) > 0:
+            # ViTPose returns (17, 3) with [y, x, conf]
+            # Convert to (17, 2) [x, y] and separate scores
+            keypoints_xy = np.stack([kpts[:, 1], kpts[:, 0]], axis=1)  # Swap to [x, y]
+            scores = kpts[:, 2]
+            all_keypoints.append(keypoints_xy)
+            all_scores.append(scores)
+    
+    pose_time = (time.time() - t0) * 1000
+    
+    if all_keypoints:
+        keypoints = np.array(all_keypoints)
+        scores = np.array(all_scores)
+    else:
+        keypoints = np.array([])
+        scores = np.array([])
+    
+    return keypoints, scores, pose_time
+
+
+def draw_skeleton_unified(image, keypoints, scores, kpt_thr=0.5):
+    """
+    Unified colorful skeleton drawing for both RTMPose and ViTPose
+    
+    Args:
+        image: Input image (BGR)
+        keypoints: Array of keypoints (N x 17 x 2) in [x, y] format
+        scores: Array of confidence scores (N x 17)
+        kpt_thr: Confidence threshold for drawing
+    
+    Returns:
+        result_image: Annotated image with colorful skeleton
+    """
+    result_image = image.copy()
+    
+    for kpts, scrs in zip(keypoints, scores):
+        # Draw skeleton lines first (so keypoints are on top)
+        for ie, (start_idx, end_idx) in enumerate(COCO_EDGES):
+            if scrs[start_idx] > kpt_thr and scrs[end_idx] > kpt_thr:
+                cv2.line(result_image, 
+                       (int(kpts[start_idx, 0]), int(kpts[start_idx, 1])),
+                       (int(kpts[end_idx, 0]), int(kpts[end_idx, 1])),
+                       EDGE_COLORS[ie], 2, lineType=cv2.LINE_AA)
+        
+        # Draw keypoints (circles) on top
+        for p in range(len(kpts)):
+            if scrs[p] > kpt_thr:
+                cv2.circle(result_image, 
+                         (int(kpts[p, 0]), int(kpts[p, 1])), 
+                         4, (0, 0, 255), thickness=-1, lineType=cv2.FILLED)
+    
+    return result_image
+
+
+def draw_results(image, boxes, keypoints, scores, method, draw_bbox=True):
+    """
+    Draw detection boxes and pose keypoints on image
+    
+    Args:
+        image: Input image (BGR)
+        boxes: List of bounding boxes
+        keypoints: Array of keypoints
+        scores: Array of confidence scores
+        method: Pose estimation method used (for display only)
+        draw_bbox: Whether to draw bounding boxes
+    
+    Returns:
+        result_image: Annotated image
+    """
+    result_image = image.copy()
+    
+    # Draw bounding boxes (optional)
+    if draw_bbox:
+        for box in boxes:
+            cv2.rectangle(result_image, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+    
+    # Draw skeleton (unified colorful visualization)
+    if len(keypoints) > 0:
+        result_image = draw_skeleton_unified(result_image, keypoints, scores, kpt_thr=0.5)
+    
+    return result_image
+
+
 def main():
-    parser = argparse.ArgumentParser(description="UDP Image Demo - Quick verification")
+    parser = argparse.ArgumentParser(description="UDP Image Demo - Configurable pose estimation")
     parser.add_argument("--config", type=str, required=True, help="Path to YAML config")
     args = parser.parse_args()
     
@@ -36,8 +228,11 @@ def main():
     with open(config_file, 'r') as f:
         config = yaml.safe_load(f)
     
+    # Get method with default fallback
+    method = config.get("pose_estimation", {}).get("method", "rtmpose")
+    
     print("\n" + "🎯" * 35)
-    print("UDP IMAGE DEMO - Quick Verification")
+    print(f"UDP IMAGE DEMO - {method.upper()} Mode")
     print("🎯" * 35 + "\n")
     
     # Stage 1: Initialize YOLO detector
@@ -52,19 +247,14 @@ def main():
     yolo = YOLO(str(yolo_path))
     print(f"   ✅ Loaded {yolo_path.name}")
     
-    # Stage 2: Initialize RTMPose (pose only, no detector)
-    print("\n📦 Stage 2: Loading RTMPose estimator...")
-    sys.path.insert(0, str(REPO_ROOT / "lib"))
-    from rtmlib.tools import RTMPose
-    from rtmlib import draw_skeleton
-    
-    pose_model = RTMPose(
-        onnx_model=config["pose_estimation"]["pose_model_url"],
-        model_input_size=tuple(config["pose_estimation"]["pose_input_size"]),
-        backend=config["pose_estimation"]["backend"],
-        device=config["pose_estimation"]["device"]
-    )
-    print(f"   ✅ Loaded RTMPose")
+    # Stage 2: Initialize pose estimator
+    print(f"\n📦 Stage 2: Loading {method.upper()} pose estimator...")
+    if method == "rtmpose":
+        print(f"   Model: RTMPose-M (ONNX)")
+    elif method == "vitpose":
+        vitpose_cfg = config["pose_estimation"]["vitpose"]
+        print(f"   Model: ViTPose-{vitpose_cfg['model_name'].upper()} (PyTorch)")
+    print(f"   ✅ Pose estimator ready")
     
     # Load image
     print("\n📸 Processing image...")
@@ -76,31 +266,29 @@ def main():
     print(f"   ✓ Loaded {input_path.name} ({image.shape[1]}x{image.shape[0]})")
     
     # Detect persons with YOLO
-    t0 = time.time()
-    results = yolo(image, classes=[0], verbose=False)
-    boxes = []
-    for result in results:
-        for box in result.boxes:
-            if box.conf[0] >= config["detection"]["confidence_threshold"]:
-                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                boxes.append([int(x1), int(y1), int(x2), int(y2)])
-    t1 = time.time()
-    print(f"   ✓ Detected {len(boxes)} persons ({(t1-t0)*1000:.1f} ms)")
+    boxes, det_time = detect_persons_yolo(
+        image, yolo, config["detection"]["confidence_threshold"]
+    )
+    print(f"   ✓ Detected {len(boxes)} persons ({det_time:.1f} ms)")
     
-    # Estimate poses with RTMPose
+    # Estimate poses
     if boxes:
-        t2 = time.time()
-        keypoints, scores = pose_model(image, bboxes=boxes)
-        t3 = time.time()
-        print(f"   ✓ Estimated {len(keypoints)} poses ({(t3-t2)*1000:.1f} ms)")
+        if method == "rtmpose":
+            keypoints, scores, pose_time = estimate_poses_rtmpose(
+                image, boxes, config["pose_estimation"]["rtmpose"]
+            )
+        elif method == "vitpose":
+            keypoints, scores, pose_time = estimate_poses_vitpose(
+                image, boxes, config["pose_estimation"]["vitpose"]
+            )
+        else:
+            print(f"   ❌ Unknown method: {method}")
+            return 1
+        
+        print(f"   ✓ Estimated {len(keypoints)} poses ({pose_time:.1f} ms)")
         
         # Draw results
-        result_image = image.copy()
-        # Draw bounding boxes
-        for box in boxes:
-            cv2.rectangle(result_image, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
-        # Draw skeleton
-        result_image = draw_skeleton(result_image, keypoints, scores, kpt_thr=0.5)
+        result_image = draw_results(image, boxes, keypoints, scores, method)
     else:
         print(f"   ⚠️  No persons detected")
         result_image = image.copy()
@@ -110,9 +298,10 @@ def main():
     output_path.parent.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(output_path), result_image)
     print(f"\n✅ Saved result: {output_path}")
-    print(f"   Total time: {(time.time()-t0):.2f}s\n")
+    print(f"   Total time: {(det_time + (pose_time if boxes else 0)) / 1000:.2f}s\n")
     
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
