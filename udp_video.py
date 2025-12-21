@@ -491,7 +491,10 @@ def main():
             backend=config["pose_estimation"]["rtmpose"]["backend"],
             device=config["pose_estimation"]["rtmpose"]["device"]
         )
-        print(f"   ✅ RTMPose-M loaded")
+        # Extract model size from input resolution
+        input_size = config["pose_estimation"]["rtmpose"]["pose_input_size"]
+        model_size = "L" if input_size[0] >= 288 else "M" if input_size[0] >= 256 else "S"
+        print(f"   ✅ RTMPose-{model_size} loaded ({input_size[0]}×{input_size[1]})")
     elif method == "vitpose":
         from vitpose.pose_only import VitPoseOnly
         model_path = PARENT_DIR / config["pose_estimation"]["vitpose"]["model_path"]

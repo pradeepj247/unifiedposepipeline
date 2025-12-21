@@ -250,7 +250,10 @@ def main():
     # Stage 2: Initialize pose estimator
     print(f"\n📦 Stage 2: Loading {method.upper()} pose estimator...")
     if method == "rtmpose":
-        print(f"   Model: RTMPose-M (ONNX)")
+        rtm_cfg = config["pose_estimation"]["rtmpose"]
+        input_size = rtm_cfg["pose_input_size"]
+        model_size = "L" if input_size[0] >= 288 else "M" if input_size[0] >= 256 else "S"
+        print(f"   Model: RTMPose-{model_size} ({input_size[0]}×{input_size[1]}, ONNX)")
     elif method == "vitpose":
         vitpose_cfg = config["pose_estimation"]["vitpose"]
         print(f"   Model: ViTPose-{vitpose_cfg['model_name'].upper()} (PyTorch)")
