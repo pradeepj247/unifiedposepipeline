@@ -57,8 +57,6 @@ def verify_imports() -> Tuple[bool, List[Dict]]:
         ("PIL", "Pillow", True),
         # Detection
         ("ultralytics", "Ultralytics/YOLO", True),
-        # Pose Estimation
-        ("rtmlib", "RTMLib", True),
         # ONNX
         ("onnx", "ONNX", False),
         ("onnxruntime", "ONNX Runtime", True),
@@ -98,6 +96,15 @@ def verify_imports() -> Tuple[bool, List[Dict]]:
             "critical": is_critical,
             "success": success,
         })
+    
+    # Check local RTMLib copy (not a pip package)
+    print("\n   📦 Checking local libraries...")
+    rtmlib_path = LIB_DIR / "rtmlib"
+    if rtmlib_path.exists() and (rtmlib_path / "__init__.py").exists():
+        print(f"   ✅ {'RTMLib':25} local copy (lib/rtmlib/)")
+    else:
+        print(f"   ❌ {'RTMLib':25} NOT FOUND (expected at lib/rtmlib/)")
+        all_critical_ok = False
     
     return all_critical_ok, results
 
@@ -356,14 +363,20 @@ def run_functional_test() -> bool:
         print(f"      ❌ YOLO test failed: {e}")
         all_ok = False
     
-    # Test RTMLib
+    # Test RTMLib (local copy)
     print("\n   🔬 Testing RTMLib...")
     try:
-        import rtmlib
-        print(f"      ✅ RTMLib import successful")
+        # Add lib directory to path and import from local copy
+        sys.path.insert(0, str(LIB_DIR))
+        from rtmlib.tools import RTMPose
+        print(f"      ✅ RTMLib import successful (from lib/rtmlib/)")
     except Exception as e:
         print(f"      ❌ RTMLib test failed: {e}")
         all_ok = False
+    finally:
+        # Remove from path to avoid side effects
+        if str(LIB_DIR) in sys.path:
+            sys.path.remove(str(LIB_DIR))
     
     return all_ok
 

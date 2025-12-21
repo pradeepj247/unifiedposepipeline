@@ -360,7 +360,6 @@ def step_9_verify_installation():
         ("torch", "PyTorch"),
         ("cv2", "OpenCV"),
         ("ultralytics", "Ultralytics/YOLO"),
-        ("rtmlib", "RTMLib"),
         ("onnxruntime", "ONNX Runtime"),
     ]
     
@@ -374,6 +373,27 @@ def step_9_verify_installation():
         except ImportError:
             print(f"   ❌ {display_name:20} NOT FOUND")
             all_ok = False
+    
+    # Check local RTMLib copy
+    rtmlib_path = REPO_ROOT / "lib" / "rtmlib"
+    if rtmlib_path.exists() and (rtmlib_path / "__init__.py").exists():
+        try:
+            version_file = rtmlib_path / "version.py"
+            if version_file.exists():
+                # Read version from version.py
+                version_content = version_file.read_text()
+                if "__version__" in version_content:
+                    version = "local copy"
+                else:
+                    version = "local copy"
+            else:
+                version = "local copy"
+            print(f"   ✅ {'RTMLib':20} {version} (lib/rtmlib/)")
+        except Exception:
+            print(f"   ✅ {'RTMLib':20} local copy (lib/rtmlib/)")
+    else:
+        print(f"   ❌ {'RTMLib':20} NOT FOUND (expected at lib/rtmlib/)")
+        all_ok = False
     
     if not all_ok:
         print("\n⚠️  Some imports failed - check errors above")
