@@ -162,11 +162,14 @@ def step_4_install_pose_estimation():
     """Step 4: Install pose estimation frameworks"""
     print_step(4, 9, "Installing Pose Estimation Frameworks")
     
-    # Note: RTMLib is used from local copy in lib/rtmlib/ (sys.path.insert prioritizes it)
-    # No pip install needed - local copy has all required code
+    # RTMLib
+    print("📦 Installing RTMLib...")
+    if run_command('pip install "rtmlib>=0.0.6"', "Failed to install RTMLib") != 0:
+        sys.exit(1)
+    print("✅ RTMLib installed")
     
     # ONNX and ONNX Runtime
-    print("📦 Installing ONNX and ONNX Runtime GPU...")
+    print("\n📦 Installing ONNX and ONNX Runtime GPU...")
     # Install ONNX first
     if run_command('pip install "onnx>=1.12.0"') != 0:
         print("⚠️  ONNX install warning (non-critical)")
@@ -200,46 +203,14 @@ def step_5_install_tracking():
     print("ℹ️  BoxMOT skipped due to compatibility issues (not needed for basic demos)")
 
 
-def step_6_install_motionagformer_deps():
-    """Step 6: Install MotionAGFormer dependencies"""
-    print_step(6, 10, "Installing MotionAGFormer Dependencies")
-    
-    # Note: MotionAGFormer model code is in lib/motionagformer/ (local copy)
-    
-    packages = [
-        '"timm>=0.9.0"',       # Vision transformers (avoid 0.6.11 - Python 3.10+ issues)
-        'easydict',            # Easy dictionary access
-        'yacs',                # Configuration system
-        'gdown',               # Google Drive downloads
-        'numba',               # JIT compilation for speed
-        'scikit-image',        # Image processing
-    ]
-    
-    print("📦 Installing MotionAGFormer packages...")
-    packages_str = ' '.join(packages)
-    if run_command(f"pip install {packages_str}") != 0:
-        print("⚠️  Some packages failed (non-critical - will retry later)")
-    else:
-        print("✅ MotionAGFormer dependencies installed")
-    
-    # Optional packages (can fail without breaking)
-    optional = ['wandb', 'torchprofile']
-    print("\n📦 Installing optional packages (logging/profiling)...")
-    if run_command(f"pip install {' '.join(optional)}") != 0:
-        print("ℹ️  Optional packages skipped (not needed for inference)")
-    else:
-        print("✅ Optional packages installed")
-
-
-def step_7_setup_directories():
-    """Step 7: Create directory structure"""
-    print_step(7, 10, "Setting Up Directory Structure")
+def step_6_setup_directories():
+    """Step 6: Create directory structure"""
+    print_step(6, 9, "Setting Up Directory Structure")
     
     dirs = [
         MODELS_DIR / "yolo",
         MODELS_DIR / "vitpose",
         MODELS_DIR / "rtmlib",
-        MODELS_DIR / "motionagformer",
         DEMO_DATA_DIR / "videos",
         DEMO_DATA_DIR / "images",
         DEMO_DATA_DIR / "outputs",
@@ -258,9 +229,9 @@ def step_7_setup_directories():
     print("✅ Directory structure created")
 
 
-def step_8_download_models(drive_mounted: bool):
-    """Step 8: Download/copy models"""
-    print_step(8, 10, "Downloading Models")
+def step_7_download_models(drive_mounted: bool):
+    """Step 7: Download/copy models"""
+    print_step(7, 9, "Downloading Models")
     
     # YOLO models
     print("\n📦 Downloading YOLO model...")
@@ -340,42 +311,16 @@ def step_8_download_models(drive_mounted: bool):
                 else:
                     print(f"   ✓ {model_file.name} already exists")
     
-    # MotionAGFormer checkpoint
-    print("\n📦 Downloading MotionAGFormer checkpoint...")
-    magf_dir = MODELS_DIR / "motionagformer"
-    magf_checkpoint = magf_dir / "motionagformer-base-h36m.pth.tr"
-    
-    if magf_checkpoint.exists():
-        size_mb = magf_checkpoint.stat().st_size / (1024 ** 2)
-        print(f"   ✓ motionagformer-base-h36m.pth.tr already exists ({size_mb:.1f} MB)")
-    else:
-        print(f"   ⬇️  Downloading MotionAGFormer-Base checkpoint (~200 MB)...")
-        print(f"   📥 Using gdown for Google Drive download...")
-        
-        # Google Drive file ID for MotionAGFormer-Base H36M
-        gdown_id = "1Iii5EwsFFm9_9lKBUPfN8bV5LmfkNUMP"
-        
-        if run_command(f'gdown {gdown_id} -O "{magf_checkpoint}"') == 0:
-            if magf_checkpoint.exists():
-                size_mb = magf_checkpoint.stat().st_size / (1024 ** 2)
-                print(f"   ✅ Downloaded motionagformer-base-h36m.pth.tr ({size_mb:.1f} MB)")
-            else:
-                print(f"   ❌ Download completed but file not found")
-        else:
-            print(f"   ❌ Download failed - you may need to download manually:")
-            print(f"      URL: https://drive.google.com/file/d/1Iii5EwsFFm9_9lKBUPfN8bV5LmfkNUMP/view")
-            print(f"      Save to: {magf_checkpoint}")
-    
-    # RTMLib models (auto-download note)
+    # RTMLib models
     print("\n📦 RTMLib Models:")
     print("   ✅ Will be downloaded automatically on first use")
     
     print("\n✅ Models setup complete")
 
 
-def step_9_setup_demo_data(drive_mounted: bool):
-    """Step 9: Setup demo data"""
-    print_step(9, 10, "Setting Up Demo Data")
+def step_8_setup_demo_data(drive_mounted: bool):
+    """Step 8: Setup demo data"""
+    print_step(8, 9, "Setting Up Demo Data")
     
     # Copy from Drive if available
     if drive_mounted and DRIVE_DEMO_DATA_PATH.exists():
@@ -410,14 +355,15 @@ def step_9_setup_demo_data(drive_mounted: bool):
     print("✅ Demo data setup complete")
 
 
-def step_10_verify_installation():
-    """Step 10: Verify installation"""
-    print_step(10, 10, "Verifying Installation")
+def step_9_verify_installation():
+    """Step 9: Verify installation"""
+    print_step(9, 9, "Verifying Installation")
     
     imports_to_check = [
         ("torch", "PyTorch"),
         ("cv2", "OpenCV"),
         ("ultralytics", "Ultralytics/YOLO"),
+        ("rtmlib", "RTMLib"),
         ("onnxruntime", "ONNX Runtime"),
     ]
     
@@ -431,27 +377,6 @@ def step_10_verify_installation():
         except ImportError:
             print(f"   ❌ {display_name:20} NOT FOUND")
             all_ok = False
-    
-    # Check local RTMLib copy
-    rtmlib_path = REPO_ROOT / "lib" / "rtmlib"
-    if rtmlib_path.exists() and (rtmlib_path / "__init__.py").exists():
-        try:
-            version_file = rtmlib_path / "version.py"
-            if version_file.exists():
-                # Read version from version.py
-                version_content = version_file.read_text()
-                if "__version__" in version_content:
-                    version = "local copy"
-                else:
-                    version = "local copy"
-            else:
-                version = "local copy"
-            print(f"   ✅ {'RTMLib':20} {version} (lib/rtmlib/)")
-        except Exception:
-            print(f"   ✅ {'RTMLib':20} local copy (lib/rtmlib/)")
-    else:
-        print(f"   ❌ {'RTMLib':20} NOT FOUND (expected at lib/rtmlib/)")
-        all_ok = False
     
     if not all_ok:
         print("\n⚠️  Some imports failed - check errors above")
@@ -491,11 +416,10 @@ def main():
         step_3_install_cv_and_detection()
         step_4_install_pose_estimation()
         step_5_install_tracking()
-        step_6_install_motionagformer_deps()
-        step_7_setup_directories()
-        step_8_download_models(drive_mounted)
-        step_9_setup_demo_data(drive_mounted)
-        step_10_verify_installation()
+        step_6_setup_directories()
+        step_7_download_models(drive_mounted)
+        step_8_setup_demo_data(drive_mounted)
+        step_9_verify_installation()
         
         # Success message
         print("\n" + "=" * 70)
@@ -504,12 +428,10 @@ def main():
         print("\n📚 Next Steps:")
         print("   1. Run: python verify_unified.py (comprehensive verification)")
         print("   2. Run: python udp_image.py --config configs/udp_image.yaml (quick test)")
-        print("   3. Run: python udp_video.py --config configs/udp_video.yaml (2D pose)")
-        print("   4. Run: python udp_3d_lifting.py (3D pose from 2D keypoints)")
+        print("   3. Run: python udp_video.py --config configs/udp_video.yaml (full test)")
         print("\n💡 Quick Commands:")
         print("   python udp_image.py --config configs/udp_image.yaml")
         print("   python udp_video.py --config configs/udp_video.yaml")
-        print("   python udp_3d_lifting.py --keypoints demo_data/outputs/stage2_keypoints.npz")
         print("\n")
         
         return 0
