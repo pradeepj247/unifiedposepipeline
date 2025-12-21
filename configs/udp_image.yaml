@@ -8,12 +8,19 @@ detection:
 
 # Pose estimation configuration
 pose_estimation:
-  method: vitpose  # Options: rtmpose, vitpose
+  method: vitpose  # Options: rtmpose, rtmpose_halpe26, vitpose
   
   # RTMPose settings (used when method=rtmpose)
   rtmpose:
     pose_model_url: https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7_420e-256x192-e48f03d0_20230504.zip
     pose_input_size: [192, 256]
+    backend: onnxruntime
+    device: cuda  # or cpu
+  
+  # RTMPose Halpe26 settings (used when method=rtmpose_halpe26) - 26 keypoints
+  rtmpose_halpe26:
+    pose_model_url: https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-l_simcc-body7_pt-body7-halpe26_700e-384x288-734182ce_20230605.zip
+    pose_input_size: [288, 384]
     backend: onnxruntime
     device: cuda  # or cpu
   

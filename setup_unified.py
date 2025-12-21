@@ -406,7 +406,7 @@ def main():
         print("🎉 SETUP COMPLETE!")
         print("=" * 70)
         print("\n📚 Next Steps:")
-        print("   1. Run: python verify.py (comprehensive verification)")
+        print("   1. Run: python verify_unified.py (comprehensive verification)")
         print("   2. Run: python udp_image.py --config configs/udp_image.yaml (quick test)")
         print("   3. Run: python udp_video.py --config configs/udp_video.yaml (full test)")
         print("\n💡 Quick Commands:")

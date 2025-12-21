@@ -33,21 +33,20 @@ COCO_EDGES = [
 
 # Halpe26 skeleton edges (26 keypoints)
 # Based on: https://github.com/Fang-Haoshu/Halpe-FullBody/
-# 0-16: COCO body keypoints, 17-22: feet, 23-25: head/neck/pelvis
+# 0-16: COCO body, 17-19: head/neck/hip, 20-25: feet
 HALPE26_EDGES = [
     # COCO body connections (0-16)
     (0, 1), (0, 2), (1, 3), (2, 4),  # Head
     (5, 6), (5, 7), (7, 9), (6, 8), (8, 10),  # Arms
     (5, 11), (6, 12), (11, 12),  # Torso
     (11, 13), (13, 15), (12, 14), (14, 16),  # Legs
-    # Feet connections (17-22) - forming triangles
-    (15, 17), (15, 18), (17, 18),  # Left foot triangle: ankle-big_toe-small_toe
-    (15, 19),  # Left heel
-    (16, 20), (16, 21), (20, 21),  # Right foot triangle: ankle-big_toe-small_toe
-    (16, 22),  # Right heel
-    # Additional keypoints (23-25): Head_top, Neck, Pelvis
-    (0, 23), (23, 24), (24, 25),  # Head_top -> Neck -> Pelvis
-    (5, 24), (6, 24)  # Shoulders to Neck
+    # Right foot connections (from ankle 16)
+    (16, 21), (16, 23), (16, 25),  # RAnkle to RBigToe, RSmallToe, RHeel
+    # Left foot connections (from ankle 15)
+    (15, 20), (15, 22), (15, 24),  # LAnkle to LBigToe, LSmallToe, LHeel
+    # Body chain connections
+    (17, 18),  # Head to Neck
+    (18, 19),  # Neck to Hip/Pelvis
 ]
 
 
@@ -265,7 +264,7 @@ def stage2_estimate_poses_rtmpose_halpe26(video_path, detections_path, config, m
     Args:
         video_path: Path to input video
         detections_path: Path to Stage 1 NPZ file
-        config: Pose config dict
+        config: Full config dict
         max_frames: Maximum frames to process
         pose_model: Pre-initialized RTMPose Halpe26 model
     
@@ -680,7 +679,7 @@ def main():
         )
     elif method == "rtmpose_halpe26":
         keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_rtmpose_halpe26(
-            video_path, detections_path, config["pose_estimation"]["rtmpose_halpe26"], max_frames, pose_model
+            video_path, detections_path, config, max_frames, pose_model
         )
     elif method == "vitpose":
         keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_vitpose(

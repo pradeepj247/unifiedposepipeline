@@ -17,8 +17,9 @@ from typing import Dict, List, Tuple
 # Configuration
 # ============================================
 REPO_ROOT = Path(__file__).parent
+PARENT_DIR = REPO_ROOT.parent
 LIB_DIR = REPO_ROOT / "lib"
-MODELS_DIR = REPO_ROOT / "models"
+MODELS_DIR = PARENT_DIR / "models"  # Models stored one level up
 DEMO_DATA_DIR = REPO_ROOT / "demo_data"
 CONFIGS_DIR = REPO_ROOT / "configs"
 
@@ -286,7 +287,7 @@ def verify_directory_structure() -> bool:
     
     required_dirs = [
         ("lib", LIB_DIR),
-        ("models", MODELS_DIR),
+        ("models (parent dir)", MODELS_DIR),
         ("models/yolo", MODELS_DIR / "yolo"),
         ("models/vitpose", MODELS_DIR / "vitpose"),
         ("models/rtmlib", MODELS_DIR / "rtmlib"),
@@ -417,9 +418,9 @@ def main():
         print("=" * 70)
         print("\n📝 Recommendations:")
         if not results["imports_ok"]:
-            print("   - Re-run setup_unified.py to install missing packages")
+            print("   - Run: python setup_unified.py")
         if not results["models_ok"]:
-            print("   - Download required model files")
+            print("   - Run: python setup_unified.py (downloads models)")
         if not results["configs_ok"]:
             print("   - Create configuration files in configs/ directory")
         print()

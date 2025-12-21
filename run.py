@@ -40,7 +40,7 @@ def main():
     # Verify
     elif command == "verify":
         print("🔍 Running verification...")
-        return run_command([sys.executable, "verify.py"])
+        return run_command([sys.executable, "verify_unified.py"])
     
     # Demo
     elif command == "demo":
