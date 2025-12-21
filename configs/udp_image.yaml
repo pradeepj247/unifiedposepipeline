@@ -13,14 +13,14 @@ pose_estimation:
   # RTMPose settings (used when method=rtmpose)
   rtmpose:
     pose_model_path: models/rtmlib/rtmpose-l-coco-384x288.onnx
-    pose_input_size: [384, 288]
+    pose_input_size: [288, 384]
     backend: onnxruntime
     device: cuda  # or cpu
   
   # RTMPose Halpe26 settings (used when method=rtmpose_halpe26) - 26 keypoints
   rtmpose_halpe26:
     pose_model_path: models/rtmlib/rtmpose-l-halpe26-384x288.onnx
-    pose_input_size: [384, 288]
+    pose_input_size: [288, 384]
     backend: onnxruntime
     device: cuda  # or cpu
   
