@@ -282,8 +282,8 @@ def step_7_download_models(drive_mounted: bool):
     print("\n📦 Downloading RTMPose ONNX models...")
     rtmlib_dir = MODELS_DIR / "rtmlib"
     rtmpose_models = {
-        "rtmpose-l-coco-384x288.onnx": "https://github.com/pradeepj247/stage3hybrik/releases/download/v1.0-models/rtmpose-l-coco-384x288.onnx",
-        "rtmpose-l-halpe26-384x288.onnx": "https://github.com/pradeepj247/stage3hybrik/releases/download/v1.0-models/rtmpose-l-halpe26-384x288.onnx",
+        "rtmpose-l-coco-384x288.onnx": "https://github.com/pradeepj247/unifiedposepipeline/releases/download/v1.0.0/rtmpose-l-coco-384x288.onnx",
+        "rtmpose-l-halpe26-384x288.onnx": "https://github.com/pradeepj247/unifiedposepipeline/releases/download/v1.0.0/rtmpose-l-halpe26-384x288.onnx",
     }
     
     for model_name, url in rtmpose_models.items():

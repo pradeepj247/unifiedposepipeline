@@ -104,7 +104,7 @@ print("\n✅ Downloads complete!")
 
 ### Step 3: Create GitHub Release
 
-1. Go to: https://github.com/pradeepj247/stage3hybrik/releases
+1. Go to: https://github.com/pradeepj247/unifiedposepipeline/releases
 2. Click **"Create a new release"**
 3. Fill in release details:
    - **Tag**: `v1.0-models`
@@ -129,8 +129,8 @@ print("\n✅ Downloads complete!")
 ## ✅ Verification
 
 After creating the release, the URLs will be:
-- `https://github.com/pradeepj247/stage3hybrik/releases/download/v1.0-models/rtmpose-l-coco-384x288.onnx`
-- `https://github.com/pradeepj247/stage3hybrik/releases/download/v1.0-models/rtmpose-l-halpe26-384x288.onnx`
+- `https://github.com/pradeepj247/unifiedposepipeline/releases/download/v1.0.0/rtmpose-l-coco-384x288.onnx`
+- `https://github.com/pradeepj247/unifiedposepipeline/releases/download/v1.0.0/rtmpose-l-halpe26-384x288.onnx`
 
 These URLs are already configured in `setup_unified.py`!
 

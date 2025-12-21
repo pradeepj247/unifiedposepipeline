@@ -23,7 +23,7 @@ These ONNX models have been extracted from the official OpenMMLab RTMPose releas
 ## 🚀 How to Create GitHub Release
 
 ### Step 1: Go to GitHub Releases
-Visit: https://github.com/pradeepj247/stage3hybrik/releases
+Visit: https://github.com/pradeepj247/unifiedposepipeline/releases
 
 ### Step 2: Create New Release
 Click **"Draft a new release"** or **"Create a new release"**
@@ -91,8 +91,8 @@ Click **"Publish release"**
 
 The download URLs will be:
 ```
-https://github.com/pradeepj247/stage3hybrik/releases/download/v1.0-models/rtmpose-l-coco-384x288.onnx
-https://github.com/pradeepj247/stage3hybrik/releases/download/v1.0-models/rtmpose-l-halpe26-384x288.onnx
+https://github.com/pradeepj247/unifiedposepipeline/releases/download/v1.0.0/rtmpose-l-coco-384x288.onnx
+https://github.com/pradeepj247/unifiedposepipeline/releases/download/v1.0.0/rtmpose-l-halpe26-384x288.onnx
 ```
 
 These URLs are already configured in `setup_unified.py`! ✨
