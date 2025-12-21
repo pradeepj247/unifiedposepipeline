@@ -162,14 +162,11 @@ def step_4_install_pose_estimation():
     """Step 4: Install pose estimation frameworks"""
     print_step(4, 9, "Installing Pose Estimation Frameworks")
     
-    # RTMLib
-    print("📦 Installing RTMLib...")
-    if run_command('pip install "rtmlib>=0.0.6"', "Failed to install RTMLib") != 0:
-        sys.exit(1)
-    print("✅ RTMLib installed")
+    # Note: RTMLib is used from local copy in lib/rtmlib/ (sys.path.insert prioritizes it)
+    # No pip install needed - local copy has all required code
     
     # ONNX and ONNX Runtime
-    print("\n📦 Installing ONNX and ONNX Runtime GPU...")
+    print("📦 Installing ONNX and ONNX Runtime GPU...")
     # Install ONNX first
     if run_command('pip install "onnx>=1.12.0"') != 0:
         print("⚠️  ONNX install warning (non-critical)")
