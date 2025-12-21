@@ -33,19 +33,21 @@ COCO_EDGES = [
 
 # Halpe26 skeleton edges (26 keypoints)
 # Based on: https://github.com/Fang-Haoshu/Halpe-FullBody/
-# 0-16: COCO body keypoints, 17-22: feet, 23-25: neck/pelvis
+# 0-16: COCO body keypoints, 17-22: feet, 23-25: head/neck/pelvis
 HALPE26_EDGES = [
     # COCO body connections (0-16)
     (0, 1), (0, 2), (1, 3), (2, 4),  # Head
     (5, 6), (5, 7), (7, 9), (6, 8), (8, 10),  # Arms
     (5, 11), (6, 12), (11, 12),  # Torso
     (11, 13), (13, 15), (12, 14), (14, 16),  # Legs
-    # Feet connections (17-22)
-    (15, 17), (15, 18), (15, 19),  # Left foot
-    (16, 20), (16, 21), (16, 22),  # Right foot
-    # Additional body connections (23-25)
-    (0, 23), (23, 24), (24, 25),  # Neck to pelvis
-    (11, 24), (12, 24)  # Pelvis to hips
+    # Feet connections (17-22) - forming triangles
+    (15, 17), (15, 18), (17, 18),  # Left foot triangle: ankle-big_toe-small_toe
+    (15, 19),  # Left heel
+    (16, 20), (16, 21), (20, 21),  # Right foot triangle: ankle-big_toe-small_toe
+    (16, 22),  # Right heel
+    # Additional keypoints (23-25): Head_top, Neck, Pelvis
+    (0, 23), (23, 24), (24, 25),  # Head_top -> Neck -> Pelvis
+    (5, 24), (6, 24)  # Shoulders to Neck
 ]
 
 
