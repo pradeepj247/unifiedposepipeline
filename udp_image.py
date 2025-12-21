@@ -104,9 +104,10 @@ def estimate_poses_rtmpose(image, boxes, config):
     sys.path.insert(0, str(REPO_ROOT / "lib"))
     from rtmlib.tools import RTMPose
     
-    # Initialize RTMPose
+    # Initialize RTMPose - load from local ONNX file
+    model_path = PARENT_DIR / config["pose_model_path"]
     pose_model = RTMPose(
-        onnx_model=config["pose_model_url"],
+        onnx_model=str(model_path),
         model_input_size=tuple(config["pose_input_size"]),
         backend=config["backend"],
         device=config["device"]
@@ -172,6 +173,40 @@ def estimate_poses_vitpose(image, boxes, config):
     else:
         keypoints = np.array([])
         scores = np.array([])
+    
+    return keypoints, scores, pose_time
+
+
+def estimate_poses_rtmpose_halpe26(image, boxes, config):
+    """
+    Stage 2c: Estimate poses using RTMPose Halpe26 (26 keypoints)
+    
+    Args:
+        image: Input image (BGR)
+        boxes: List of bounding boxes from detection
+        config: RTMPose Halpe26 configuration dict
+    
+    Returns:
+        keypoints: Array of keypoints (N x 26 x 2)
+        scores: Array of confidence scores (N x 26)
+        pose_time: Pose estimation time in milliseconds
+    """
+    sys.path.insert(0, str(REPO_ROOT / "lib"))
+    from rtmlib.tools import RTMPose
+    
+    # Initialize RTMPose Halpe26 - load from local ONNX file
+    model_path = PARENT_DIR / config["pose_model_path"]
+    pose_model = RTMPose(
+        onnx_model=str(model_path),
+        model_input_size=tuple(config["pose_input_size"]),
+        backend=config["backend"],
+        device=config["device"]
+    )
+    
+    # Run pose estimation
+    t0 = time.time()
+    keypoints, scores = pose_model(image, bboxes=boxes)
+    pose_time = (time.time() - t0) * 1000
     
     return keypoints, scores, pose_time
 
@@ -343,7 +378,7 @@ def main():
                 image, boxes, config["pose_estimation"]["rtmpose"]
             )
         elif method == "rtmpose_halpe26":
-            keypoints, scores, pose_time = estimate_poses_rtmpose(
+            keypoints, scores, pose_time = estimate_poses_rtmpose_halpe26(
                 image, boxes, config["pose_estimation"]["rtmpose_halpe26"]
             )
         elif method == "vitpose":

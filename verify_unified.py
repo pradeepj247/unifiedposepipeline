@@ -195,20 +195,29 @@ def verify_models() -> Tuple[bool, Dict]:
     else:
         print(f"      ❌ Directory not found: {vitpose_dir}")
     
-    # RTMLib models
-    print("\n   🔍 RTMLib Models:")
+    # RTMLib models (RTMPose)
+    print("\n   📦 RTMLib (RTMPose):")
     rtmlib_dir = MODELS_DIR / "rtmlib"
     if rtmlib_dir.exists():
         rtmlib_files = list(rtmlib_dir.glob("*.onnx")) + list(rtmlib_dir.glob("*.pth"))
         if rtmlib_files:
             for model_file in rtmlib_files:
                 size_mb = model_file.stat().st_size / (1024 ** 2)
-                print(f"      ✅ {model_file.name:30} ({size_mb:.1f} MB)")
+                print(f"      ✅ {model_file.name:40} ({size_mb:.1f} MB)")
                 models_status["rtmlib"].append(model_file.name)
+            
+            # Check for required models
+            required_models = ["rtmpose-l-coco-384x288.onnx", "rtmpose-l-halpe26-384x288.onnx"]
+            for req_model in required_models:
+                if req_model not in [f.name for f in rtmlib_files]:
+                    print(f"      ⚠️  Missing: {req_model}")
+                    all_ok = False
         else:
-            print(f"      ℹ️  No local models (will download on first use)")
+            print(f"      ⚠️  No ONNX models found - run setup_unified.py to download")
+            all_ok = False
     else:
-        print(f"      ℹ️  Directory not found (will be created on first use)")
+        print(f"      ❌ Directory not found - run setup_unified.py")
+        all_ok = False
     
     return all_ok, models_status
 
@@ -290,7 +299,7 @@ def verify_directory_structure() -> bool:
         ("models (parent dir)", MODELS_DIR),
         ("models/yolo", MODELS_DIR / "yolo"),
         ("models/vitpose", MODELS_DIR / "vitpose"),
-        ("models/rtmlib", MODELS_DIR / "rtmlib"),
+        ("models/rtmlib (RTMPose)", MODELS_DIR / "rtmlib"),
         ("demo_data", DEMO_DATA_DIR),
         ("demo_data/videos", DEMO_DATA_DIR / "videos"),
         ("demo_data/images", DEMO_DATA_DIR / "images"),

@@ -629,8 +629,10 @@ def main():
     
     if method == "rtmpose":
         from rtmlib.tools import RTMPose
+        # Load from local ONNX file
+        model_path = PARENT_DIR / config["pose_estimation"]["rtmpose"]["pose_model_path"]
         pose_model = RTMPose(
-            onnx_model=config["pose_estimation"]["rtmpose"]["pose_model_url"],
+            onnx_model=str(model_path),
             model_input_size=tuple(config["pose_estimation"]["rtmpose"]["pose_input_size"]),
             backend=config["pose_estimation"]["rtmpose"]["backend"],
             device=config["pose_estimation"]["rtmpose"]["device"]
@@ -641,8 +643,10 @@ def main():
         print(f"   ✅ RTMPose-{model_size} loaded ({input_size[0]}×{input_size[1]}, 17 keypoints)")
     elif method == "rtmpose_halpe26":
         from rtmlib.tools import RTMPose
+        # Load from local ONNX file
+        model_path = PARENT_DIR / config["pose_estimation"]["rtmpose_halpe26"]["pose_model_path"]
         pose_model = RTMPose(
-            onnx_model=config["pose_estimation"]["rtmpose_halpe26"]["pose_model_url"],
+            onnx_model=str(model_path),
             model_input_size=tuple(config["pose_estimation"]["rtmpose_halpe26"]["pose_input_size"]),
             backend=config["pose_estimation"]["rtmpose_halpe26"]["backend"],
             device=config["pose_estimation"]["rtmpose_halpe26"]["device"]

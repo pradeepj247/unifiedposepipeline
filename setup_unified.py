@@ -278,6 +278,26 @@ def step_7_download_models(drive_mounted: bool):
     else:
         print(f"   ⚠️  Config not found at {source_config}")
     
+    # RTMPose models
+    print("\n📦 Downloading RTMPose ONNX models...")
+    rtmlib_dir = MODELS_DIR / "rtmlib"
+    rtmpose_models = {
+        "rtmpose-l-coco-384x288.onnx": "https://github.com/pradeepj247/stage3hybrik/releases/download/v1.0-models/rtmpose-l-coco-384x288.onnx",
+        "rtmpose-l-halpe26-384x288.onnx": "https://github.com/pradeepj247/stage3hybrik/releases/download/v1.0-models/rtmpose-l-halpe26-384x288.onnx",
+    }
+    
+    for model_name, url in rtmpose_models.items():
+        output_path = rtmlib_dir / model_name
+        if output_path.exists():
+            print(f"   ✓ {model_name} already exists")
+        else:
+            print(f"   ⬇️  Downloading {model_name} (~110 MB)...")
+            if run_command(f'curl -L -o "{output_path}" "{url}"') == 0:
+                size_mb = output_path.stat().st_size / (1024 ** 2)
+                print(f"   ✅ Downloaded {model_name} ({size_mb:.1f} MB)")
+            else:
+                print(f"   ❌ Download failed for {model_name}")
+    
     # Also check Drive for backup
     if drive_mounted and DRIVE_MODELS_PATH.exists():
         print(f"   📂 Checking Drive for additional models: {DRIVE_MODELS_PATH}")
