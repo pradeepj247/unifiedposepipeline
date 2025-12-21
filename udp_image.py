@@ -24,18 +24,41 @@ REPO_ROOT = Path(__file__).parent
 PARENT_DIR = REPO_ROOT.parent
 MODELS_DIR = PARENT_DIR / "models"  # Models stored in parent directory
 
-# COCO skeleton edges (pre-defined for performance)
+# COCO skeleton edges (17 keypoints - pre-defined for performance)
 COCO_EDGES = [
     (0, 1), (0, 2), (2, 4), (1, 3), (6, 8), (8, 10),
     (5, 7), (7, 9), (5, 11), (11, 13), (13, 15), (6, 12),
     (12, 14), (14, 16), (5, 6), (11, 12)
 ]
 
-# Pre-compute rainbow colors for skeleton edges (performance optimization)
-EDGE_COLORS = [
-    tuple([int(c * 255) for c in matplotlib.colors.hsv_to_rgb([i/float(len(COCO_EDGES)), 1.0, 1.0])])
-    for i in range(len(COCO_EDGES))
+# Halpe26 skeleton edges (26 keypoints)
+# Based on: https://github.com/Fang-Haoshu/Halpe-FullBody/
+# 0-16: COCO body keypoints, 17-22: feet, 23-25: neck/pelvis
+HALPE26_EDGES = [
+    # COCO body connections (0-16)
+    (0, 1), (0, 2), (1, 3), (2, 4),  # Head
+    (5, 6), (5, 7), (7, 9), (6, 8), (8, 10),  # Arms
+    (5, 11), (6, 12), (11, 12),  # Torso
+    (11, 13), (13, 15), (12, 14), (14, 16),  # Legs
+    # Feet connections (17-22)
+    (15, 17), (15, 18), (15, 19),  # Left foot
+    (16, 20), (16, 21), (16, 22),  # Right foot
+    # Additional body connections (23-25)
+    (0, 23), (23, 24), (24, 25),  # Neck to pelvis
+    (11, 24), (12, 24)  # Pelvis to hips
 ]
+
+
+def get_edge_colors(num_edges):
+    """Generate rainbow colors for skeleton edges"""
+    return [
+        tuple([int(c * 255) for c in matplotlib.colors.hsv_to_rgb([i/float(num_edges), 1.0, 1.0])])
+        for i in range(num_edges)
+    ]
+
+# Pre-compute colors
+COCO_EDGE_COLORS = get_edge_colors(len(COCO_EDGES))
+HALPE26_EDGE_COLORS = get_edge_colors(len(HALPE26_EDGES))
 
 
 def detect_persons_yolo(image, yolo, confidence_threshold):
@@ -155,11 +178,12 @@ def estimate_poses_vitpose(image, boxes, config):
 def draw_skeleton_unified(image, keypoints, scores, kpt_thr=0.5):
     """
     Unified colorful skeleton drawing for both RTMPose and ViTPose
+    Automatically detects COCO (17 kpts) or Halpe26 (26 kpts)
     
     Args:
         image: Input image (BGR)
-        keypoints: Array of keypoints (N x 17 x 2) in [x, y] format
-        scores: Array of confidence scores (N x 17)
+        keypoints: Array of keypoints (N x 17 x 2) or (N x 26 x 2) in [x, y] format
+        scores: Array of confidence scores (N x 17) or (N x 26)
         kpt_thr: Confidence threshold for drawing
     
     Returns:
@@ -168,20 +192,42 @@ def draw_skeleton_unified(image, keypoints, scores, kpt_thr=0.5):
     result_image = image.copy()
     
     for kpts, scrs in zip(keypoints, scores):
-        # Draw skeleton lines first (so keypoints are on top)
-        for ie, (start_idx, end_idx) in enumerate(COCO_EDGES):
-            if scrs[start_idx] > kpt_thr and scrs[end_idx] > kpt_thr:
-                cv2.line(result_image, 
-                       (int(kpts[start_idx, 0]), int(kpts[start_idx, 1])),
-                       (int(kpts[end_idx, 0]), int(kpts[end_idx, 1])),
-                       EDGE_COLORS[ie], 2, lineType=cv2.LINE_AA)
+        num_keypoints = len(kpts)
         
-        # Draw keypoints (circles) on top
-        for p in range(len(kpts)):
+        # Select skeleton and colors based on keypoint count
+        if num_keypoints == 26:
+            edges = HALPE26_EDGES
+            edge_colors = HALPE26_EDGE_COLORS
+        else:  # Default to COCO (17 keypoints)
+            edges = COCO_EDGES
+            edge_colors = COCO_EDGE_COLORS
+        
+        # Draw skeleton lines first (so keypoints are on top)
+        for ie, (start_idx, end_idx) in enumerate(edges):
+            if start_idx < num_keypoints and end_idx < num_keypoints:
+                if scrs[start_idx] > kpt_thr and scrs[end_idx] > kpt_thr:
+                    cv2.line(result_image, 
+                           (int(kpts[start_idx, 0]), int(kpts[start_idx, 1])),
+                           (int(kpts[end_idx, 0]), int(kpts[end_idx, 1])),
+                           edge_colors[ie], 2, lineType=cv2.LINE_AA)
+        
+        # Draw keypoints (circles) on top with color coding
+        for p in range(num_keypoints):
             if scrs[p] > kpt_thr:
+                # Color coding for Halpe26
+                if num_keypoints == 26:
+                    if p < 17:  # Body keypoints
+                        color = (0, 0, 255)  # Red
+                    elif p < 23:  # Feet keypoints (17-22)
+                        color = (0, 255, 0)  # Green
+                    else:  # Additional body keypoints (23-25)
+                        color = (255, 0, 0)  # Blue
+                else:
+                    color = (0, 0, 255)  # Red for COCO
+                
                 cv2.circle(result_image, 
                          (int(kpts[p, 0]), int(kpts[p, 1])), 
-                         4, (0, 0, 255), thickness=-1, lineType=cv2.FILLED)
+                         4, color, thickness=-1, lineType=cv2.FILLED)
     
     return result_image
 
@@ -228,8 +274,18 @@ def main():
     with open(config_file, 'r') as f:
         config = yaml.safe_load(f)
     
+    # Validate required config sections
+    if "input" not in config:
+        print(f"❌ Error: Config file missing 'input' section")
+        print(f"   Config file: {config_file}")
+        print(f"   Available sections: {list(config.keys())}")
+        return 1
+    
     # Get method with default fallback
     method = config.get("pose_estimation", {}).get("method", "rtmpose")
+    
+    # Normalize method name to lowercase for comparison
+    method = method.lower().strip()
     
     print("\n" + "🎯" * 35)
     print(f"UDP IMAGE DEMO - {method.upper()} Mode")
@@ -253,7 +309,12 @@ def main():
         rtm_cfg = config["pose_estimation"]["rtmpose"]
         input_size = rtm_cfg["pose_input_size"]
         model_size = "L" if input_size[0] >= 288 else "M" if input_size[0] >= 256 else "S"
-        print(f"   Model: RTMPose-{model_size} ({input_size[0]}×{input_size[1]}, ONNX)")
+        print(f"   Model: RTMPose-{model_size} ({input_size[0]}×{input_size[1]}, ONNX, 17 keypoints)")
+    elif method == "rtmpose_halpe26":
+        rtm_cfg = config["pose_estimation"]["rtmpose_halpe26"]
+        input_size = rtm_cfg["pose_input_size"]
+        model_size = "L" if input_size[0] >= 288 else "M" if input_size[0] >= 256 else "S"
+        print(f"   Model: RTMPose-{model_size} Halpe26 ({input_size[0]}×{input_size[1]}, ONNX, 26 keypoints)")
     elif method == "vitpose":
         vitpose_cfg = config["pose_estimation"]["vitpose"]
         print(f"   Model: ViTPose-{vitpose_cfg['model_name'].upper()} (PyTorch)")
@@ -280,15 +341,21 @@ def main():
             keypoints, scores, pose_time = estimate_poses_rtmpose(
                 image, boxes, config["pose_estimation"]["rtmpose"]
             )
+        elif method == "rtmpose_halpe26":
+            keypoints, scores, pose_time = estimate_poses_rtmpose(
+                image, boxes, config["pose_estimation"]["rtmpose_halpe26"]
+            )
         elif method == "vitpose":
             keypoints, scores, pose_time = estimate_poses_vitpose(
                 image, boxes, config["pose_estimation"]["vitpose"]
             )
         else:
             print(f"   ❌ Unknown method: {method}")
+            print(f"   Available methods: rtmpose, rtmpose_halpe26, vitpose")
             return 1
         
-        print(f"   ✓ Estimated {len(keypoints)} poses ({pose_time:.1f} ms)")
+        num_kpts = len(keypoints[0]) if len(keypoints) > 0 else 0
+        print(f"   ✓ Estimated {len(keypoints)} poses with {num_kpts} keypoints each ({pose_time:.1f} ms)")
         
         # Draw results
         result_image = draw_results(image, boxes, keypoints, scores, method)

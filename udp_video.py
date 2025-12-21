@@ -24,18 +24,41 @@ REPO_ROOT = Path(__file__).parent
 PARENT_DIR = REPO_ROOT.parent
 MODELS_DIR = PARENT_DIR / "models"
 
-# COCO skeleton edges (pre-defined for performance)
+# COCO skeleton edges (17 keypoints - pre-defined for performance)
 COCO_EDGES = [
     (0, 1), (0, 2), (2, 4), (1, 3), (6, 8), (8, 10),
     (5, 7), (7, 9), (5, 11), (11, 13), (13, 15), (6, 12),
     (12, 14), (14, 16), (5, 6), (11, 12)
 ]
 
-# Pre-compute rainbow colors for skeleton edges
-EDGE_COLORS = [
-    tuple([int(c * 255) for c in matplotlib.colors.hsv_to_rgb([i/float(len(COCO_EDGES)), 1.0, 1.0])])
-    for i in range(len(COCO_EDGES))
+# Halpe26 skeleton edges (26 keypoints)
+# Based on: https://github.com/Fang-Haoshu/Halpe-FullBody/
+# 0-16: COCO body keypoints, 17-22: feet, 23-25: neck/pelvis
+HALPE26_EDGES = [
+    # COCO body connections (0-16)
+    (0, 1), (0, 2), (1, 3), (2, 4),  # Head
+    (5, 6), (5, 7), (7, 9), (6, 8), (8, 10),  # Arms
+    (5, 11), (6, 12), (11, 12),  # Torso
+    (11, 13), (13, 15), (12, 14), (14, 16),  # Legs
+    # Feet connections (17-22)
+    (15, 17), (15, 18), (15, 19),  # Left foot
+    (16, 20), (16, 21), (16, 22),  # Right foot
+    # Additional body connections (23-25)
+    (0, 23), (23, 24), (24, 25),  # Neck to pelvis
+    (11, 24), (12, 24)  # Pelvis to hips
 ]
+
+
+def get_edge_colors(num_edges):
+    """Generate rainbow colors for skeleton edges"""
+    return [
+        tuple([int(c * 255) for c in matplotlib.colors.hsv_to_rgb([i/float(num_edges), 1.0, 1.0])])
+        for i in range(num_edges)
+    ]
+
+# Pre-compute colors for COCO
+COCO_EDGE_COLORS = get_edge_colors(len(COCO_EDGES))
+HALPE26_EDGE_COLORS = get_edge_colors(len(HALPE26_EDGES))
 
 
 def stage1_detect_persons(video_path, yolo, config, max_frames):
@@ -189,12 +212,107 @@ def stage2_estimate_poses_rtmpose(video_path, detections_path, config, max_frame
                 all_keypoints.append(keypoints[0])  # Take first (only) detection
                 all_scores.append(scores[0])
             else:
-                all_keypoints.append(np.zeros((17, 2)))
-                all_scores.append(np.zeros(17))
+                num_kpts = config.get('num_keypoints', 17)
+                all_keypoints.append(np.zeros((num_kpts, 2)))
+                all_scores.append(np.zeros(num_kpts))
         else:
             # No detection, store empty
-            all_keypoints.append(np.zeros((17, 2)))
-            all_scores.append(np.zeros(17))
+            num_kpts = config.get('num_keypoints', 17)
+            all_keypoints.append(np.zeros((num_kpts, 2)))
+            all_scores.append(np.zeros(num_kpts))
+        
+        frames_processed += 1
+        
+        # Progress indicator
+        if frames_processed % 30 == 0:
+            print(f"   Processed {frames_processed}/{len(frame_numbers)} frames", end='\r')
+    
+    cap.release()
+    t_end = time.time()
+    
+    total_time = t_end - t_start
+    processing_fps = frames_processed / total_time
+    
+    # Save to NPZ
+    output_path = REPO_ROOT / config['output']['stage2_keypoints']
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    np.savez_compressed(
+        output_path,
+        frame_numbers=frame_numbers,
+        keypoints=np.array(all_keypoints),
+        scores=np.array(all_scores)
+    )
+    
+    valid_poses = np.sum(np.array(all_scores)[:, 0] > 0)
+    
+    print(f"\n   ✅ Stage 2 complete!")
+    print(f"   Processed: {frames_processed} frames")
+    print(f"   Valid poses: {valid_poses}/{frames_processed}")
+    print(f"   Time: {total_time:.2f}s")
+    print(f"   FPS: {processing_fps:.1f}")
+    print(f"   Output: {output_path}")
+    
+    return output_path, total_time, processing_fps
+
+
+def stage2_estimate_poses_rtmpose_halpe26(video_path, detections_path, config, max_frames, pose_model):
+    """
+    Stage 2: Estimate poses using RTMPose Halpe26 (26 keypoints)
+    
+    Args:
+        video_path: Path to input video
+        detections_path: Path to Stage 1 NPZ file
+        config: Pose config dict
+        max_frames: Maximum frames to process
+        pose_model: Pre-initialized RTMPose Halpe26 model
+    
+    Returns:
+        output_path: Path to saved NPZ file
+        total_time: Processing time in seconds
+        fps: Processing FPS
+    """
+    print("\n" + "=" * 70)
+    print("🎯 STAGE 2: 2D Pose Estimation (RTMPose Halpe26 - 26 keypoints)")
+    print("=" * 70)
+    
+    # Load detections
+    detections = np.load(detections_path)
+    frame_numbers = detections['frame_numbers']
+    bboxes = detections['bboxes']
+    
+    print(f"   Loaded detections: {len(frame_numbers)} frames")
+    
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise ValueError(f"Could not open video: {video_path}")
+    
+    # Storage for keypoints
+    all_keypoints = []
+    all_scores = []
+    
+    t_start = time.time()
+    frames_processed = 0
+    
+    for frame_idx, bbox in zip(frame_numbers, bboxes):
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        # Check if valid detection
+        if bbox[2] > 0:  # Valid bbox
+            # Run pose estimation
+            keypoints, scores = pose_model(frame, bboxes=[bbox])
+            if len(keypoints) > 0:
+                all_keypoints.append(keypoints[0])  # Take first (only) detection
+                all_scores.append(scores[0])
+            else:
+                all_keypoints.append(np.zeros((26, 2)))
+                all_scores.append(np.zeros(26))
+        else:
+            # No detection, store empty
+            all_keypoints.append(np.zeros((26, 2)))
+            all_scores.append(np.zeros(26))
         
         frames_processed += 1
         
@@ -332,33 +450,55 @@ def stage2_estimate_poses_vitpose(video_path, detections_path, config, max_frame
 
 def draw_skeleton_unified(image, keypoints, scores, kpt_thr=0.5):
     """
-    Unified colorful skeleton drawing
+    Unified colorful skeleton drawing for pose visualization
+    Automatically detects COCO (17 kpts) or Halpe26 (26 kpts)
     
     Args:
         image: Input image (BGR)
-        keypoints: Keypoints array (17 x 2) in [x, y] format
-        scores: Confidence scores (17,)
+        keypoints: Keypoints array (N x 2) where N=17 or 26
+        scores: Confidence scores (N,)
         kpt_thr: Confidence threshold
     
     Returns:
         result_image: Annotated image
     """
     result_image = image.copy()
+    num_keypoints = len(keypoints)
+    
+    # Select skeleton and colors based on keypoint count
+    if num_keypoints == 26:
+        edges = HALPE26_EDGES
+        edge_colors = HALPE26_EDGE_COLORS
+    else:  # Default to COCO (17 keypoints)
+        edges = COCO_EDGES
+        edge_colors = COCO_EDGE_COLORS
     
     # Draw skeleton lines
-    for ie, (start_idx, end_idx) in enumerate(COCO_EDGES):
-        if scores[start_idx] > kpt_thr and scores[end_idx] > kpt_thr:
-            cv2.line(result_image, 
-                   (int(keypoints[start_idx, 0]), int(keypoints[start_idx, 1])),
-                   (int(keypoints[end_idx, 0]), int(keypoints[end_idx, 1])),
-                   EDGE_COLORS[ie], 2, lineType=cv2.LINE_AA)
+    for ie, (start_idx, end_idx) in enumerate(edges):
+        if start_idx < num_keypoints and end_idx < num_keypoints:
+            if scores[start_idx] > kpt_thr and scores[end_idx] > kpt_thr:
+                cv2.line(result_image, 
+                       (int(keypoints[start_idx, 0]), int(keypoints[start_idx, 1])),
+                       (int(keypoints[end_idx, 0]), int(keypoints[end_idx, 1])),
+                       edge_colors[ie], 2, lineType=cv2.LINE_AA)
     
-    # Draw keypoints
-    for p in range(len(keypoints)):
+    # Draw keypoints with different colors for different groups
+    for p in range(num_keypoints):
         if scores[p] > kpt_thr:
+            # Color coding for Halpe26
+            if num_keypoints == 26:
+                if p < 17:  # Body keypoints
+                    color = (0, 0, 255)  # Red
+                elif p < 23:  # Feet keypoints (17-22)
+                    color = (0, 255, 0)  # Green
+                else:  # Additional body keypoints (23-25)
+                    color = (255, 0, 0)  # Blue
+            else:
+                color = (0, 0, 255)  # Red for COCO
+            
             cv2.circle(result_image, 
                      (int(keypoints[p, 0]), int(keypoints[p, 1])), 
-                     4, (0, 0, 255), thickness=-1, lineType=cv2.FILLED)
+                     4, color, thickness=-1, lineType=cv2.FILLED)
     
     return result_image
 
@@ -453,6 +593,9 @@ def main():
     max_frames = config.get("video", {}).get("max_frames", None)
     plot_enabled = config.get("output", {}).get("plot", True)
     
+    # Normalize method name to lowercase for comparison
+    method = method.lower().strip()
+    
     print("\n" + "🎬" * 35)
     print(f"UDP VIDEO DEMO - {method.upper()} Mode")
     print("🎬" * 35)
@@ -494,7 +637,19 @@ def main():
         # Extract model size from input resolution
         input_size = config["pose_estimation"]["rtmpose"]["pose_input_size"]
         model_size = "L" if input_size[0] >= 288 else "M" if input_size[0] >= 256 else "S"
-        print(f"   ✅ RTMPose-{model_size} loaded ({input_size[0]}×{input_size[1]})")
+        print(f"   ✅ RTMPose-{model_size} loaded ({input_size[0]}×{input_size[1]}, 17 keypoints)")
+    elif method == "rtmpose_halpe26":
+        from rtmlib.tools import RTMPose
+        pose_model = RTMPose(
+            onnx_model=config["pose_estimation"]["rtmpose_halpe26"]["pose_model_url"],
+            model_input_size=tuple(config["pose_estimation"]["rtmpose_halpe26"]["pose_input_size"]),
+            backend=config["pose_estimation"]["rtmpose_halpe26"]["backend"],
+            device=config["pose_estimation"]["rtmpose_halpe26"]["device"]
+        )
+        # Extract model size from input resolution
+        input_size = config["pose_estimation"]["rtmpose_halpe26"]["pose_input_size"]
+        model_size = "L" if input_size[0] >= 288 else "M" if input_size[0] >= 256 else "S"
+        print(f"   ✅ RTMPose-{model_size} Halpe26 loaded ({input_size[0]}×{input_size[1]}, 26 keypoints)")
     elif method == "vitpose":
         from vitpose.pose_only import VitPoseOnly
         model_path = PARENT_DIR / config["pose_estimation"]["vitpose"]["model_path"]
@@ -520,6 +675,10 @@ def main():
     if method == "rtmpose":
         keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_rtmpose(
             video_path, detections_path, config, max_frames, pose_model
+        )
+    elif method == "rtmpose_halpe26":
+        keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_rtmpose_halpe26(
+            video_path, detections_path, config["pose_estimation"]["rtmpose_halpe26"], max_frames, pose_model
         )
     elif method == "vitpose":
         keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_vitpose(

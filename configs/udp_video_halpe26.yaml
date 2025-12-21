@@ -1,0 +1,26 @@
+# UDP Video Configuration - Halpe26 (26 keypoints)
+# Stage 1: Detection → NPZ | Stage 2: Pose → NPZ | Stage 3: Visualization → Video
+
+detection:
+  model_path: yolov8s.pt
+  confidence_threshold: 0.5
+
+pose_estimation:
+  method: rtmpose_halpe26
+  
+  rtmpose_halpe26:
+    pose_model_url: https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-l_simcc-body7_pt-body7-halpe26_700e-384x288-734182ce_20230605.zip
+    pose_input_size: [288, 384]
+    backend: onnxruntime
+    device: cuda
+    num_keypoints: 26
+
+video:
+  input_path: demo_data/videos/dance.mp4
+  max_frames: 360  # Set to null to process all frames
+
+output:
+  stage1_detections: demo_data/outputs/detections_halpe26.npz
+  stage2_keypoints: demo_data/outputs/keypoints_halpe26.npz
+  video_output: demo_data/outputs/result_halpe26.mp4
+  plot: true  # Set to false to skip visualization stage
