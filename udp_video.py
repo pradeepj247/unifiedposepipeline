@@ -45,7 +45,7 @@ def stage1_detect_persons(video_path, yolo, config, max_frames):
     Args:
         video_path: Path to input video
         yolo: YOLO model instance
-        config: Detection config dict
+        config: Full config dict (needs detection and output sections)
         max_frames: Maximum frames to process
     
     Returns:
@@ -67,7 +67,7 @@ def stage1_detect_persons(video_path, yolo, config, max_frames):
     print(f"   Video: {video_path.name}")
     print(f"   Total frames: {total_frames}")
     print(f"   Processing: {frames_to_process} frames")
-    print(f"   Confidence threshold: {config['confidence_threshold']}")
+    print(f"   Confidence threshold: {config['detection']['confidence_threshold']}")
     
     # Storage for detections
     frame_numbers = []
@@ -90,7 +90,7 @@ def stage1_detect_persons(video_path, yolo, config, max_frames):
         
         for result in results:
             for box in result.boxes:
-                if box.conf[0] >= config['confidence_threshold']:
+                if box.conf[0] >= config['detection']['confidence_threshold']:
                     x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
                     area = (x2 - x1) * (y2 - y1)
                     if area > largest_area:
@@ -510,7 +510,7 @@ def main():
     
     # Stage 1: Detection
     detections_path, stage1_time, stage1_fps = stage1_detect_persons(
-        video_path, yolo, config["detection"], max_frames
+        video_path, yolo, config, max_frames
     )
     
     # Stage 2: Pose Estimation
