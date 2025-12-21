@@ -1,0 +1,5 @@
+# Ignore large ONNX model files - these go to GitHub Releases
+*.onnx
+
+# Keep the README
+!README.md
