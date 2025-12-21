@@ -6,7 +6,7 @@
 # Detection configuration
 detection:
   type: yolo
-  model_path: models/yolo/yolov8n.pt  # Using nano for speed
+  model_path: models/yolo/yolov8s.pt  # Using small for better accuracy
   confidence_threshold: 0.5
 
 # Pose estimation configuration

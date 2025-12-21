@@ -463,10 +463,18 @@ def main():
     print("\n📦 Loading YOLO detector...")
     from ultralytics import YOLO
     
-    yolo_filename = config["detection"]["model_path"]
-    yolo_path = MODELS_DIR / "yolo" / yolo_filename
-    if not yolo_path.exists():
-        yolo_path = REPO_ROOT / yolo_filename
+    # Handle both full paths and filenames for YOLO model
+    yolo_config_path = config["detection"]["model_path"]
+    if "/" in yolo_config_path or "\\" in yolo_config_path:
+        # Full path provided - check multiple locations
+        yolo_path = PARENT_DIR / yolo_config_path
+        if not yolo_path.exists():
+            yolo_path = REPO_ROOT / yolo_config_path
+    else:
+        # Just filename provided
+        yolo_path = MODELS_DIR / "yolo" / yolo_config_path
+        if not yolo_path.exists():
+            yolo_path = REPO_ROOT / yolo_config_path
     
     yolo = YOLO(str(yolo_path))
     print(f"   ✅ Loaded {yolo_path.name}")

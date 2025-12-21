@@ -9,8 +9,8 @@ pose_estimation:
   method: rtmpose  # Options: rtmpose, vitpose
   
   rtmpose:
-    pose_model_url: https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7_420e-256x192-e48f03d0_20230504.zip
-    pose_input_size: [192, 256]
+    pose_model_url: https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-l_simcc-body7_pt-body7_420e-384x288-3f5a1437_20230504.zip
+    pose_input_size: [288, 384]
     backend: onnxruntime
     device: cuda
   
@@ -21,7 +21,7 @@ pose_estimation:
     device: cuda
 
 video:
-  input_path: demo_data/videos/sample.mp4
+  input_path: demo_data/videos/dance.mp4
   max_frames: 360  # Set to null to process all frames
 
 output:
