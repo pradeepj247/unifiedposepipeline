@@ -1,28 +1,31 @@
-# UDP Video Demo Configuration  
-# Comprehensive testing - processes video with full statistics
+# UDP Video Configuration - 3-Stage Pipeline
+# Stage 1: Detection → NPZ | Stage 2: Pose → NPZ | Stage 3: Visualization → Video
 
-# Detection configuration (YOLO)
 detection:
-  model_path: models/yolo/yolov8s.pt  # Small model for balance
+  model_path: yolov8s.pt
   confidence_threshold: 0.5
 
-# Pose estimation configuration (RTMPose)
 pose_estimation:
-  pose_model_url: https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-l_simcc-body7_pt-body7_420e-384x288-3f5a1437_20230504.zip
-  pose_input_size: [288, 384]
-  backend: onnxruntime
-  device: cuda  # or cpu
+  method: rtmpose  # Options: rtmpose, vitpose
+  
+  rtmpose:
+    pose_model_url: https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7_420e-256x192-e48f03d0_20230504.zip
+    pose_input_size: [192, 256]
+    backend: onnxruntime
+    device: cuda
+  
+  vitpose:
+    model_path: models/vitpose/vitpose-b.pth
+    model_name: b
+    dataset: coco
+    device: cuda
 
-# Input - video file
-input:
-  path: demo_data/videos/dance.mp4
+video:
+  input_path: demo_data/videos/sample.mp4
+  max_frames: 360  # Set to null to process all frames
 
-# Output
 output:
-  path: demo_data/outputs/video_result.mp4
-  save_json: true  # Export keypoints to JSON
-  json_path: demo_data/outputs/video_keypoints.json
-
-# Processing parameters
-processing:
-  max_frames: 100  # Limit frames for testing (set to null for full video)
+  stage1_detections: demo_data/outputs/detections.npz
+  stage2_keypoints: demo_data/outputs/keypoints.npz
+  video_output: demo_data/outputs/result.mp4
+  plot: true  # Set to false to skip visualization stage
