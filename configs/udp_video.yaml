@@ -6,7 +6,7 @@ detection:
   confidence_threshold: 0.5
 
 pose_estimation:
-  method: rtmpose  # Options: rtmpose, rtmpose_halpe26, vitpose
+  method: rtmpose  # Options: rtmpose, rtmpose_halpe26, vitpose, wb3d
   
   rtmpose:
     pose_model_path: models/rtmlib/rtmpose-l-coco-384x288.onnx
@@ -24,6 +24,12 @@ pose_estimation:
     model_path: models/vitpose/vitpose-b.pth
     model_name: b
     dataset: coco
+    device: cuda
+  
+  wb3d:
+    pose_model_path: models/wb3d/rtmw3d-l.onnx
+    pose_input_size: [288, 384]
+    backend: onnxruntime
     device: cuda
 
 video:

@@ -240,6 +240,7 @@ def step_7_setup_directories():
         MODELS_DIR / "vitpose",
         MODELS_DIR / "rtmlib",
         MODELS_DIR / "motionagformer",
+        MODELS_DIR / "wb3d",
         DEMO_DATA_DIR / "videos",
         DEMO_DATA_DIR / "images",
         DEMO_DATA_DIR / "outputs",
@@ -365,6 +366,30 @@ def step_8_download_models(drive_mounted: bool):
             print(f"   ❌ Download failed - you may need to download manually:")
             print(f"      URL: https://drive.google.com/file/d/1Iii5EwsFFm9_9lKBUPfN8bV5LmfkNUMP/view")
             print(f"      Save to: {magf_checkpoint}")
+    
+    # Whole-Body 3D model (rtmw3d-l.onnx)
+    print("\n📦 Copying Whole-Body 3D model from Drive...")
+    wb3d_dir = MODELS_DIR / "wb3d"
+    wb3d_model = wb3d_dir / "rtmw3d-l.onnx"
+    
+    if wb3d_model.exists():
+        size_mb = wb3d_model.stat().st_size / (1024 ** 2)
+        print(f"   ✓ rtmw3d-l.onnx already exists ({size_mb:.1f} MB)")
+    elif drive_mounted:
+        drive_wb3d_path = DRIVE_ROOT / "rtmw3d_onnx_exports" / "rtmw3d-l.onnx"
+        if drive_wb3d_path.exists():
+            print(f"   📋 Copying from Drive: {drive_wb3d_path}")
+            if run_command(f'cp "{drive_wb3d_path}" "{wb3d_model}"') == 0:
+                size_mb = wb3d_model.stat().st_size / (1024 ** 2)
+                print(f"   ✅ Copied rtmw3d-l.onnx ({size_mb:.1f} MB)")
+            else:
+                print(f"   ❌ Failed to copy model from Drive")
+        else:
+            print(f"   ⚠️  Model not found on Drive: {drive_wb3d_path}")
+            print(f"      Expected location: /content/drive/MyDrive/rtmw3d_onnx_exports/rtmw3d-l.onnx")
+    else:
+        print(f"   ⚠️  Drive not mounted - skipping wb3d model")
+        print(f"      Manual copy: Place rtmw3d-l.onnx in {wb3d_model}")
     
     # RTMLib models (auto-download note)
     print("\n📦 RTMLib Models:")

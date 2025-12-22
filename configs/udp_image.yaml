@@ -8,7 +8,7 @@ detection:
 
 # Pose estimation configuration
 pose_estimation:
-  method: vitpose  # Options: rtmpose, rtmpose_halpe26, vitpose
+  method: vitpose  # Options: rtmpose, rtmpose_halpe26, vitpose, wb3d
   
   # RTMPose settings (used when method=rtmpose)
   rtmpose:
@@ -29,6 +29,13 @@ pose_estimation:
     model_path: models/vitpose/vitpose-b.pth
     model_name: b  # Options: s, b, l, h
     dataset: coco
+    device: cuda  # or cpu
+  
+  # Whole-Body 3D settings (used when method=wb3d) - 133 keypoints with 3D coordinates
+  wb3d:
+    pose_model_path: models/wb3d/rtmw3d-l.onnx
+    pose_input_size: [288, 384]
+    backend: onnxruntime
     device: cuda  # or cpu
 
 # Input - single image

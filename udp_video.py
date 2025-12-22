@@ -449,14 +449,110 @@ def stage2_estimate_poses_vitpose(video_path, detections_path, config, max_frame
     return output_path, total_time, processing_fps
 
 
+    return output_path, total_time, processing_fps
+
+
+def stage2_estimate_poses_wb3d(video_path, detections_path, config, max_frames, pose_model):
+    """
+    Stage 2: Estimate 3D whole-body poses using RTMPose3d (133 keypoints)
+    
+    Args:
+        video_path: Path to input video
+        detections_path: Path to Stage 1 NPZ file
+        config: Pose config dict
+        max_frames: Maximum frames to process
+        pose_model: Pre-initialized RTMPose3d model
+    
+    Returns:
+        output_path: Path to saved NPZ file
+        total_time: Processing time in seconds
+        fps: Processing FPS
+    """
+    print("\n" + "=" * 70)
+    print("🎯 STAGE 2: 3D Whole-Body Pose Estimation (RTMPose3D - 133 keypoints)")
+    print("=" * 70)
+    
+    # Load detections
+    detections = np.load(detections_path)
+    frame_numbers = detections['frame_numbers']
+    bboxes = detections['bboxes']
+    
+    print(f"   Loaded detections: {len(frame_numbers)} frames")
+    
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise ValueError(f"Could not open video: {video_path}")
+    
+    # Storage for keypoints
+    all_keypoints = []
+    all_scores = []
+    
+    t_start = time.time()
+    frames_processed = 0
+    
+    for frame_idx, bbox in zip(frame_numbers, bboxes):
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        # Check if valid detection
+        if bbox[2] > 0:  # Valid bbox
+            # Run pose estimation (returns 3D coords, scores, simcc, 2D)
+            keypoints_3d, scores, keypoints_simcc, keypoints_2d = pose_model(frame, bboxes=[bbox])
+            if len(keypoints_2d) > 0:
+                all_keypoints.append(keypoints_2d[0])  # Take first (only) detection - use 2D for viz
+                all_scores.append(scores[0])
+            else:
+                all_keypoints.append(np.zeros((133, 2)))
+                all_scores.append(np.zeros(133))
+        else:
+            # No detection, store empty
+            all_keypoints.append(np.zeros((133, 2)))
+            all_scores.append(np.zeros(133))
+        
+        frames_processed += 1
+        
+        # Progress indicator
+        if frames_processed % 30 == 0:
+            print(f"   Processed {frames_processed}/{len(frame_numbers)} frames", end='\r')
+    
+    cap.release()
+    t_end = time.time()
+    
+    total_time = t_end - t_start
+    processing_fps = frames_processed / total_time
+    
+    # Save to NPZ
+    output_path = REPO_ROOT / config['output']['stage2_keypoints']
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    np.savez_compressed(
+        output_path,
+        frame_numbers=frame_numbers,
+        keypoints=np.array(all_keypoints),
+        scores=np.array(all_scores)
+    )
+    
+    valid_poses = np.sum(np.array(all_scores)[:, 0] > 0)
+    
+    print(f"\n   ✅ Stage 2 complete!")
+    print(f"   Processed: {frames_processed} frames")
+    print(f"   Valid poses: {valid_poses}/{frames_processed}")
+    print(f"   Time: {total_time:.2f}s")
+    print(f"   FPS: {processing_fps:.1f}")
+    print(f"   Output: {output_path}")
+    
+    return output_path, total_time, processing_fps
+
+
 def draw_skeleton_unified(image, keypoints, scores, kpt_thr=0.5):
     """
     Unified colorful skeleton drawing for pose visualization
-    Automatically detects COCO (17 kpts) or Halpe26 (26 kpts)
+    Automatically detects COCO (17 kpts), Halpe26 (26 kpts), or Wholebody (133 kpts)
     
     Args:
         image: Input image (BGR)
-        keypoints: Keypoints array (N x 2) where N=17 or 26
+        keypoints: Keypoints array (N x 2) where N=17, 26, or 133
         scores: Confidence scores (N,)
         kpt_thr: Confidence threshold
     
@@ -465,6 +561,17 @@ def draw_skeleton_unified(image, keypoints, scores, kpt_thr=0.5):
     """
     result_image = image.copy()
     num_keypoints = len(keypoints)
+    
+    # For wholebody (133 keypoints), use rtmlib's draw_skeleton
+    if num_keypoints == 133:
+        sys.path.insert(0, str(REPO_ROOT / "lib"))
+        from rtmlib import draw_skeleton
+        result_image = draw_skeleton(result_image, 
+                                    keypoints[np.newaxis, :, :],  # Add batch dimension
+                                    scores[np.newaxis, :],         # Add batch dimension
+                                    openpose_skeleton=False,
+                                    kpt_thr=kpt_thr)
+        return result_image
     
     # Select skeleton and colors based on keypoint count
     if num_keypoints == 26:
@@ -665,6 +772,17 @@ def main():
             device=config["pose_estimation"]["vitpose"]["device"]
         )
         print(f"   ✅ ViTPose-{config['pose_estimation']['vitpose']['model_name'].upper()} loaded")
+    elif method == "wb3d":
+        from rtmlib.tools import RTMPose3d
+        model_path = PARENT_DIR / config["pose_estimation"]["wb3d"]["pose_model_path"]
+        pose_model = RTMPose3d(
+            onnx_model=str(model_path),
+            model_input_size=tuple(config["pose_estimation"]["wb3d"]["pose_input_size"]),
+            backend=config["pose_estimation"]["wb3d"]["backend"],
+            device=config["pose_estimation"]["wb3d"]["device"]
+        )
+        input_size = config["pose_estimation"]["wb3d"]["pose_input_size"]
+        print(f"   ✅ RTMW3D-L loaded ({input_size[0]}×{input_size[1]}, 133 keypoints with 3D)")
     else:
         print(f"   ❌ Unknown method: {method}")
         return 1
@@ -687,6 +805,10 @@ def main():
         )
     elif method == "vitpose":
         keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_vitpose(
+            video_path, detections_path, config, max_frames, pose_model
+        )
+    elif method == "wb3d":
+        keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_wb3d(
             video_path, detections_path, config, max_frames, pose_model
         )
     

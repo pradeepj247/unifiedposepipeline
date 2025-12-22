@@ -211,15 +211,51 @@ def estimate_poses_rtmpose_halpe26(image, boxes, config):
     return keypoints, scores, pose_time
 
 
-def draw_skeleton_unified(image, keypoints, scores, kpt_thr=0.5):
+def estimate_poses_wb3d(image, boxes, config):
     """
-    Unified colorful skeleton drawing for both RTMPose and ViTPose
-    Automatically detects COCO (17 kpts) or Halpe26 (26 kpts)
+    Stage 2d: Estimate 3D whole-body poses using RTMPose3d (133 keypoints)
     
     Args:
         image: Input image (BGR)
-        keypoints: Array of keypoints (N x 17 x 2) or (N x 26 x 2) in [x, y] format
-        scores: Array of confidence scores (N x 17) or (N x 26)
+        boxes: List of bounding boxes from detection
+        config: WB3D configuration dict
+    
+    Returns:
+        keypoints_3d: Array of 3D keypoints (N x 133 x 3)
+        scores: Array of confidence scores (N x 133)
+        keypoints_2d: Array of 2D projections (N x 133 x 2)
+        pose_time: Pose estimation time in milliseconds
+    """
+    sys.path.insert(0, str(REPO_ROOT / "lib"))
+    from rtmlib.tools import RTMPose3d
+    
+    # Initialize RTMPose3d - load from local ONNX file
+    model_path = PARENT_DIR / config["pose_model_path"]
+    pose_model = RTMPose3d(
+        onnx_model=str(model_path),
+        model_input_size=tuple(config["pose_input_size"]),
+        backend=config["backend"],
+        device=config["device"]
+    )
+    
+    # Run pose estimation
+    t0 = time.time()
+    keypoints_3d, scores, keypoints_simcc, keypoints_2d = pose_model(image, bboxes=boxes)
+    pose_time = (time.time() - t0) * 1000
+    
+    # Return 2D for visualization (but keep 3D in the structure)
+    return keypoints_2d, scores, pose_time
+
+
+def draw_skeleton_unified(image, keypoints, scores, kpt_thr=0.5):
+    """
+    Unified colorful skeleton drawing for all pose types
+    Automatically detects COCO (17 kpts), Halpe26 (26 kpts), or Wholebody (133 kpts)
+    
+    Args:
+        image: Input image (BGR)
+        keypoints: Array of keypoints (N x K x 2) in [x, y] format
+        scores: Array of confidence scores (N x K)
         kpt_thr: Confidence threshold for drawing
     
     Returns:
@@ -229,6 +265,17 @@ def draw_skeleton_unified(image, keypoints, scores, kpt_thr=0.5):
     
     for kpts, scrs in zip(keypoints, scores):
         num_keypoints = len(kpts)
+        
+        # For wholebody (133 keypoints), use rtmlib's draw_skeleton
+        if num_keypoints == 133:
+            sys.path.insert(0, str(REPO_ROOT / "lib"))
+            from rtmlib import draw_skeleton
+            result_image = draw_skeleton(result_image, 
+                                        kpts[np.newaxis, :, :],  # Add batch dimension
+                                        scrs[np.newaxis, :],      # Add batch dimension
+                                        openpose_skeleton=False,
+                                        kpt_thr=kpt_thr)
+            continue
         
         # Select skeleton and colors based on keypoint count
         if num_keypoints == 26:
@@ -264,6 +311,8 @@ def draw_skeleton_unified(image, keypoints, scores, kpt_thr=0.5):
                 cv2.circle(result_image, 
                          (int(kpts[p, 0]), int(kpts[p, 1])), 
                          4, color, thickness=-1, lineType=cv2.FILLED)
+    
+    return result_image
     
     return result_image
 
@@ -354,6 +403,10 @@ def main():
     elif method == "vitpose":
         vitpose_cfg = config["pose_estimation"]["vitpose"]
         print(f"   Model: ViTPose-{vitpose_cfg['model_name'].upper()} (PyTorch)")
+    elif method == "wb3d":
+        wb3d_cfg = config["pose_estimation"]["wb3d"]
+        input_size = wb3d_cfg["pose_input_size"]
+        print(f"   Model: RTMW3D-L ({input_size[0]}×{input_size[1]}, ONNX, 133 keypoints with 3D)")
     print(f"   ✅ Pose estimator ready")
     
     # Load image
@@ -385,9 +438,13 @@ def main():
             keypoints, scores, pose_time = estimate_poses_vitpose(
                 image, boxes, config["pose_estimation"]["vitpose"]
             )
+        elif method == "wb3d":
+            keypoints, scores, pose_time = estimate_poses_wb3d(
+                image, boxes, config["pose_estimation"]["wb3d"]
+            )
         else:
             print(f"   ❌ Unknown method: {method}")
-            print(f"   Available methods: rtmpose, rtmpose_halpe26, vitpose")
+            print(f"   Available methods: rtmpose, rtmpose_halpe26, vitpose, wb3d")
             return 1
         
         num_kpts = len(keypoints[0]) if len(keypoints) > 0 else 0
