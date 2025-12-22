@@ -2,11 +2,11 @@ import torch
 from timm.models.layers import DropPath
 from torch import nn
 
-from model.modules.attention import Attention
-from model.modules.ctrgc import CTRGCBlock
-from model.modules.graph import GCN
-from model.modules.mlp import MLP
-from model.modules.tcn import MultiScaleTCN
+from .attention import Attention
+from .ctrgc import CTRGCBlock
+from .graph import GCN
+from .mlp import MLP
+from .tcn import MultiScaleTCN
 
 
 class MetaFormerBlock(nn.Module):
