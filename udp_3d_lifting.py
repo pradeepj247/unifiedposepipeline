@@ -31,7 +31,6 @@ from tqdm import tqdm
 import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-from scipy.spatial.transform import Rotation as Rot
 
 # Use non-interactive backend
 matplotlib.use('Agg')
@@ -292,13 +291,32 @@ def show3Dpose(vals, ax):
     ax.tick_params('z', labelleft=False)
 
 
-def camera_to_world(X, R, t):
-    """Convert camera coordinates to world coordinates."""
-    if R.shape == (4,):  # Quaternion
-        rot = Rot.from_quat(R)
-        R = rot.as_matrix()
+def qrot(q, v):
+    """
+    Rotate vector(s) v about the rotation described by quaternion(s) q.
+    Expects quaternion format [w, x, y, z] and vector [x, y, z].
+    """
+    assert q.shape[-1] == 4
+    assert v.shape[-1] == 3
     
-    return (R @ X.T).T + t
+    qvec = q[..., 1:]  # [x, y, z] part of quaternion
+    uv = np.cross(qvec, v)
+    uuv = np.cross(qvec, uv)
+    return v + 2 * (q[..., :1] * uv + uuv)
+
+
+def camera_to_world(X, R, t):
+    """
+    Apply camera rotation to 3D keypoints using quaternion rotation.
+    Args:
+        X (Nx3): 3D points
+        R (4,): Quaternion rotation [w, x, y, z]
+        t: Translation (scalar or vector)
+    Returns: Rotated points
+    """
+    # Tile quaternion to match number of joints
+    R_tiled = np.tile(R, (X.shape[0], 1))
+    return qrot(R_tiled, X) + t
 
 
 def create_visualization(video_path, poses_3d, output_path, max_frames=None):
@@ -358,7 +376,11 @@ def create_visualization(video_path, poses_3d, output_path, max_frames=None):
         # Get 3D pose
         pose_3d = poses_3d[i].copy()
         
-        # Apply camera_to_world rotation
+        # CRITICAL: Center Hip (joint 0) at origin BEFORE rotation
+        # This ensures rotation happens around the skeleton's center (MotionAGFormer convention)
+        pose_3d = pose_3d - pose_3d[0:1, :]  # Subtract Hip position from all joints
+        
+        # Apply camera_to_world rotation using quaternion (now rotating around centered Hip)
         pose_3d = camera_to_world(pose_3d, R=rot, t=0)
         
         # Normalize for display
