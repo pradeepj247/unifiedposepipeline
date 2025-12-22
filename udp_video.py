@@ -235,7 +235,7 @@ def stage2_estimate_poses_rtmpose(video_path, detections_path, config, max_frame
     processing_fps = frames_processed / total_time
     
     # Save to NPZ
-    output_path = REPO_ROOT / config['output']['stage2_keypoints']
+    output_path = REPO_ROOT / config['output']['stage2_keypoints_2d']
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
     np.savez_compressed(
@@ -328,7 +328,7 @@ def stage2_estimate_poses_rtmpose_halpe26(video_path, detections_path, config, m
     processing_fps = frames_processed / total_time
     
     # Save to NPZ
-    output_path = REPO_ROOT / config['output']['stage2_keypoints']
+    output_path = REPO_ROOT / config['output']['stage2_keypoints_2d']
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
     np.savez_compressed(
@@ -455,6 +455,7 @@ def stage2_estimate_poses_vitpose(video_path, detections_path, config, max_frame
 def stage2_estimate_poses_wb3d(video_path, detections_path, config, max_frames, pose_model):
     """
     Stage 2: Estimate 3D whole-body poses using RTMPose3d (133 keypoints)
+    Saves both 2D and 3D keypoints
     
     Args:
         video_path: Path to input video
@@ -464,7 +465,8 @@ def stage2_estimate_poses_wb3d(video_path, detections_path, config, max_frames, 
         pose_model: Pre-initialized RTMPose3d model
     
     Returns:
-        output_path: Path to saved NPZ file
+        output_path_2d: Path to saved 2D keypoints NPZ file
+        output_path_3d: Path to saved 3D keypoints NPZ file
         total_time: Processing time in seconds
         fps: Processing FPS
     """
@@ -484,7 +486,8 @@ def stage2_estimate_poses_wb3d(video_path, detections_path, config, max_frames, 
         raise ValueError(f"Could not open video: {video_path}")
     
     # Storage for keypoints
-    all_keypoints = []
+    all_keypoints_2d = []
+    all_keypoints_3d = []
     all_scores = []
     
     t_start = time.time()
@@ -500,14 +503,17 @@ def stage2_estimate_poses_wb3d(video_path, detections_path, config, max_frames, 
             # Run pose estimation (returns 3D coords, scores, simcc, 2D)
             keypoints_3d, scores, keypoints_simcc, keypoints_2d = pose_model(frame, bboxes=[bbox])
             if len(keypoints_2d) > 0:
-                all_keypoints.append(keypoints_2d[0])  # Take first (only) detection - use 2D for viz
+                all_keypoints_2d.append(keypoints_2d[0])  # 2D projections
+                all_keypoints_3d.append(keypoints_3d[0])  # 3D coordinates
                 all_scores.append(scores[0])
             else:
-                all_keypoints.append(np.zeros((133, 2)))
+                all_keypoints_2d.append(np.zeros((133, 2)))
+                all_keypoints_3d.append(np.zeros((133, 3)))
                 all_scores.append(np.zeros(133))
         else:
             # No detection, store empty
-            all_keypoints.append(np.zeros((133, 2)))
+            all_keypoints_2d.append(np.zeros((133, 2)))
+            all_keypoints_3d.append(np.zeros((133, 3)))
             all_scores.append(np.zeros(133))
         
         frames_processed += 1
@@ -522,14 +528,25 @@ def stage2_estimate_poses_wb3d(video_path, detections_path, config, max_frames, 
     total_time = t_end - t_start
     processing_fps = frames_processed / total_time
     
-    # Save to NPZ
-    output_path = REPO_ROOT / config['output']['stage2_keypoints']
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    # Save 2D keypoints NPZ
+    output_path_2d = REPO_ROOT / config['output']['stage2_keypoints_2d']
+    output_path_2d.parent.mkdir(parents=True, exist_ok=True)
     
     np.savez_compressed(
-        output_path,
+        output_path_2d,
         frame_numbers=frame_numbers,
-        keypoints=np.array(all_keypoints),
+        keypoints=np.array(all_keypoints_2d),
+        scores=np.array(all_scores)
+    )
+    
+    # Save 3D keypoints NPZ
+    output_path_3d = REPO_ROOT / config['output']['stage2_keypoints_3d']
+    output_path_3d.parent.mkdir(parents=True, exist_ok=True)
+    
+    np.savez_compressed(
+        output_path_3d,
+        frame_numbers=frame_numbers,
+        keypoints_3d=np.array(all_keypoints_3d),
         scores=np.array(all_scores)
     )
     
@@ -540,9 +557,10 @@ def stage2_estimate_poses_wb3d(video_path, detections_path, config, max_frames, 
     print(f"   Valid poses: {valid_poses}/{frames_processed}")
     print(f"   Time: {total_time:.2f}s")
     print(f"   FPS: {processing_fps:.1f}")
-    print(f"   Output: {output_path}")
+    print(f"   Output 2D: {output_path_2d}")
+    print(f"   Output 3D: {output_path_3d}")
     
-    return output_path, total_time, processing_fps
+    return output_path_2d, output_path_3d, total_time, processing_fps
 
 
 def draw_skeleton_unified(image, keypoints, scores, kpt_thr=0.5):
@@ -645,7 +663,7 @@ def stage3_visualize(video_path, keypoints_path, config):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
     # Setup video writer
-    output_path = REPO_ROOT / config['output']['video_output']
+    output_path = REPO_ROOT / config['output']['video_output_2d']
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -672,6 +690,134 @@ def stage3_visualize(video_path, keypoints_path, config):
     
     cap.release()
     out.release()
+    t_end = time.time()
+    
+    total_time = t_end - t_start
+    
+    print(f"\n   ✅ Stage 3 complete!")
+    print(f"   Processed: {frames_processed} frames")
+    print(f"   Time: {total_time:.2f}s")
+    print(f"   Output: {output_path}")
+    
+    return output_path, total_time
+
+
+def stage3_visualize_3d(video_path, keypoints_2d_path, keypoints_3d_path, config):
+    """
+    Stage 3: Visualize 3D poses with split-screen (2D + 3D scatter)
+    
+    Args:
+        video_path: Path to input video
+        keypoints_2d_path: Path to 2D keypoints NPZ file
+        keypoints_3d_path: Path to 3D keypoints NPZ file
+        config: Output config dict
+    
+    Returns:
+        output_path: Path to saved video
+        total_time: Processing time in seconds
+    """
+    import matplotlib
+    matplotlib.use('Agg')  # Non-interactive backend
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    
+    print("\n" + "=" * 70)
+    print("🎯 STAGE 3: 3D Visualization (Split-Screen)")
+    print("=" * 70)
+    
+    # Load keypoints
+    data_2d = np.load(keypoints_2d_path)
+    data_3d = np.load(keypoints_3d_path)
+    frame_numbers = data_2d['frame_numbers']
+    keypoints_2d = data_2d['keypoints']
+    keypoints_3d = data_3d['keypoints_3d']
+    scores = data_2d['scores']
+    
+    print(f"   Loaded keypoints: {len(frame_numbers)} frames")
+    print(f"   2D shape: {keypoints_2d.shape}")
+    print(f"   3D shape: {keypoints_3d.shape}")
+    
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise ValueError(f"Could not open video: {video_path}")
+    
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    
+    # Output will be twice the width (side-by-side)
+    output_width = width * 2
+    output_height = height
+    
+    # Setup video writer
+    output_path = REPO_ROOT / config['output']['video_output_3d']
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(str(output_path), fourcc, fps, (output_width, output_height))
+    
+    t_start = time.time()
+    frames_processed = 0
+    
+    # Create figure for 3D plot (reuse for each frame)
+    fig = plt.figure(figsize=(width/100, height/100), dpi=100)
+    
+    for frame_idx, kpts_2d, kpts_3d, scrs in zip(frame_numbers, keypoints_2d, keypoints_3d, scores):
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        # Left panel: 2D skeleton overlay
+        left_panel = frame.copy()
+        if scrs[0] > 0:  # Check if valid pose
+            left_panel = draw_skeleton_unified(left_panel, kpts_2d, scrs, kpt_thr=0.3)
+        
+        # Right panel: 3D scatter plot
+        fig.clear()
+        ax = fig.add_subplot(111, projection='3d')
+        
+        if scrs[0] > 0:
+            # Filter keypoints by confidence
+            valid_mask = scrs > 0.3
+            valid_kpts = kpts_3d[valid_mask]
+            
+            if len(valid_kpts) > 0:
+                ax.scatter(valid_kpts[:, 0], valid_kpts[:, 1], valid_kpts[:, 2],
+                          c='blue', marker='o', s=10, alpha=0.6)
+                
+                # Set labels and limits
+                ax.set_xlabel('X')
+                ax.set_ylabel('Y')
+                ax.set_zlabel('Z (Depth)')
+                ax.set_title('3D Keypoints', fontsize=10)
+                
+                # Auto-scale axes
+                ax.set_xlim(valid_kpts[:, 0].min() - 0.1, valid_kpts[:, 0].max() + 0.1)
+                ax.set_ylim(valid_kpts[:, 1].min() - 0.1, valid_kpts[:, 1].max() + 0.1)
+                ax.set_zlim(valid_kpts[:, 2].min() - 0.1, valid_kpts[:, 2].max() + 0.1)
+        else:
+            ax.text(0.5, 0.5, 0.5, 'No pose detected', ha='center', va='center')
+        
+        # Convert matplotlib figure to image (use buffer_rgba for newer matplotlib)
+        fig.canvas.draw()
+        buf = np.asarray(fig.canvas.buffer_rgba())
+        right_panel = buf[:, :, :3]  # Drop alpha channel (RGBA -> RGB)
+        right_panel = cv2.cvtColor(right_panel, cv2.COLOR_RGB2BGR)
+        right_panel = cv2.resize(right_panel, (width, height))
+        
+        # Combine left and right panels
+        combined_frame = np.hstack([left_panel, right_panel])
+        
+        out.write(combined_frame)
+        frames_processed += 1
+        
+        # Progress indicator
+        if frames_processed % 30 == 0:
+            print(f"   Processed {frames_processed}/{len(frame_numbers)} frames", end='\r')
+    
+    cap.release()
+    out.release()
+    plt.close(fig)
     t_end = time.time()
     
     total_time = t_end - t_start
@@ -795,28 +941,36 @@ def main():
     )
     
     # Stage 2: Pose Estimation
-    if method == "rtmpose":
-        keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_rtmpose(
+    if method == "wb3d":
+        # wb3d returns two paths (2D and 3D)
+        keypoints_2d_path, keypoints_3d_path, stage2_time, stage2_fps = stage2_estimate_poses_wb3d(
             video_path, detections_path, config, max_frames, pose_model
         )
-    elif method == "rtmpose_halpe26":
-        keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_rtmpose_halpe26(
-            video_path, detections_path, config, max_frames, pose_model
-        )
-    elif method == "vitpose":
-        keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_vitpose(
-            video_path, detections_path, config, max_frames, pose_model
-        )
-    elif method == "wb3d":
-        keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_wb3d(
-            video_path, detections_path, config, max_frames, pose_model
-        )
+    else:
+        # Other methods return single path
+        if method == "rtmpose":
+            keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_rtmpose(
+                video_path, detections_path, config, max_frames, pose_model
+            )
+        elif method == "rtmpose_halpe26":
+            keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_rtmpose_halpe26(
+                video_path, detections_path, config, max_frames, pose_model
+            )
+        elif method == "vitpose":
+            keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_vitpose(
+                video_path, detections_path, config, max_frames, pose_model
+            )
     
     # Stage 3: Visualization (optional)
     if plot_enabled:
-        video_output_path, stage3_time = stage3_visualize(
-            video_path, keypoints_path, config
-        )
+        if method == "wb3d":
+            video_output_path, stage3_time = stage3_visualize_3d(
+                video_path, keypoints_2d_path, keypoints_3d_path, config
+            )
+        else:
+            video_output_path, stage3_time = stage3_visualize(
+                video_path, keypoints_path, config
+            )
     else:
         print("\n⏭️  Stage 3 skipped (plot=false)")
         stage3_time = 0

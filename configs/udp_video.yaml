@@ -38,6 +38,8 @@ video:
 
 output:
   stage1_detections: demo_data/outputs/detections.npz
-  stage2_keypoints: demo_data/outputs/keypoints.npz
-  video_output: demo_data/outputs/result.mp4
+  stage2_keypoints_2d: demo_data/outputs/keypoints_2D.npz
+  stage2_keypoints_3d: demo_data/outputs/keypoints_3D.npz  # Only for wb3d
+  video_output_2d: demo_data/outputs/result_2D.mp4
+  video_output_3d: demo_data/outputs/result_3D.mp4  # Only for wb3d
   plot: true  # Set to false to skip visualization stage
