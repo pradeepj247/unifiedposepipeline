@@ -2,7 +2,7 @@ from collections import OrderedDict
 
 import torch
 from torch import nn
-from timm.models.layers import DropPath
+from timm.layers import DropPath
 
 from .modules.attention import Attention
 from .modules.graph import GCN

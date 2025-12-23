@@ -1,5 +1,5 @@
 import torch
-from timm.models.layers import DropPath
+from timm.layers import DropPath
 from torch import nn
 
 from .attention import Attention

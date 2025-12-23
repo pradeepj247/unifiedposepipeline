@@ -9,7 +9,7 @@ Pipeline:
 
 Usage:
     # Basic 3D lifting (no visualization)
-    python udp_3d_lifting.py --keypoints demo_data/outputs/stage2_keypoints.npz
+    python udp_3d_lifting.py --keypoints demo_data/outputs/keypoints_2D.npz
     
     # With visualization overlay
     python udp_3d_lifting.py \
@@ -293,11 +293,8 @@ def run_3d_inference(keypoints, model, width, height, device='cuda'):
     Returns:
         poses_3d: (num_frames, 17, 3) 3D poses [x, y, z]
     """
-    print('   Splitting into 243-frame clips...')
-    
     # Split into clips
     clips, downsample = turn_into_clips(keypoints)
-    print(f'   Created {len(clips)} clip(s)')
     
     all_output_3D = []
     
@@ -553,13 +550,11 @@ def main():
         scores = scores[:args.max_frames]
     
     num_frames = keypoints_2d.shape[0]
-    print(f"   Shape: {keypoints_2d.shape}")
     print(f"   ✅ Loaded {num_frames} frames of COCO-17 keypoints")
     
     # Add batch dimension (CRITICAL!)
     keypoints_2d = keypoints_2d[np.newaxis, ...]  # (1, num_frames, 17, 2)
     scores = scores[np.newaxis, ...]              # (1, num_frames, 17)
-    print(f"   After adding batch dim: {keypoints_2d.shape}")
     
     # Convert COCO → H36M
     print(f"\n🔄 Converting COCO-17 → H36M-17 format...")
@@ -567,7 +562,6 @@ def main():
     h36m_kpts, h36m_scores, valid_frames = h36m_coco_format(keypoints_2d, scores)
     elapsed = time.time() - t_start
     print(f"   ✅ Converted in {elapsed:.2f}s")
-    print(f"   Shape: {h36m_kpts.shape}")
     
     # Add confidence scores to last dimension
     h36m_keypoints = np.concatenate((h36m_kpts, h36m_scores[..., None]), axis=-1)
@@ -605,8 +599,8 @@ def main():
     
     # Save 3D poses
     output_dir = keypoints_path.parent
-    poses_3d_path = output_dir / f"{keypoints_path.stem}_3d.npy"
-    np.save(poses_3d_path, poses_3d)
+    poses_3d_path = output_dir / "keypoints_3D_magf.npz"
+    np.savez(poses_3d_path, poses_3d=poses_3d)
     
     size_mb = poses_3d_path.stat().st_size / (1024 ** 2)
     print(f"\n💾 Saved 3D poses: {poses_3d_path}")
