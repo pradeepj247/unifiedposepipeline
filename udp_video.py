@@ -234,15 +234,18 @@ def stage2_estimate_poses_rtmpose(video_path, detections_path, config, max_frame
     total_time = t_end - t_start
     processing_fps = frames_processed / total_time
     
-    # Save to NPZ
-    output_path = REPO_ROOT / config['output']['stage2_keypoints_2d']
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    # Save to NPZ with model-specific naming
+    output_dir = REPO_ROOT / Path(config['output']['stage2_keypoints_2d']).parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / "kps_2d_rtm.npz"
     
     np.savez_compressed(
         output_path,
         frame_numbers=frame_numbers,
         keypoints=np.array(all_keypoints),
-        scores=np.array(all_scores)
+        scores=np.array(all_scores),
+        joint_format="coco17_2d.json",
+        model_type="rtmpose"
     )
     
     valid_poses = np.sum(np.array(all_scores)[:, 0] > 0)
@@ -327,15 +330,18 @@ def stage2_estimate_poses_rtmpose_halpe26(video_path, detections_path, config, m
     total_time = t_end - t_start
     processing_fps = frames_processed / total_time
     
-    # Save to NPZ
-    output_path = REPO_ROOT / config['output']['stage2_keypoints_2d']
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    # Save to NPZ with model-specific naming
+    output_dir = REPO_ROOT / Path(config['output']['stage2_keypoints_2d']).parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / "kps_2d_rtm_halpe26.npz"
     
     np.savez_compressed(
         output_path,
         frame_numbers=frame_numbers,
         keypoints=np.array(all_keypoints),
-        scores=np.array(all_scores)
+        scores=np.array(all_scores),
+        joint_format="halpe26_2d.json",
+        model_type="rtmpose_halpe26"
     )
     
     valid_poses = np.sum(np.array(all_scores)[:, 0] > 0)
@@ -426,15 +432,18 @@ def stage2_estimate_poses_vitpose(video_path, detections_path, config, max_frame
     total_time = t_end - t_start
     processing_fps = frames_processed / total_time
     
-    # Save to NPZ
-    output_path = REPO_ROOT / config['output']['stage2_keypoints']
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    # Save to NPZ with model-specific naming
+    output_dir = REPO_ROOT / Path(config['output']['stage2_keypoints']).parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / "kps_2d_vit.npz"
     
     np.savez_compressed(
         output_path,
         frame_numbers=frame_numbers,
         keypoints=np.array(all_keypoints),
-        scores=np.array(all_scores)
+        scores=np.array(all_scores),
+        joint_format="coco17_2d.json",
+        model_type="vitpose"
     )
     
     valid_poses = np.sum(np.array(all_scores)[:, 0] > 0)
@@ -528,26 +537,30 @@ def stage2_estimate_poses_wb3d(video_path, detections_path, config, max_frames, 
     total_time = t_end - t_start
     processing_fps = frames_processed / total_time
     
-    # Save 2D keypoints NPZ
-    output_path_2d = REPO_ROOT / config['output']['stage2_keypoints_2d']
-    output_path_2d.parent.mkdir(parents=True, exist_ok=True)
+    # Save 2D keypoints NPZ with model-specific naming
+    output_dir = REPO_ROOT / Path(config['output']['stage2_keypoints_2d']).parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path_2d = output_dir / "kps_2d_wb3d.npz"
     
     np.savez_compressed(
         output_path_2d,
         frame_numbers=frame_numbers,
         keypoints=np.array(all_keypoints_2d),
-        scores=np.array(all_scores)
+        scores=np.array(all_scores),
+        joint_format="dwpose133_2d.json",
+        model_type="wb3d"
     )
     
-    # Save 3D keypoints NPZ
-    output_path_3d = REPO_ROOT / config['output']['stage2_keypoints_3d']
-    output_path_3d.parent.mkdir(parents=True, exist_ok=True)
+    # Save 3D keypoints NPZ with model-specific naming
+    output_path_3d = output_dir / "kps_3d_wb3d.npz"
     
     np.savez_compressed(
         output_path_3d,
         frame_numbers=frame_numbers,
         keypoints_3d=np.array(all_keypoints_3d),
-        scores=np.array(all_scores)
+        scores=np.array(all_scores),
+        joint_format="dwpose133_3d.json",
+        model_type="wb3d"
     )
     
     valid_poses = np.sum(np.array(all_scores)[:, 0] > 0)

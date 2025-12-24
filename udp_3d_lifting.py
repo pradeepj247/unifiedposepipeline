@@ -597,10 +597,15 @@ def main():
     print(f"   Processing speed: {poses_3d.shape[0] / elapsed:.1f} fps")
     print(f"   Output shape: {poses_3d.shape}")
     
-    # Save 3D poses
+    # Save 3D poses with metadata
     output_dir = keypoints_path.parent
-    poses_3d_path = output_dir / "keypoints_3D_magf.npz"
-    np.savez(poses_3d_path, poses_3d=poses_3d)
+    poses_3d_path = output_dir / "kps_3d_magf.npz"
+    np.savez(
+        poses_3d_path,
+        poses_3d=poses_3d,
+        joint_format="h36m17_3d_magf.json",
+        model_type="motionagformer"
+    )
     
     size_mb = poses_3d_path.stat().st_size / (1024 ** 2)
     print(f"\n💾 Saved 3D poses: {poses_3d_path}")
