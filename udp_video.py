@@ -40,13 +40,18 @@ HALPE26_EDGES = [
     (5, 6), (5, 7), (7, 9), (6, 8), (8, 10),  # Arms
     (5, 11), (6, 12), (11, 12),  # Torso
     (11, 13), (13, 15), (12, 14), (14, 16),  # Legs
-    # Right foot connections (from ankle 16)
-    (16, 21), (16, 23), (16, 25),  # RAnkle to RBigToe, RSmallToe, RHeel
+    # Additional body connections (head and pelvis)
+    (0, 17),  # Nose to head_top
+    (0, 18),  # Nose to neck
+    (11, 19),  # Left_hip to pelvis
+    (12, 19),  # Right_hip to pelvis
     # Left foot connections (from ankle 15)
     (15, 20), (15, 22), (15, 24),  # LAnkle to LBigToe, LSmallToe, LHeel
-    # Body chain connections
-    (17, 18),  # Head to Neck
-    (18, 19),  # Neck to Hip/Pelvis
+    # Right foot connections (from ankle 16)
+    (16, 21), (16, 23), (16, 25),  # RAnkle to RBigToe, RSmallToe, RHeel
+    # Foot internal connections (optional for better visualization)
+    (20, 22), (21, 23),  # Toe connections
+    (22, 24), (23, 25),  # Toe to heel
 ]
 
 
@@ -333,7 +338,7 @@ def stage2_estimate_poses_rtmpose_halpe26(video_path, detections_path, config, m
     # Save to NPZ with model-specific naming
     output_dir = REPO_ROOT / Path(config['output']['stage2_keypoints_2d']).parent
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / "kps_2d_rtm_halpe26.npz"
+    output_path = output_dir / "kps_2D_halpe26.npz"
     
     np.savez_compressed(
         output_path,
@@ -675,8 +680,18 @@ def stage3_visualize(video_path, keypoints_path, config):
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
-    # Setup video writer
-    output_path = REPO_ROOT / config['output']['video_output_2d']
+    # Setup video writer - determine filename based on method
+    if 'halpe26' in str(keypoints_path):
+        output_filename = 'result_halpe2D.mp4'
+    elif 'vit' in str(keypoints_path):
+        output_filename = 'result_vitpose2D.mp4'
+    elif 'rtm' in str(keypoints_path):
+        output_filename = 'result_rtmpose2D.mp4'
+    else:
+        output_filename = 'result_2D.mp4'  # fallback
+    
+    output_dir = REPO_ROOT / "demo_data" / "outputs"
+    output_path = output_dir / output_filename
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -762,8 +777,9 @@ def stage3_visualize_3d(video_path, keypoints_2d_path, keypoints_3d_path, config
     output_width = width * 2
     output_height = height
     
-    # Setup video writer
-    output_path = REPO_ROOT / config['output']['video_output_3d']
+    # Setup video writer - wb3d always outputs to result_wb_2D3D.mp4
+    output_dir = REPO_ROOT / "demo_data" / "outputs"
+    output_path = output_dir / "result_wb_2D3D.mp4"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
