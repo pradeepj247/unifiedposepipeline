@@ -6,7 +6,7 @@ detection:
   confidence_threshold: 0.5
 
 pose_estimation:
-  method: rtmpose  # Options: rtmpose, rtmpose_halpe26, vitpose, wb3d
+  method: rtmpose  # Options: rtmpose, vitpose, rtmpose_h26, wholebody
   
   rtmpose:
     pose_model_path: models/rtmlib/rtmpose-l-coco-384x288.onnx
@@ -14,7 +14,7 @@ pose_estimation:
     backend: onnxruntime
     device: cuda
   
-  rtmpose_halpe26:
+  rtmpose_h26:
     pose_model_path: models/rtmlib/rtmpose-l-halpe26-384x288.onnx
     pose_input_size: [288, 384]
     backend: onnxruntime
@@ -26,7 +26,7 @@ pose_estimation:
     dataset: coco
     device: cuda
   
-  wb3d:
+  wholebody:
     pose_model_path: models/wb3d/rtmw3d-l.onnx
     pose_input_size: [288, 384]
     backend: onnxruntime
@@ -39,7 +39,7 @@ video:
 output:
   stage1_detections: demo_data/outputs/detections.npz
   stage2_keypoints_2d: demo_data/outputs/keypoints_2D.npz
-  stage2_keypoints_3d: demo_data/outputs/keypoints_3D.npz  # Only for wb3d
+  stage2_keypoints_3d: demo_data/outputs/keypoints_3D.npz  # Only for wholebody
   video_output_2d: demo_data/outputs/result_2D.mp4
-  video_output_3d: demo_data/outputs/result_3D.mp4  # Only for wb3d
+  video_output_3d: demo_data/outputs/result_3D.mp4  # Only for wholebody
   plot: true  # Set to false to skip visualization stage

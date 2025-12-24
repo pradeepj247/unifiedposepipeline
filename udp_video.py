@@ -265,7 +265,7 @@ def stage2_estimate_poses_rtmpose(video_path, detections_path, config, max_frame
     return output_path, total_time, processing_fps
 
 
-def stage2_estimate_poses_rtmpose_halpe26(video_path, detections_path, config, max_frames, pose_model):
+def stage2_estimate_poses_rtmpose_h26(video_path, detections_path, config, max_frames, pose_model):
     """
     Stage 2: Estimate poses using RTMPose Halpe26 (26 keypoints)
     
@@ -346,7 +346,7 @@ def stage2_estimate_poses_rtmpose_halpe26(video_path, detections_path, config, m
         keypoints=np.array(all_keypoints),
         scores=np.array(all_scores),
         joint_format="halpe26_2d.json",
-        model_type="rtmpose_halpe26"
+        model_type="rtmpose_h26"
     )
     
     valid_poses = np.sum(np.array(all_scores)[:, 0] > 0)
@@ -466,7 +466,7 @@ def stage2_estimate_poses_vitpose(video_path, detections_path, config, max_frame
     return output_path, total_time, processing_fps
 
 
-def stage2_estimate_poses_wb3d(video_path, detections_path, config, max_frames, pose_model):
+def stage2_estimate_poses_wholebody(video_path, detections_path, config, max_frames, pose_model):
     """
     Stage 2: Estimate 3D whole-body poses using RTMPose3d (133 keypoints)
     Saves both 2D and 3D keypoints
@@ -545,7 +545,7 @@ def stage2_estimate_poses_wb3d(video_path, detections_path, config, max_frames, 
     # Save 2D keypoints NPZ with model-specific naming
     output_dir = REPO_ROOT / Path(config['output']['stage2_keypoints_2d']).parent
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path_2d = output_dir / "kps_2d_wb3d.npz"
+    output_path_2d = output_dir / "kps_2d_wholebody.npz"
     
     np.savez_compressed(
         output_path_2d,
@@ -553,11 +553,11 @@ def stage2_estimate_poses_wb3d(video_path, detections_path, config, max_frames, 
         keypoints=np.array(all_keypoints_2d),
         scores=np.array(all_scores),
         joint_format="dwpose133_2d.json",
-        model_type="wb3d"
+        model_type="wholebody"
     )
     
     # Save 3D keypoints NPZ with model-specific naming
-    output_path_3d = output_dir / "kps_3d_wb3d.npz"
+    output_path_3d = output_dir / "kps_3d_wholebody.npz"
     
     np.savez_compressed(
         output_path_3d,
@@ -565,7 +565,7 @@ def stage2_estimate_poses_wb3d(video_path, detections_path, config, max_frames, 
         keypoints_3d=np.array(all_keypoints_3d),
         scores=np.array(all_scores),
         joint_format="dwpose133_3d.json",
-        model_type="wb3d"
+        model_type="wholebody"
     )
     
     valid_poses = np.sum(np.array(all_scores)[:, 0] > 0)
@@ -782,7 +782,7 @@ def stage3_visualize_3d(video_path, keypoints_2d_path, keypoints_3d_path, config
     output_width = width * 2
     output_height = height
     
-    # Setup video writer - wb3d always outputs to result_wb_2D3D.mp4
+    # Setup video writer - wholebody always outputs to result_wb_2D3D.mp4
     output_dir = REPO_ROOT / "demo_data" / "outputs"
     output_path = output_dir / "result_wb_2D3D.mp4"
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -933,18 +933,18 @@ def main():
         input_size = config["pose_estimation"]["rtmpose"]["pose_input_size"]
         model_size = "L" if input_size[0] >= 288 else "M" if input_size[0] >= 256 else "S"
         print(f"   ✅ RTMPose-{model_size} loaded ({input_size[0]}×{input_size[1]}, 17 keypoints)")
-    elif method == "rtmpose_halpe26":
+    elif method == "rtmpose_h26":
         from rtmlib.tools import RTMPose
         # Load from local ONNX file
-        model_path = PARENT_DIR / config["pose_estimation"]["rtmpose_halpe26"]["pose_model_path"]
+        model_path = PARENT_DIR / config["pose_estimation"]["rtmpose_h26"]["pose_model_path"]
         pose_model = RTMPose(
             onnx_model=str(model_path),
-            model_input_size=tuple(config["pose_estimation"]["rtmpose_halpe26"]["pose_input_size"]),
-            backend=config["pose_estimation"]["rtmpose_halpe26"]["backend"],
-            device=config["pose_estimation"]["rtmpose_halpe26"]["device"]
+            model_input_size=tuple(config["pose_estimation"]["rtmpose_h26"]["pose_input_size"]),
+            backend=config["pose_estimation"]["rtmpose_h26"]["backend"],
+            device=config["pose_estimation"]["rtmpose_h26"]["device"]
         )
         # Extract model size from input resolution
-        input_size = config["pose_estimation"]["rtmpose_halpe26"]["pose_input_size"]
+        input_size = config["pose_estimation"]["rtmpose_h26"]["pose_input_size"]
         model_size = "L" if input_size[0] >= 288 else "M" if input_size[0] >= 256 else "S"
         print(f"   ✅ RTMPose-{model_size} Halpe26 loaded ({input_size[0]}×{input_size[1]}, 26 keypoints)")
     elif method == "vitpose":
@@ -957,16 +957,16 @@ def main():
             device=config["pose_estimation"]["vitpose"]["device"]
         )
         print(f"   ✅ ViTPose-{config['pose_estimation']['vitpose']['model_name'].upper()} loaded")
-    elif method == "wb3d":
+    elif method == "wholebody":
         from rtmlib.tools import RTMPose3d
-        model_path = PARENT_DIR / config["pose_estimation"]["wb3d"]["pose_model_path"]
+        model_path = PARENT_DIR / config["pose_estimation"]["wholebody"]["pose_model_path"]
         pose_model = RTMPose3d(
             onnx_model=str(model_path),
-            model_input_size=tuple(config["pose_estimation"]["wb3d"]["pose_input_size"]),
-            backend=config["pose_estimation"]["wb3d"]["backend"],
-            device=config["pose_estimation"]["wb3d"]["device"]
+            model_input_size=tuple(config["pose_estimation"]["wholebody"]["pose_input_size"]),
+            backend=config["pose_estimation"]["wholebody"]["backend"],
+            device=config["pose_estimation"]["wholebody"]["device"]
         )
-        input_size = config["pose_estimation"]["wb3d"]["pose_input_size"]
+        input_size = config["pose_estimation"]["wholebody"]["pose_input_size"]
         print(f"   ✅ RTMW3D-L loaded ({input_size[0]}×{input_size[1]}, 133 keypoints with 3D)")
     else:
         print(f"   ❌ Unknown method: {method}")
@@ -980,9 +980,9 @@ def main():
     )
     
     # Stage 2: Pose Estimation
-    if method == "wb3d":
-        # wb3d returns two paths (2D and 3D)
-        keypoints_2d_path, keypoints_3d_path, stage2_time, stage2_fps = stage2_estimate_poses_wb3d(
+    if method == "wholebody":
+        # wholebody returns two paths (2D and 3D)
+        keypoints_2d_path, keypoints_3d_path, stage2_time, stage2_fps = stage2_estimate_poses_wholebody(
             video_path, detections_path, config, max_frames, pose_model
         )
     else:
@@ -991,8 +991,8 @@ def main():
             keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_rtmpose(
                 video_path, detections_path, config, max_frames, pose_model
             )
-        elif method == "rtmpose_halpe26":
-            keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_rtmpose_halpe26(
+        elif method == "rtmpose_h26":
+            keypoints_path, stage2_time, stage2_fps = stage2_estimate_poses_rtmpose_h26(
                 video_path, detections_path, config, max_frames, pose_model
             )
         elif method == "vitpose":
@@ -1002,7 +1002,7 @@ def main():
     
     # Stage 3: Visualization (optional)
     if plot_enabled:
-        if method == "wb3d":
+        if method == "wholebody":
             video_output_path, stage3_time = stage3_visualize_3d(
                 video_path, keypoints_2d_path, keypoints_3d_path, config
             )
