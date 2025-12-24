@@ -1,13 +1,22 @@
 """
 WB3D Visualization Debugger
 
-Standalone visualization for Whole-Body 3D (WB3D) skeleton to debug and fix rendering issues.
-Processes only first 120 frames for quick iteration.
+Standalone visualization for Whole-Body 3D (WB3D) skeleton with MotionAGFormer-style normalization.
+Properly renders grounded skeleton with adaptive Z-axis limits to prevent head clipping.
+
+Features:
+- MotionAGFormer normalization (max of positive values, not max absolute)
+- Adaptive Z-axis limits ensure full skeleton visibility
+- Grounded skeleton (feet at z=0)
+- Color-coded bones (blue=left, red=right, green=center)
+- Left panel: 2D keypoints overlaid on video frame
+- Right panel: 3D skeleton with proper grounding and normalization
 
 Usage:
     python vis_wb3d.py \
         --video demo_data/videos/dance.mp4 \
-        --wb3d demo_data/outputs/keypoints_3D_wb.npz \
+        --kps2d demo_data/outputs/kps_2d_wb3d.npz \
+        --kps3d demo_data/outputs/kps_3d_wb3d.npz \
         --output demo_data/outputs/debug_wb3d.mp4 \
         --max-frames 120
 """
@@ -117,10 +126,17 @@ def render_wb3d_skeleton(pose_3d, width, height, frame_idx=0, debug=True):
         print(f"  X range: [{np.min(body_pose[:, 0]):.3f}, {np.max(body_pose[:, 0]):.3f}]")
         print(f"  Y range: [{np.min(body_pose[:, 1]):.3f}, {np.max(body_pose[:, 1]):.3f}]")
     
-    # Normalize to [0, 1] range for display
-    max_value = np.max(np.abs(body_pose))
+    # Normalize using MotionAGFormer approach (max of positive values, not max absolute)
+    max_value = np.max(body_pose)
     if max_value > 0:
         body_pose /= max_value
+    
+    if debug and frame_idx == 0:
+        print(f"\nAfter normalization:")
+        print(f"  Normalization factor: {max_value:.3f}")
+        print(f"  X range: [{np.min(body_pose[:, 0]):.3f}, {np.max(body_pose[:, 0]):.3f}]")
+        print(f"  Y range: [{np.min(body_pose[:, 1]):.3f}, {np.max(body_pose[:, 1]):.3f}]")
+        print(f"  Z range: [{np.min(body_pose[:, 2]):.3f}, {np.max(body_pose[:, 2]):.3f}]")
     
     # Create figure
     fig = plt.figure(figsize=(height / 100, height / 100), dpi=100)
@@ -228,14 +244,20 @@ def render_wb3d_skeleton(pose_3d, width, height, frame_idx=0, debug=True):
                    str(i+1), fontsize=14, color='black', fontweight='bold',
                    bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7))
     
-    # Set view limits (same as MAGF)
+    # Set view limits (MotionAGFormer approach with adaptive Z-axis)
     RADIUS = 0.72
-    RADIUS_Z = 0.7
+    RADIUS_Z = max(1.1, np.max(body_pose[:, 2]) * 1.1)  # Adaptive: ensure full skeleton visible
     xroot, yroot, zroot = 0, 0, 0
     ax.set_xlim3d([-RADIUS + xroot, RADIUS + xroot])
     ax.set_ylim3d([-RADIUS + yroot, RADIUS + yroot])
-    ax.set_zlim3d([-RADIUS_Z + zroot, RADIUS_Z + zroot])
+    ax.set_zlim3d([0, RADIUS_Z + zroot])  # From ground up, adaptive height
     ax.set_aspect('auto')
+    
+    if debug and frame_idx == 0:
+        print(f"\nVisualization limits:")
+        print(f"  X: [{-RADIUS:.2f}, {RADIUS:.2f}]")
+        print(f"  Y: [{-RADIUS:.2f}, {RADIUS:.2f}]")
+        print(f"  Z: [0.00, {RADIUS_Z:.2f}] (adaptive)")
     
     # White background
     white = (1.0, 1.0, 1.0, 0.0)
@@ -250,7 +272,7 @@ def render_wb3d_skeleton(pose_3d, width, height, frame_idx=0, debug=True):
     ax.tick_params(labelsize=6)
     
     # Add title
-    ax.set_title(f'WB3D Skeleton (Frame {frame_idx})', fontsize=11, fontweight='bold', pad=10)
+    ax.set_title('3D Skeleton', fontsize=11, fontweight='bold', pad=10)
     
     # Convert to image
     fig.canvas.draw()
@@ -265,13 +287,14 @@ def render_wb3d_skeleton(pose_3d, width, height, frame_idx=0, debug=True):
     return img
 
 
-def create_wb3d_visualization(video_path, wb3d_path, output_path, max_frames=120):
+def create_wb3d_visualization(video_path, kps2d_path, kps3d_path, output_path, max_frames=120):
     """
     Create visualization video for WB3D skeleton debugging.
     
     Args:
         video_path: Path to original video
-        wb3d_path: Path to keypoints_3D_wb.npz
+        kps2d_path: Path to kps_2d_wb3d.npz (2D keypoints)
+        kps3d_path: Path to kps_3d_wb3d.npz (3D keypoints)
         output_path: Path to save output video
         max_frames: Maximum frames to render (default: 120 for debugging)
     """
@@ -279,13 +302,17 @@ def create_wb3d_visualization(video_path, wb3d_path, output_path, max_frames=120
     print("🐛 WB3D Skeleton Visualization Debugger")
     print("=" * 70)
     
-    # Load WB3D poses
-    print(f"\n📂 Loading WB3D data...")
-    wb3d_data = np.load(wb3d_path)
-    poses_wb3d = wb3d_data['keypoints_3d']  # (N, 133, 3)
+    # Load 2D and 3D keypoints
+    print(f"\n📂 Loading keypoints...")
+    kps2d_data = np.load(kps2d_path)
+    kps3d_data = np.load(kps3d_path)
     
-    print(f"   WB3D shape: {poses_wb3d.shape}")
-    print(f"   Total joints: 133 (Body: 17, Hands: 42, Face: 68, Extra: 6)")
+    poses_2d = kps2d_data['keypoints']  # (N, 133, 2)
+    poses_3d = kps3d_data['keypoints_3d']  # (N, 133, 3) - Note: key is 'keypoints_3d'
+    
+    print(f"   2D keypoints: {poses_2d.shape}")
+    print(f"   3D keypoints: {poses_3d.shape}")
+    print(f"   Total joints: 133 (Body: 23, Face: 68, Left hand: 21, Right hand: 21)")
     
     # Open video
     cap = cv2.VideoCapture(str(video_path))
@@ -301,7 +328,7 @@ def create_wb3d_visualization(video_path, wb3d_path, output_path, max_frames=120
     print(f"\n📹 Video: {video_width}x{video_height}, {fps} fps, {video_frames} frames")
     
     # Limit frames
-    total_frames = min(poses_wb3d.shape[0], video_frames, max_frames)
+    total_frames = min(poses_2d.shape[0], poses_3d.shape[0], video_frames, max_frames)
     print(f"   Processing: {total_frames} frames (debug mode)")
     
     # Create output directory
@@ -314,7 +341,17 @@ def create_wb3d_visualization(video_path, wb3d_path, output_path, max_frames=120
     output_width = panel_width * 2
     output_height = panel_height
     
-    print(f"\n🎨 Output: {output_width}x{output_height} (Video | WB3D)")
+    # Body skeleton connections (first 23 joints)
+    BODY_EDGES = [
+        (0, 1), (0, 2), (1, 3), (2, 4),  # Head
+        (5, 6), (5, 7), (7, 9), (6, 8), (8, 10),  # Arms
+        (5, 11), (6, 12), (11, 12),  # Torso
+        (11, 13), (13, 15), (12, 14), (14, 16),  # Legs
+        (15, 17), (15, 18), (15, 19),  # Left foot
+        (16, 20), (16, 21), (16, 22),  # Right foot
+    ]
+    
+    print(f"\n🎨 Output: {output_width}x{output_height} (2D on Video | 3D Skeleton)")
     
     # Video writer
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -333,31 +370,40 @@ def create_wb3d_visualization(video_path, wb3d_path, output_path, max_frames=120
         if frame.shape[1] != panel_width or frame.shape[0] != panel_height:
             frame = cv2.resize(frame, (panel_width, panel_height))
         
-        # Render WB3D skeleton (debug mode for first frame)
+        # LEFT PANEL: Draw 2D keypoints on video frame
+        frame_2d = frame.copy()
+        kpts_2d = poses_2d[i][:23]  # First 23 body joints
+        
+        # Draw skeleton connections
+        for start, end in BODY_EDGES:
+            x1, y1 = int(kpts_2d[start, 0]), int(kpts_2d[start, 1])
+            x2, y2 = int(kpts_2d[end, 0]), int(kpts_2d[end, 1])
+            cv2.line(frame_2d, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        
+        # Draw keypoints
+        for idx in range(23):
+            x, y = int(kpts_2d[idx, 0]), int(kpts_2d[idx, 1])
+            cv2.circle(frame_2d, (x, y), 4, (0, 0, 255), -1)
+        
+        # RIGHT PANEL: Render 3D skeleton
         wb3d_img = render_wb3d_skeleton(
-            poses_wb3d[i], 
+            poses_3d[i], 
             panel_width, 
             panel_height, 
             frame_idx=i,
-            debug=(i == 0)  # Print debug info only for first frame
+            debug=False  # No debug output during rendering
         )
         
         # Add labels
         font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(frame, "Original Video", (10, 30), font, 0.8, 
+        cv2.putText(frame_2d, f"2D Keypoints (Frame {i+1}/{total_frames})", (10, 30), font, 0.8, 
                     (255, 255, 255), 2, cv2.LINE_AA)
-        cv2.putText(wb3d_img, f"WB3D Skeleton (Frame {i+1}/{total_frames})", (10, 30), 
+        cv2.putText(wb3d_img, f"3D Skeleton (Frame {i+1}/{total_frames})", (10, 30), 
                     font, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
         
         # Combine panels
-        combined = np.hstack([frame, wb3d_img])
+        combined = np.hstack([frame_2d, wb3d_img])
         out.write(combined)
-        
-        # Save first frame as PNG for detailed inspection
-        if i == 0:
-            debug_frame_path = output_path.parent / "debug_wb3d_001.png"
-            cv2.imwrite(str(debug_frame_path), combined)
-            print(f"\n📸 Saved first frame: {debug_frame_path}")
     
     cap.release()
     out.release()
@@ -378,8 +424,10 @@ def main():
     )
     parser.add_argument('--video', type=str, required=True,
                         help='Path to original video')
-    parser.add_argument('--wb3d', type=str, required=True,
-                        help='Path to keypoints_3D_wb.npz')
+    parser.add_argument('--kps2d', type=str, required=True,
+                        help='Path to kps_2d_wb3d.npz (2D keypoints)')
+    parser.add_argument('--kps3d', type=str, required=True,
+                        help='Path to kps_3d_wb3d.npz (3D keypoints)')
     parser.add_argument('--output', type=str, default=None,
                         help='Path to output video (default: debug_wb3d.mp4)')
     parser.add_argument('--max-frames', type=int, default=120,
@@ -389,14 +437,19 @@ def main():
     
     # Check inputs
     video_path = Path(args.video)
-    wb3d_path = Path(args.wb3d)
+    kps2d_path = Path(args.kps2d)
+    kps3d_path = Path(args.kps3d)
     
     if not video_path.exists():
         print(f"❌ Video not found: {video_path}")
         return 1
     
-    if not wb3d_path.exists():
-        print(f"❌ WB3D file not found: {wb3d_path}")
+    if not kps2d_path.exists():
+        print(f"❌ 2D keypoints file not found: {kps2d_path}")
+        return 1
+    
+    if not kps3d_path.exists():
+        print(f"❌ 3D keypoints file not found: {kps3d_path}")
         return 1
     
     # Setup output path
@@ -410,7 +463,8 @@ def main():
     # Create debug visualization
     success = create_wb3d_visualization(
         video_path,
-        wb3d_path,
+        kps2d_path,
+        kps3d_path,
         output_path,
         max_frames=args.max_frames
     )
@@ -419,11 +473,6 @@ def main():
         print("\n" + "=" * 70)
         print("✅ DEBUG VIDEO CREATED!")
         print("=" * 70)
-        print(f"\nReview the video and check:")
-        print(f"  1. Is skeleton grounded at z=0?")
-        print(f"  2. Are all connections correct?")
-        print(f"  3. Are joint numbers visible in first few frames?")
-        print(f"\nVideo: {output_path}")
     else:
         print("\n❌ Failed to create debug video")
         return 1
