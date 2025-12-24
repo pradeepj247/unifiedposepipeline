@@ -1,0 +1,96 @@
+{
+  "format_name": "Wholebody3D-133",
+  "description": "Wholebody 133-keypoint format for 3D pose estimation (body + hands + face)",
+  "num_joints": 133,
+  "keypoint_groups": {
+    "body": {
+      "range": [0, 22],
+      "count": 23,
+      "description": "COCO-17 body keypoints + 6 foot keypoints in 3D"
+    },
+    "face": {
+      "range": [23, 90],
+      "count": 68,
+      "description": "Face keypoints in 3D (68 facial landmarks)"
+    },
+    "left_hand": {
+      "range": [91, 111],
+      "count": 21,
+      "description": "Left hand keypoints in 3D"
+    },
+    "right_hand": {
+      "range": [112, 132],
+      "count": 21,
+      "description": "Right hand keypoints in 3D"
+    }
+  },
+  "body_joint_names": [
+    "nose",
+    "left_eye",
+    "right_eye",
+    "left_ear",
+    "right_ear",
+    "left_shoulder",
+    "right_shoulder",
+    "left_elbow",
+    "right_elbow",
+    "left_wrist",
+    "right_wrist",
+    "left_hip",
+    "right_hip",
+    "left_knee",
+    "right_knee",
+    "left_ankle",
+    "right_ankle",
+    "left_big_toe",
+    "left_small_toe",
+    "left_heel",
+    "right_big_toe",
+    "right_small_toe",
+    "right_heel"
+  ],
+  "body_skeleton_connections": [
+    [0, 1],
+    [0, 2],
+    [1, 3],
+    [2, 4],
+    [0, 5],
+    [0, 6],
+    [5, 6],
+    [5, 7],
+    [7, 9],
+    [6, 8],
+    [8, 10],
+    [5, 11],
+    [6, 12],
+    [11, 12],
+    [11, 13],
+    [13, 15],
+    [12, 14],
+    [14, 16],
+    [15, 17],
+    [15, 18],
+    [15, 19],
+    [16, 20],
+    [16, 21],
+    [16, 22]
+  ],
+  "coordinate_system": {
+    "type": "camera_space_hybrid",
+    "origin": "camera_optical_center",
+    "x_axis": "left to right in image plane (positive = right)",
+    "y_axis": "top to bottom in image plane (positive = down)",
+    "z_axis": "camera to scene (positive = away from camera, into scene)",
+    "units": "mixed (X/Y in pixels, Z in millimeters or relative depth)",
+    "notes": "X and Y coordinates correspond to 2D image coordinates. Z represents depth/height."
+  },
+  "usage": "Wholebody3D end-to-end 3D pose estimation",
+  "notes": [
+    "X/Y coordinates match 2D pixel coordinates for direct overlay",
+    "Z coordinate represents relative depth/height",
+    "Body keypoints 0-16: COCO-17 standard body",
+    "Body keypoints 17-22: Foot detail (toes and heels)",
+    "Face keypoints 23-90: 68-point facial landmarks",
+    "End-to-end model ensures 2D-3D consistency via reprojection loss"
+  ]
+}

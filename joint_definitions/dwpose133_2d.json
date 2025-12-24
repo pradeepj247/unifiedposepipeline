@@ -1,0 +1,92 @@
+{
+  "format_name": "DWPose-133",
+  "description": "DWPose wholebody 133-keypoint format for 2D pose estimation (body + hands + face)",
+  "num_joints": 133,
+  "keypoint_groups": {
+    "body": {
+      "range": [0, 22],
+      "count": 23,
+      "description": "COCO-17 body keypoints + 6 foot keypoints (toes and heels)"
+    },
+    "face": {
+      "range": [23, 90],
+      "count": 68,
+      "description": "Face keypoints (68 facial landmarks)"
+    },
+    "left_hand": {
+      "range": [91, 111],
+      "count": 21,
+      "description": "Left hand keypoints (wrist + 20 finger joints)"
+    },
+    "right_hand": {
+      "range": [112, 132],
+      "count": 21,
+      "description": "Right hand keypoints (wrist + 20 finger joints)"
+    }
+  },
+  "body_joint_names": [
+    "nose",
+    "left_eye",
+    "right_eye",
+    "left_ear",
+    "right_ear",
+    "left_shoulder",
+    "right_shoulder",
+    "left_elbow",
+    "right_elbow",
+    "left_wrist",
+    "right_wrist",
+    "left_hip",
+    "right_hip",
+    "left_knee",
+    "right_knee",
+    "left_ankle",
+    "right_ankle",
+    "left_big_toe",
+    "left_small_toe",
+    "left_heel",
+    "right_big_toe",
+    "right_small_toe",
+    "right_heel"
+  ],
+  "body_skeleton_connections": [
+    [0, 1],
+    [0, 2],
+    [1, 3],
+    [2, 4],
+    [0, 5],
+    [0, 6],
+    [5, 6],
+    [5, 7],
+    [7, 9],
+    [6, 8],
+    [8, 10],
+    [5, 11],
+    [6, 12],
+    [11, 12],
+    [11, 13],
+    [13, 15],
+    [12, 14],
+    [14, 16],
+    [15, 17],
+    [15, 18],
+    [15, 19],
+    [16, 20],
+    [16, 21],
+    [16, 22]
+  ],
+  "coordinate_system": {
+    "type": "image_pixels",
+    "origin": "top_left",
+    "x_axis": "left to right (positive = right)",
+    "y_axis": "top to bottom (positive = down)",
+    "units": "pixels"
+  },
+  "usage": "DWPose wholebody 2D detection (RTMPose-based)",
+  "notes": [
+    "Body keypoints 0-16: COCO-17 standard body",
+    "Body keypoints 17-22: Foot detail (toes and heels)",
+    "Face keypoints 23-90: 68-point facial landmarks",
+    "Hand keypoints follow MediaPipe hand landmark convention"
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "format_name": "H36M-17-MAGF",
+  "description": "Human3.6M 17-keypoint format used by MotionAGFormer for 3D pose estimation",
+  "num_joints": 17,
+  "joint_names": [
+    "pelvis_root",
+    "right_hip",
+    "right_knee",
+    "right_ankle",
+    "left_hip",
+    "left_knee",
+    "left_ankle",
+    "spine_mid",
+    "spine_top_neck",
+    "chin",
+    "head_top",
+    "left_shoulder",
+    "left_elbow",
+    "left_wrist",
+    "right_shoulder",
+    "right_elbow",
+    "right_wrist"
+  ],
+  "joint_aliases": {
+    "0": ["pelvis", "root", "spine_base", "hip_center"],
+    "8": ["thorax", "neck_base", "spine_top"],
+    "9": ["neck", "nose", "chin"],
+    "10": ["head", "head_top"]
+  },
+  "skeleton_connections": [
+    [0, 1],
+    [0, 4],
+    [1, 2],
+    [2, 3],
+    [4, 5],
+    [5, 6],
+    [0, 7],
+    [7, 8],
+    [8, 14],
+    [8, 11],
+    [14, 15],
+    [15, 16],
+    [11, 12],
+    [12, 13],
+    [8, 9],
+    [9, 10]
+  ],
+  "left_right_pairs": [
+    [1, 4],
+    [2, 5],
+    [3, 6],
+    [11, 14],
+    [12, 15],
+    [13, 16]
+  ],
+  "color_scheme": {
+    "left_joints": [4, 5, 6, 11, 12, 13],
+    "right_joints": [1, 2, 3, 14, 15, 16],
+    "center_joints": [0, 7, 8, 9, 10],
+    "left_color": [0, 0, 255],
+    "right_color": [255, 0, 0],
+    "center_color": [0, 255, 0]
+  },
+  "coordinate_system": {
+    "type": "body_relative",
+    "origin": "pelvis (joint 0)",
+    "x_axis": "right to left (positive = left)",
+    "y_axis": "down to up (positive = up)",
+    "z_axis": "back to front (positive = forward)",
+    "units": "normalized",
+    "notes": "Pelvis (joint 0) is set to origin [0, 0, 0] by MotionAGFormer"
+  },
+  "usage": "MotionAGFormer 3D pose lifting"
+}

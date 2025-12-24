@@ -1,0 +1,63 @@
+{
+  "format_name": "COCO-17",
+  "description": "COCO 17-keypoint format used by RTMPose and ViTPose for 2D pose estimation",
+  "num_joints": 17,
+  "joint_names": [
+    "nose",
+    "left_eye",
+    "right_eye",
+    "left_ear",
+    "right_ear",
+    "left_shoulder",
+    "right_shoulder",
+    "left_elbow",
+    "right_elbow",
+    "left_wrist",
+    "right_wrist",
+    "left_hip",
+    "right_hip",
+    "left_knee",
+    "right_knee",
+    "left_ankle",
+    "right_ankle"
+  ],
+  "skeleton_connections": [
+    [0, 1],
+    [0, 2],
+    [1, 3],
+    [2, 4],
+    [0, 5],
+    [0, 6],
+    [5, 6],
+    [5, 7],
+    [7, 9],
+    [6, 8],
+    [8, 10],
+    [5, 11],
+    [6, 12],
+    [11, 12],
+    [11, 13],
+    [13, 15],
+    [12, 14],
+    [14, 16]
+  ],
+  "left_right_pairs": [
+    [1, 2],
+    [3, 4],
+    [5, 6],
+    [7, 8],
+    [9, 10],
+    [11, 12],
+    [13, 14],
+    [15, 16]
+  ],
+  "color_scheme": {
+    "left_joints": [1, 3, 5, 7, 9, 11, 13, 15],
+    "right_joints": [2, 4, 6, 8, 10, 12, 14, 16],
+    "center_joints": [0],
+    "left_color": [0, 0, 255],
+    "right_color": [255, 0, 0],
+    "center_color": [0, 255, 0]
+  },
+  "usage": "RTMPose, ViTPose (2D detection)"
+}
