@@ -709,6 +709,11 @@ def stage3_visualize(video_path, keypoints_path, config):
         if scrs[0] > 0:  # Check if valid pose
             frame = draw_skeleton_unified(frame, kpts, scrs, kpt_thr=0.5)
         
+        # Add frame number in upper-right corner
+        cv2.putText(frame, f'Frame: {int(frame_idx)}', 
+                   (width - 180, 40), cv2.FONT_HERSHEY_SIMPLEX, 
+                   1.0, (0, 255, 0), 2, cv2.LINE_AA)
+        
         out.write(frame)
         frames_processed += 1
         
@@ -836,6 +841,11 @@ def stage3_visualize_3d(video_path, keypoints_2d_path, keypoints_3d_path, config
         
         # Combine left and right panels
         combined_frame = np.hstack([left_panel, right_panel])
+        
+        # Add frame number in upper-right corner of combined frame
+        cv2.putText(combined_frame, f'Frame: {int(frame_idx)}', 
+                   (output_width - 180, 40), cv2.FONT_HERSHEY_SIMPLEX, 
+                   1.0, (0, 255, 0), 2, cv2.LINE_AA)
         
         out.write(combined_frame)
         frames_processed += 1
