@@ -12,23 +12,21 @@ detector:
   detect_only_humans: true  # If true, only detect person class (COCO class 0)
 
 # ============================================================================
-# Re-Identification (ReID) Settings
-# ============================================================================
-reid:
-  apply: false  # Enable/disable ReID for identity association
-  model_path: models/reid/osnet_x1_0_msmt17.pth  # Path to ReID model
-  device: cuda
-
-# ============================================================================
 # Tracking Settings
 # ============================================================================
 tracking:
-  enabled: false  # Enable/disable tracking (default: false, only largest bbox)
-  tracker: botsort  # Options: botsort, deepocsort, bytetrack, strongsort, ocsort
-  tracker_config: configs/trackers/botsort.yaml  # Path to tracker-specific config
+  enabled: true  # Enable/disable tracking (true = use tracker, false = detection only)
+  tracker: botsort  # Options: botsort, bytetrack, boosttrack, deepocsort, strongsort, ocsort, hybridsort
+                    # Recommended: botsort (best accuracy), bytetrack (fastest), boosttrack (best IDF1)
   
-  # If tracking is disabled, use largest bbox selection
-  largest_bbox_only: true  # Select only the largest detected bbox per frame
+  # Re-Identification (ReID) Settings - Appearance-based tracking
+  reid:
+    enabled: false  # true = appearance features (slower, better ID), false = motion only (faster)
+    weights_path: models/reid/osnet_x0_25_msmt17.pt  # ReID model weights (OSNet, MobileNet, etc.)
+    # Note: If weights not found, will automatically fall back to motion-only tracking
+  
+  # Output mode
+  largest_bbox_only: true  # Select only the largest tracked bbox per frame (maintains compatibility)
 
 # ============================================================================
 # Input/Output Settings
