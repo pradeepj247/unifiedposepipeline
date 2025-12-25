@@ -21,6 +21,7 @@ import argparse
 import yaml
 import numpy as np
 import cv2
+import time
 from pathlib import Path
 from tqdm import tqdm
 import sys
@@ -184,6 +185,9 @@ def process_video(config):
     frame_numbers = []
     bboxes_list = []
     
+    # Start timing
+    t_start = time.time()
+    
     # Process frames
     pbar = tqdm(total=num_frames, desc="Detecting", disable=not verbose)
     
@@ -221,6 +225,11 @@ def process_video(config):
     pbar.close()
     cap.release()
     
+    # End timing
+    t_end = time.time()
+    total_time = t_end - t_start
+    processing_fps = len(frame_numbers) / total_time if total_time > 0 else 0
+    
     # Convert to numpy arrays (match udp_video.py format exactly)
     frame_numbers = np.array(frame_numbers, dtype=np.int64)  # Default numpy dtype
     bboxes = np.array(bboxes_list, dtype=np.int64)  # Integer coordinates like udp_video.py
@@ -237,6 +246,8 @@ def process_video(config):
         print(f"  Total frames processed: {len(frame_numbers)}")
         print(f"  Frames with detections: {valid_detections}")
         print(f"  Detection rate: {valid_detections / len(frame_numbers) * 100:.1f}%")
+        print(f"  Processing FPS: {processing_fps:.1f}")
+        print(f"  Time taken: {total_time:.2f}s")
     
     return detections_data
 
