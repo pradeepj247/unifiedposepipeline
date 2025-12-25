@@ -114,13 +114,31 @@ def load_tracker(tracker_name, reid_config, device='cuda', half=False):
     
     # Check if ReID is enabled
     if reid_config.get('enabled', False):
-        reid_weights = Path(reid_config['weights_path'])
+        reid_weights_str = reid_config['weights_path']
+        reid_weights = Path(reid_weights_str)
+        
+        # Try multiple path resolution strategies (same as YOLO)
+        # 1. Try as-is (absolute path)
+        # 2. Try relative to current directory
+        # 3. Try relative to parent directory (where models/ actually is)
+        if not reid_weights.exists():
+            # Try relative to parent directory
+            reid_weights_parent = Path('..') / reid_weights_str
+            if reid_weights_parent.exists():
+                reid_weights = reid_weights_parent
+            # Try as absolute path with /content/models
+            elif Path('/content') / reid_weights_str:
+                reid_weights_abs = Path('/content') / reid_weights_str
+                if reid_weights_abs.exists():
+                    reid_weights = reid_weights_abs
+        
         if not reid_weights.exists():
             print(f"   ⚠️  ReID weights not found: {reid_weights}")
+            print(f"   Tried: {reid_weights_str}, ../{reid_weights_str}, /content/{reid_weights_str}")
             print(f"   Using motion-only tracking (no appearance features)")
             tracker = tracker_class(device=device, half=half)
         else:
-            print(f"   Using ReID weights: {reid_weights}")
+            print(f"   ✅ ReID weights found: {reid_weights}")
             tracker = tracker_class(
                 reid_weights=reid_weights,
                 device=device,
