@@ -1,0 +1,82 @@
+# Detector Configuration for Tracking Benchmark
+# Testing BoxMOT tracking with ReID on campus_walk.mp4
+# Goal: Observe track ID stability and FPS impact with ReID enabled
+
+# ============================================================================
+# Detector Settings
+# ============================================================================
+detector:
+  type: yolo  # Options: yolo, rtmdet
+  model_path: models/yolo/yolov8s.pt  # Path to detector model
+  confidence: 0.3  # Confidence threshold for detections
+  device: cuda  # Device to use: cuda or cpu
+  detect_only_humans: true  # Only detect person class (COCO class 0)
+
+# ============================================================================
+# Tracking Settings - BENCHMARK CONFIGURATION
+# ============================================================================
+tracking:
+  enabled: true  # Enable tracking
+  
+  # Tracker selection: Using ByteTrack (fastest: 1265 Hz motion-only)
+  # Options: botsort, bytetrack, boosttrack, deepocsort, strongsort, ocsort, hybridsort
+  tracker: bytetrack  # Fastest tracker for baseline
+  
+  # Re-Identification (ReID) Settings - ENABLED FOR BENCHMARK
+  reid:
+    enabled: true  # Enable appearance-based tracking with ReID
+    
+    # Using OSNet x1.0 model (better accuracy than x0.25)
+    # Available models:
+    #   - osnet_x0_25_msmt17.pt  (lightweight, ~0.5M params)
+    #   - osnet_x1_0_msmt17.pt   (medium, ~2M params) <- Using this
+    #   - mobilenetv2_x1_4_msmt17.pt (medium, ~6M params)
+    weights_path: models/reid/osnet_x1_0_msmt17.pt
+    
+    # Note: ReID model will be auto-downloaded if not found
+  
+  # Output mode
+  largest_bbox_only: true  # For pipeline compatibility (select largest bbox)
+
+# ============================================================================
+# Input/Output Settings
+# ============================================================================
+input:
+  video_path: /content/campus_walk.mp4  # Input video with multiple people
+  max_frames: 0  # Process all frames (0 = no limit)
+
+output:
+  detections_file: demo_data/outputs/detections_tracking_reid.npz  # NPZ output
+  save_visualization: true  # Save annotated video with track IDs
+  visualization_path: demo_data/outputs/campus_walk_tracking_reid.mp4  # Output video
+
+# ============================================================================
+# Advanced Settings
+# ============================================================================
+advanced:
+  batch_size: 1  # Batch size for detection
+  verbose: true  # Print detailed progress and benchmarking info
+
+# ============================================================================
+# BENCHMARK EXPECTATIONS:
+# ============================================================================
+# Without tracking/ReID (raw YOLO): ~70 FPS (baseline)
+# 
+# With ByteTrack + OSNet x1.0 ReID:
+#   - Detection FPS: ~70 FPS (unchanged)
+#   - Tracking FPS: ~100-200 FPS (ByteTrack is fast)
+#   - ReID overhead: ~20-30ms per frame
+#   - Combined FPS: ~30-40 FPS (expected drop due to ReID)
+#   - Overall FPS: ~25-35 FPS (including I/O)
+#
+# Track ID Stability:
+#   - Without ReID: Frequent ID switches during occlusions
+#   - With ReID: Consistent IDs even after occlusions
+#   - Unique track IDs: Depends on number of people in video
+#
+# Output Visualization:
+#   - Each person gets unique colored bbox
+#   - Track ID shown above bbox
+#   - Same ID maintained across frames (with ReID)
+#
+# ============================================================================
