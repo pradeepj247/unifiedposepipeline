@@ -264,6 +264,28 @@ output:
 | `udp_video.py` | Main unified pipeline | `stage1_detect_yolo()`, `stage2_estimate_poses_*()`, `stage3_visualize()` |
 | `udp_3d_lifting.py` | Standalone 3D lifting | Converts 2D keypoints → 3D using MAGF |
 | `vis_wb3d.py` | Wholebody visualization tool | 2-panel video with 2D+3D skeletons |
+| `run_detector.py` | Standalone detector/tracker | Detection with YOLO/RTMDet, optional tracking |
+
+### 6.1.1 Standalone Detector (`run_detector.py`)
+
+**Purpose:** Modular detection and tracking script that can be used independently or as part of the pipeline.
+
+**Configuration:** `configs/detector.yaml`
+
+**Key Features:**
+- **Detector Support:** YOLOv8, RTMDet (planned)
+- **Tracking Support:** BoT-SORT, DeepOCSORT, ByteTrack, StrongSORT, OCSORT (planned)
+- **ReID Support:** OSNet-based re-identification (planned)
+- **Modes:**
+  - Detection only (default): Selects largest bbox per frame
+  - Tracking: Multi-object tracking across frames (future)
+
+**Usage:**
+```bash
+python run_detector.py --config configs/detector.yaml
+```
+
+**Output:** Same format as `udp_video.py` Stage 1 (`detections.npz`)
 
 ### 6.2 Recent Bug Fixes
 
@@ -431,6 +453,9 @@ unifiedposepipeline/
 ```bash
 # Install dependencies
 pip install -r requirements.txt
+
+# Run standalone detector (new modular approach)
+python run_detector.py --config configs/detector.yaml
 
 # Run full pipeline
 python udp_video.py --config configs/udp_video.yaml

@@ -1,0 +1,50 @@
+# Detector Configuration
+# This config controls object detection and tracking for the unified pose pipeline
+
+# ============================================================================
+# Detector Settings
+# ============================================================================
+detector:
+  type: yolo  # Options: yolo, rtmdet
+  model_path: models/yolo/yolov8s.pt  # Path to detector model
+  confidence: 0.3  # Confidence threshold for detections
+  device: cuda  # Device to use: cuda or cpu
+  detect_only_humans: true  # If true, only detect person class (COCO class 0)
+
+# ============================================================================
+# Re-Identification (ReID) Settings
+# ============================================================================
+reid:
+  apply: false  # Enable/disable ReID for identity association
+  model_path: models/reid/osnet_x1_0_msmt17.pth  # Path to ReID model
+  device: cuda
+
+# ============================================================================
+# Tracking Settings
+# ============================================================================
+tracking:
+  enabled: false  # Enable/disable tracking (default: false, only largest bbox)
+  tracker: botsort  # Options: botsort, deepocsort, bytetrack, strongsort, ocsort
+  tracker_config: configs/trackers/botsort.yaml  # Path to tracker-specific config
+  
+  # If tracking is disabled, use largest bbox selection
+  largest_bbox_only: true  # Select only the largest detected bbox per frame
+
+# ============================================================================
+# Input/Output Settings
+# ============================================================================
+input:
+  video_path: demo_data/videos/dance.mp4  # Path to input video
+  max_frames: 300  # Maximum number of frames to process (0 = all frames)
+
+output:
+  detections_file: demo_data/outputs/detections.npz  # Output detections NPZ file
+  save_visualization: false  # Save annotated video with bounding boxes
+  visualization_path: demo_data/outputs/detections_vis.mp4  # Visualization output
+
+# ============================================================================
+# Advanced Settings
+# ============================================================================
+advanced:
+  batch_size: 1  # Batch size for detection (usually 1 for video)
+  verbose: true  # Print progress information
