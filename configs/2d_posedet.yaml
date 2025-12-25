@@ -1,0 +1,36 @@
+# 2D Pose Detection Configuration
+# This config is for standalone 2D pose estimation using pre-computed detections
+
+# Pose estimation model to use
+pose_estimation_model: rtmpose  # Options: rtmpose, vitpose, rtmpose_h26
+
+# Model configurations
+rtmpose:
+  pose_model_path: models/rtmlib/rtmpose-l-coco-384x288.onnx
+  pose_input_size: [288, 384]
+  backend: onnxruntime
+  device: cuda
+
+rtmpose_h26:
+  pose_model_path: models/rtmlib/rtmpose-l-halpe26-384x288.onnx
+  pose_input_size: [288, 384]
+  backend: onnxruntime
+  device: cuda
+
+vitpose:
+  model_path: models/vitpose/vitpose-b.pth
+  model_name: b
+  dataset: coco
+  device: cuda
+
+# Input video file
+input_video: demo_data/videos/dance.mp4
+
+# Detections file from Stage 1 (run_detector.py or udp_video.py Stage 1)
+detections_file: demo_data/outputs/detections.npz
+
+# Maximum frames to process (null or 0 to process all frames)
+max_frames: 360
+
+# Output directory (filename will be auto-generated based on model type)
+output_dir: demo_data/outputs
