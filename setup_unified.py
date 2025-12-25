@@ -181,23 +181,29 @@ def step_4_install_pose_estimation():
 
 def step_5_install_tracking():
     """Step 5: Install tracking frameworks (BoxMOT)"""
-    print_step(5, 9, "Installing Tracking Frameworks")
+    print_step(5, 10, "Installing Tracking Frameworks")
     
-    # Skip BoxMOT for now - has NumPy compatibility issues
-    # Only install lightweight dependencies
+    # Install BoxMOT and tracking dependencies
     packages = [
+        "boxmot",              # Multi-object tracking with ReID
         "supervision>=0.15.0",
         "filterpy>=1.4.5",
         "scikit-learn>=1.0.0",
     ]
     
-    print("📦 Installing tracking dependencies (BoxMOT skipped - optional)...")
+    print("📦 Installing BoxMOT and tracking dependencies...")
     packages_quoted = ' '.join([f'"{pkg}"' for pkg in packages])
     if run_command(f"pip install {packages_quoted}") != 0:
         print("⚠️  Some tracking packages failed (non-critical)")
     else:
-        print("✅ Tracking dependencies installed")
-    print("ℹ️  BoxMOT skipped due to compatibility issues (not needed for basic demos)")
+        print("✅ BoxMOT and tracking dependencies installed")
+    
+    # Install gdown for Google Drive downloads (ReID models, etc.)
+    print("\n📦 Installing gdown for Google Drive downloads...")
+    if run_command('pip install "gdown"') != 0:
+        print("⚠️  gdown install failed (needed for ReID models)")
+    else:
+        print("✅ gdown installed")
 
 
 def step_6_install_motionagformer_deps():
@@ -395,6 +401,33 @@ def step_8_download_models(drive_mounted: bool):
     print("\n📦 RTMLib Models:")
     print("   ✅ Will be downloaded automatically on first use")
     
+    # ReID model for tracking (OSNet x1.0 MSMT17)
+    print("\n📦 Downloading ReID model for tracking...")
+    reid_dir = MODELS_DIR / "reid"
+    reid_dir.mkdir(parents=True, exist_ok=True)
+    reid_model = reid_dir / "osnet_x1_0_msmt17.pt"
+    
+    if reid_model.exists():
+        size_mb = reid_model.stat().st_size / (1024 ** 2)
+        print(f"   ✓ osnet_x1_0_msmt17.pt already exists ({size_mb:.1f} MB)")
+    else:
+        print(f"   ⬇️  Downloading OSNet x1.0 MSMT17 (~25 MB)...")
+        print(f"   📥 Using gdown for Google Drive download...")
+        
+        # Google Drive file ID for OSNet x1.0 MSMT17
+        gdown_id = "1LaG1EJpHrxdAxKnSCJ_i0u-nbxSAeiFY"
+        
+        if run_command(f'gdown {gdown_id} -O "{reid_model}"') == 0:
+            if reid_model.exists():
+                size_mb = reid_model.stat().st_size / (1024 ** 2)
+                print(f"   ✅ Downloaded osnet_x1_0_msmt17.pt ({size_mb:.1f} MB)")
+            else:
+                print(f"   ❌ Download completed but file not found")
+        else:
+            print(f"   ❌ Download failed - you may need to download manually:")
+            print(f"      URL: https://drive.google.com/file/d/1LaG1EJpHrxdAxKnSCJ_i0u-nbxSAeiFY/view")
+            print(f"      Save to: {reid_model}")
+    
     print("\n✅ Models setup complete")
 
 
@@ -420,6 +453,21 @@ def step_9_setup_demo_data(drive_mounted: bool):
                 print(f"   ✓ dance.mp4 already exists")
         else:
             print(f"   ⚠️  dance.mp4 not found on Drive")
+        
+        # Copy campus_walk.mp4
+        campus_src = DRIVE_DEMO_DATA_PATH / "campus_walk.mp4"
+        campus_dst = DEMO_DATA_DIR / "videos" / "campus_walk.mp4"
+        
+        if campus_src.exists():
+            if not campus_dst.exists():
+                print(f"   📋 Copying campus_walk.mp4...")
+                if run_command(f'cp "{campus_src}" "{campus_dst}"') == 0:
+                    size_mb = campus_dst.stat().st_size / (1024 ** 2)
+                    print(f"   ✅ Copied campus_walk.mp4 ({size_mb:.1f} MB)")
+            else:
+                print(f"   ✓ campus_walk.mp4 already exists")
+        else:
+            print(f"   ⚠️  campus_walk.mp4 not found on Drive")
     else:
         print("   ℹ️  No Drive access - demo files can be added manually")
     
