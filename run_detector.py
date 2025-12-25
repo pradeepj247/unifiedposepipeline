@@ -14,8 +14,7 @@ Usage:
 Output:
     detections.npz with keys:
         - frame_numbers: (N,) array of frame indices
-        - bboxes: (N, 5) array of [x1, y1, x2, y2, confidence]
-        - scores: (N,) array of detection confidence scores
+        - bboxes: (N, 4) array of [x1, y1, x2, y2] (integer coordinates)
 """
 
 import argparse
@@ -105,10 +104,10 @@ def select_largest_bbox(bboxes):
     Select the largest bounding box by area
     
     Args:
-        bboxes: (N, 5) array of [x1, y1, x2, y2, confidence]
+        bboxes: (N, 5) array of [x1, y1, x2, y2, confidence] from detector
     
     Returns:
-        bbox: (5,) array of the largest bbox, or empty array if no detections
+        bbox: (4,) array of [x1, y1, x2, y2] (largest bbox, integers), or empty array if no detections
     """
     if len(bboxes) == 0:
         return np.array([])
@@ -119,7 +118,8 @@ def select_largest_bbox(bboxes):
     # Get index of largest area
     largest_idx = np.argmax(areas)
     
-    return bboxes[largest_idx]
+    # Return only coordinates (no confidence)
+    return bboxes[largest_idx, :4]
 
 
 def process_video(config):
@@ -183,7 +183,6 @@ def process_video(config):
     # Storage for detections
     frame_numbers = []
     bboxes_list = []
-    scores_list = []
     
     # Process frames
     pbar = tqdm(total=num_frames, desc="Detecting", disable=not verbose)
@@ -208,17 +207,13 @@ def process_video(config):
             raise NotImplementedError("Tracking not yet implemented")
         else:
             # Select largest bbox only
+            frame_numbers.append(frame_idx)
             if len(detections) > 0:
-                largest_bbox = select_largest_bbox(detections)
-                
-                frame_numbers.append(frame_idx)
-                bboxes_list.append(largest_bbox[:4])  # x1, y1, x2, y2
-                scores_list.append(largest_bbox[4])   # confidence
+                largest_bbox = select_largest_bbox(detections)  # Returns (4,) array
+                bboxes_list.append(largest_bbox)  # [x1, y1, x2, y2]
             else:
                 # No detection - store empty bbox
-                frame_numbers.append(frame_idx)
                 bboxes_list.append([0, 0, 0, 0])
-                scores_list.append(0.0)
         
         frame_idx += 1
         pbar.update(1)
@@ -226,27 +221,22 @@ def process_video(config):
     pbar.close()
     cap.release()
     
-    # Convert to numpy arrays
-    frame_numbers = np.array(frame_numbers, dtype=np.int32)
-    bboxes = np.array(bboxes_list, dtype=np.float32)
-    scores = np.array(scores_list, dtype=np.float32)
-    
-    # Add confidence as 5th column to bboxes (for compatibility)
-    bboxes_with_conf = np.zeros((len(bboxes), 5), dtype=np.float32)
-    bboxes_with_conf[:, :4] = bboxes
-    bboxes_with_conf[:, 4] = scores
+    # Convert to numpy arrays (match udp_video.py format exactly)
+    frame_numbers = np.array(frame_numbers, dtype=np.int64)  # Default numpy dtype
+    bboxes = np.array(bboxes_list, dtype=np.int64)  # Integer coordinates like udp_video.py
     
     detections_data = {
         'frame_numbers': frame_numbers,
-        'bboxes': bboxes_with_conf,
-        'scores': scores
+        'bboxes': bboxes
     }
     
     if verbose:
+        # Count valid detections (bboxes where x2 > 0)
+        valid_detections = np.sum(bboxes[:, 2] > 0)
         print(f"\n✓ Detection complete!")
         print(f"  Total frames processed: {len(frame_numbers)}")
-        print(f"  Frames with detections: {np.sum(scores > 0)}")
-        print(f"  Detection rate: {np.sum(scores > 0) / len(frame_numbers) * 100:.1f}%")
+        print(f"  Frames with detections: {valid_detections}")
+        print(f"  Detection rate: {valid_detections / len(frame_numbers) * 100:.1f}%")
     
     return detections_data
 
@@ -256,7 +246,7 @@ def save_detections(detections_data, output_path, verbose=True):
     Save detections to NPZ file
     
     Args:
-        detections_data: Dictionary with frame_numbers, bboxes, scores
+        detections_data: Dictionary with frame_numbers, bboxes
         output_path: Path to output NPZ file
         verbose: Print save confirmation
     """
@@ -264,18 +254,17 @@ def save_detections(detections_data, output_path, verbose=True):
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
-    # Save NPZ
-    np.savez(
+    # Save NPZ (use compressed to match udp_video.py)
+    np.savez_compressed(
         output_path,
         frame_numbers=detections_data['frame_numbers'],
-        bboxes=detections_data['bboxes'],
-        scores=detections_data['scores']
+        bboxes=detections_data['bboxes']
     )
     
     if verbose:
         print(f"\n✓ Saved detections to: {output_path}")
-        print(f"  Shape: bboxes={detections_data['bboxes'].shape}, "
-              f"scores={detections_data['scores'].shape}")
+        print(f"  Shape: bboxes={detections_data['bboxes'].shape}")
+        print(f"  Format: frame_numbers (int64), bboxes (int64, 4 values per frame)")
 
 
 def main():

@@ -36,7 +36,6 @@ for key in data.keys():
 # Extract arrays
 frame_numbers = data['frame_numbers']
 bboxes = data['bboxes']
-scores = data['scores']
 
 # Validation checks
 print(f"\n{'='*70}")
@@ -47,16 +46,15 @@ print(f"{'='*70}")
 print(f"\n✓ Check 1: Array shapes")
 print(f"  frame_numbers: {frame_numbers.shape}")
 print(f"  bboxes:        {bboxes.shape}")
-print(f"  scores:        {scores.shape}")
 
-assert len(frame_numbers) == len(bboxes) == len(scores), \
+assert len(frame_numbers) == len(bboxes), \
     "Arrays must have same length!"
-print(f"  All arrays have length {len(frame_numbers)} ✓")
+print(f"  Both arrays have length {len(frame_numbers)} ✓")
 
 # Check 2: Bbox format
 print(f"\n✓ Check 2: Bbox format")
-assert bboxes.shape[1] == 5, "Bboxes must have 5 columns [x1, y1, x2, y2, conf]"
-print(f"  Bboxes have 5 columns: [x1, y1, x2, y2, conf] ✓")
+assert bboxes.shape[1] == 4, "Bboxes must have 4 columns [x1, y1, x2, y2]"
+print(f"  Bboxes have 4 columns: [x1, y1, x2, y2] ✓")
 
 # Check 3: Frame numbers sequential
 print(f"\n✓ Check 3: Frame numbers")
@@ -68,12 +66,12 @@ else:
 
 # Check 4: Valid bbox coordinates
 print(f"\n✓ Check 4: Bbox coordinates")
-valid_bboxes = np.sum(scores > 0)
+valid_bboxes = np.sum(bboxes[:, 2] > 0)  # Count frames where x2 > 0
 print(f"  Frames with detections: {valid_bboxes}/{len(frame_numbers)}")
 print(f"  Detection rate: {valid_bboxes/len(frame_numbers)*100:.1f}%")
 
 if valid_bboxes > 0:
-    valid_mask = scores > 0
+    valid_mask = bboxes[:, 2] > 0  # Frames with actual detections
     valid_bbox_coords = bboxes[valid_mask, :4]
     
     # Check x2 > x1 and y2 > y1
@@ -100,24 +98,25 @@ else:
 print(f"\n{'='*70}")
 print("SAMPLE OUTPUT (First 5 frames)")
 print(f"{'='*70}")
-print(f"{'Frame':<8} {'Bbox (x1, y1, x2, y2)':<40} {'Conf':<8}")
-print("-" * 70)
+print(f"{'Frame':<8} {'Bbox (x1, y1, x2, y2)':<40}")
+print("-" * 50)
 
 for i in range(min(5, len(frame_numbers))):
     frame = frame_numbers[i]
-    bbox = bboxes[i, :4]
-    conf = scores[i]
+    bbox = bboxes[i]
     
-    if conf > 0:
-        bbox_str = f"({bbox[0]:.1f}, {bbox[1]:.1f}, {bbox[2]:.1f}, {bbox[3]:.1f})"
-        print(f"{frame:<8} {bbox_str:<40} {conf:.3f}")
+    if bbox[2] > 0:  # Valid detection (x2 > 0)
+        bbox_str = f"({bbox[0]}, {bbox[1]}, {bbox[2]}, {bbox[3]})"
+        print(f"{frame:<8} {bbox_str:<40}")
     else:
-        print(f"{frame:<8} {'No detection':<40} {conf:.3f}")
+        print(f"{frame:<8} {'No detection':<40}")
 
 print(f"\n{'='*70}")
 print("✓ VALIDATION COMPLETE")
 print(f"{'='*70}")
 print(f"\nDetections file is valid and ready for Stage 2 (pose estimation)!")
+print(f"\nFormat: frame_numbers (int64), bboxes (int64, shape N x 4)")
+print(f"This matches udp_video.py Stage 1 output format exactly.")
 print(f"\nNext steps:")
 print(f"  1. Run 2D pose estimation:")
 print(f"     python udp_video.py --config configs/udp_video.yaml")

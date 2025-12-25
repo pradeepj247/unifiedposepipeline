@@ -87,13 +87,19 @@ The detector outputs a standard NPZ file with the following keys:
 
 ```python
 {
-    'frame_numbers': np.array(shape=(N,), dtype=int32),
-    'bboxes': np.array(shape=(N, 5), dtype=float32),  # [x1, y1, x2, y2, conf]
-    'scores': np.array(shape=(N,), dtype=float32)
+    'frame_numbers': np.array(shape=(N,), dtype=int64),
+    'bboxes': np.array(shape=(N, 4), dtype=int64)  # [x1, y1, x2, y2]
 }
 ```
 
-This format is identical to `udp_video.py` Stage 1 output and can be used interchangeably.
+This format is **identical** to `udp_video.py` Stage 1 output and can be used interchangeably.
+
+**Key Details:**
+- `frame_numbers`: Sequential frame indices (0, 1, 2, ...)
+- `bboxes`: Bounding box coordinates in `[x1, y1, x2, y2]` format
+  - **Integer coordinates** (int64 dtype)
+  - Empty detections stored as `[0, 0, 0, 0]`
+  - Valid detections have `x2 > 0`
 
 ## Usage Modes
 

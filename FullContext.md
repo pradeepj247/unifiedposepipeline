@@ -26,8 +26,8 @@ Build a **unified, configurable pose estimation pipeline** that integrates multi
 
 **Output:**
 - `demo_data/outputs/detections.npz`
-  - Keys: `frame_numbers`, `bboxes`, `scores`
-  - Format: `bboxes` shape `(N_frames, 5)` → `[x1, y1, x2, y2, confidence]`
+  - Keys: `frame_numbers`, `bboxes`
+  - Format: `bboxes` shape `(N_frames, 4)` → `[x1, y1, x2, y2]`
 
 **Script:** `udp_video.py` → `stage1_detect_yolo()`
 
@@ -375,9 +375,8 @@ unifiedposepipeline/
 ### Detection Output (`detections.npz`)
 ```python
 {
-    'frame_numbers': np.array(shape=(N,), dtype=int),
-    'bboxes': np.array(shape=(N, 5), dtype=float),  # [x1, y1, x2, y2, conf]
-    'scores': np.array(shape=(N,), dtype=float)
+    'frame_numbers': np.array(shape=(N,), dtype=int64),
+    'bboxes': np.array(shape=(N, 4), dtype=int64)  # [x1, y1, x2, y2]
 }
 ```
 
