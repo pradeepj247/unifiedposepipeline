@@ -36,20 +36,21 @@ tracking:
     # Note: ReID model will be auto-downloaded if not found
   
   # Output mode
-  largest_bbox_only: true  # For pipeline compatibility (select largest bbox)
+  largest_bbox_only: false  # Multi-person tracking (false = all persons, true = largest only)
 
 # ============================================================================
 # Input/Output Settings
 # ============================================================================
 input:
-  video_path: demo_data/videos/campus_walk.mp4  # Input video with multiple people
+  video_path: demo_data/videos/  # Directory containing input videos
+  video_filename: kohli_nets.mp4  # Video file name
   max_frames: 0  # Process all frames (0 = no limit)
 
 output:
   detections_file: demo_data/outputs/detections_tracking_reid.npz  # Single bbox per frame (largest)
   raw_detections_file: demo_data/outputs/raw_detections.npz  # All tracked persons (multi-person)
   save_visualization: true  # Save annotated video with track IDs
-  visualization_path: demo_data/outputs/campus_walk_tracking_reid.mp4  # Output video
+  visualization_path: demo_data/outputs/  # Output directory (filename auto-generated from input)
 
 # ============================================================================
 # Advanced Settings

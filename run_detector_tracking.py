@@ -312,12 +312,18 @@ def draw_tracks(frame, tracked_bboxes, show_conf=False):
         else:
             label = f"ID:{track_id}"
         
-        # Draw label background
+        # Draw label inside bbox upper-right corner (prevents cutoff at frame edges)
         (label_w, label_h), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-        cv2.rectangle(frame_out, (x1, y1 - label_h - 10), (x1 + label_w, y1), color, -1)
+        
+        # Position text inside bbox: right-aligned, 5 pixels from top-right corner
+        text_x = x2 - label_w - 5  # 5 pixels from right edge
+        text_y = y1 + label_h + 5  # 5 pixels from top edge
+        
+        # Draw label background (semi-transparent rectangle)
+        cv2.rectangle(frame_out, (text_x - 2, y1 + 2), (x2 - 2, text_y + 2), color, -1)
         
         # Draw label text
-        cv2.putText(frame_out, label, (x1, y1 - 5), 
+        cv2.putText(frame_out, label, (text_x, text_y), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
     
     return frame_out
@@ -334,7 +340,10 @@ def process_video(config):
         detections_data: Dictionary with frame_numbers, bboxes
     """
     # Extract config parameters
-    video_path = config['input']['video_path']
+    import os
+    video_dir = config['input'].get('video_path', 'demo_data/videos/')
+    video_filename = config['input'].get('video_filename', 'dance.mp4')
+    video_path = os.path.join(video_dir, video_filename)
     max_frames = config['input']['max_frames']
     
     detector_type = config['detector']['type']
@@ -763,10 +772,21 @@ def main():
     
     # Save visualization if enabled
     if config['output'].get('save_visualization', False):
-        vis_path = config['output'].get('visualization_path', 'demo_data/outputs/tracking_vis.mp4')
+        import os
+        # Reconstruct full video path
+        video_dir = config['input'].get('video_path', 'demo_data/videos/')
+        video_filename = config['input'].get('video_filename', 'dance.mp4')
+        video_path = os.path.join(video_dir, video_filename)
+        
+        # Auto-generate output filename: <input_name>_tracking_reid.mp4
+        vis_dir = config['output'].get('visualization_path', 'demo_data/outputs/')
+        video_basename = os.path.splitext(video_filename)[0]  # Remove extension
+        vis_filename = f"{video_basename}_tracking_reid.mp4"
+        vis_path = os.path.join(vis_dir, vis_filename)
+        
         max_frames = config['input']['max_frames']
         save_visualization(
-            config['input']['video_path'], 
+            video_path, 
             detections_data, 
             vis_path, 
             max_frames=max_frames,
