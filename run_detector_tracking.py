@@ -528,14 +528,36 @@ def process_video(config):
         
         # Track ID statistics (if tracking enabled)
         if tracking_enabled and len(all_tracks_per_frame) > 0:
-            all_track_ids = set()
-            for tracks in all_tracks_per_frame:
+            # Build per-ID statistics: frame appearances, start/end frames
+            track_id_stats = {}  # {track_id: {'frames': [frame_nums], 'start': int, 'end': int, 'count': int}}
+            
+            for frame_num, tracks in enumerate(all_tracks_per_frame):
                 if len(tracks) > 0:
-                    all_track_ids.update(tracks[:, 4].astype(int))
+                    for track in tracks:
+                        track_id = int(track[4])
+                        if track_id not in track_id_stats:
+                            track_id_stats[track_id] = {
+                                'frames': [],
+                                'start': frame_num,
+                                'end': frame_num,
+                                'count': 0
+                            }
+                        track_id_stats[track_id]['frames'].append(frame_num)
+                        track_id_stats[track_id]['end'] = frame_num
+                        track_id_stats[track_id]['count'] += 1
+            
+            # Print summary
             print(f"\n📊 Tracking Statistics:")
-            print(f"  Unique track IDs: {len(all_track_ids)}")
-            if len(all_track_ids) > 0:
-                print(f"  Track IDs seen: {sorted(all_track_ids)}")
+            print(f"  Unique track IDs: {len(track_id_stats)}")
+            print(f"  Track IDs seen: {sorted(track_id_stats.keys())}")
+            
+            # Print detailed table
+            if len(track_id_stats) > 0:
+                print(f"\n  {'Person ID':<12} {'# Frames':<12} {'Start Frame':<12} {'End Frame':<12}")
+                print(f"  {'-'*12} {'-'*12} {'-'*12} {'-'*12}")
+                for track_id in sorted(track_id_stats.keys()):
+                    stats = track_id_stats[track_id]
+                    print(f"  {track_id:<12} {stats['count']:<12} {stats['start']:<12} {stats['end']:<12}")
     
     return detections_data
 
