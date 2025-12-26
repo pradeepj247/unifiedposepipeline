@@ -167,9 +167,9 @@ def download_wb3d_models():
         print("  Skipping rtmw3d-l.onnx (already exists)")
         return
     
-    # Check Drive backup (primary source)
-    if DRIVE_MODELS:
-        drive_path = os.path.join(DRIVE_MODELS, "wb3d", "rtmw3d-l.onnx")
+    # Check Drive backup (primary source - stored in rtmw3d_onnx_exports/)
+    if is_colab_environment() and os.path.exists("/content/drive/MyDrive"):
+        drive_path = "/content/drive/MyDrive/rtmw3d_onnx_exports/rtmw3d-l.onnx"
         if os.path.exists(drive_path):
             print("  Copying from Drive: rtmw3d-l.onnx")
             run_command(f"cp '{drive_path}' '{model_path}'")
