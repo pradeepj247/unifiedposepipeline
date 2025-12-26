@@ -58,8 +58,31 @@ def load_yolo_detector(model_path, device='cuda', confidence=0.3):
     except ImportError:
         raise ImportError("ultralytics package not found. Install with: pip install ultralytics")
     
-    print(f"Loading YOLO model from: {model_path}")
-    model = YOLO(model_path)
+    import os
+    
+    # Multi-path resolution (similar to ReID model logic)
+    # Check multiple locations for YOLO model
+    candidate_paths = [
+        model_path,  # As-is path (e.g., models/yolo/yolov8s.pt)
+        os.path.join('..', model_path),  # Parent directory (e.g., ../models/yolo/yolov8s.pt)
+        os.path.join('/content', model_path.lstrip('models/'))  # Absolute Colab path (e.g., /content/yolo/yolov8s.pt)
+    ]
+    
+    resolved_path = None
+    for path in candidate_paths:
+        if os.path.exists(path):
+            resolved_path = path
+            print(f"   ✅ YOLO model found: {path}")
+            break
+    
+    if resolved_path is None:
+        print(f"   ❌ YOLO model not found at any of these locations:")
+        for path in candidate_paths:
+            print(f"      - {path}")
+        raise FileNotFoundError(f"YOLO model not found: {model_path}")
+    
+    print(f"Loading YOLO model from: {resolved_path}")
+    model = YOLO(resolved_path)
     model.to(device)
     
     return model
