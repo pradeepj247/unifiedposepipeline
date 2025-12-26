@@ -11,6 +11,7 @@ Usage:
 
 import os
 import sys
+import subprocess
 from setup_utils import (
     is_colab_environment, print_header, print_step, run_command,
     check_file_exists, print_success, print_error, print_warning, COLOR_YELLOW
@@ -56,7 +57,7 @@ def setup_demo_videos():
     for video_name in video_files:
         local_path = os.path.join(videos_dir, video_name)
         
-        if check_file_exists(local_path):
+        if os.path.exists(local_path):
             existing_count += 1
             continue
         
@@ -64,7 +65,9 @@ def setup_demo_videos():
         drive_path = os.path.join(drive_videos_dir, video_name)
         if os.path.exists(drive_path):
             try:
-                run_command(f"cp '{drive_path}' '{local_path}'")
+                print(f"  Copying {video_name}...")
+                # Silent copy with subprocess
+                subprocess.run(f"cp '{drive_path}' '{local_path}'", shell=True, check=True, capture_output=True)
                 copied_count += 1
             except Exception as e:
                 print_warning(f"Failed to copy {video_name}: {e}")
@@ -74,7 +77,7 @@ def setup_demo_videos():
     
     # Print summary
     if copied_count > 0:
-        print(f"  ✓ Copied: {copied_count} video(s)")
+        print(f"  ✓ Copied {copied_count} video(s)")
     if existing_count > 0:
         print(f"  ✓ Already present: {existing_count} video(s)")
     if missing_count > 0:
@@ -98,8 +101,10 @@ def setup_demo_images():
     url = "https://raw.githubusercontent.com/ultralytics/yolov5/master/data/images/bus.jpg"
     
     try:
-        run_command(f"curl -L '{url}' -o '{image_path}'")
-        print("  ✓ Downloaded sample.jpg")
+        print("  Copying sample.jpg...")
+        # Silent download with subprocess
+        subprocess.run(f"curl -sL '{url}' -o '{image_path}'", shell=True, check=True, capture_output=True)
+        print("  ✓ Copied 1 image")
     except Exception as e:
         print_warning(f"Failed to download sample image: {e}")
         print("  You can manually place any image in:")
