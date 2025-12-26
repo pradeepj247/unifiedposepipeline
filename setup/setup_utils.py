@@ -108,9 +108,9 @@ def check_file_exists(filepath):
     exists = os.path.isfile(filepath)
     if exists:
         size_mb = os.path.getsize(filepath) / (1024 * 1024)
-        print(f"✓ Found: {filepath} ({size_mb:.1f} MB)")
+        print(f"  ✓ Found: {filepath} ({size_mb:.1f} MB)")
     else:
-        print(f"✗ Missing: {filepath}")
+        print(f"  ✗ Missing: {filepath}")
     return exists
 
 

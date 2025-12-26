@@ -138,7 +138,7 @@ def download_vitpose_models():
             return
     
     # Download from GitHub releases
-    url = "https://github.com/ViTAE-Transformer/ViTPose/releases/download/v1.0/vitpose-b.pth"
+    url = "https://github.com/pradeepj247/easy-pose-pipeline/releases/download/v1.0/vitpose-b.pth"
     cmd = f"curl -L '{url}' -o '{model_path}'"
     
     if VERBOSE:
@@ -159,8 +159,8 @@ def download_rtmpose_models():
     rtmpose_dir = os.path.join(MODELS_DIR, "rtmlib")
     
     models = {
-        "rtmpose-l-coco-384x288.onnx": ("https://github.com/open-mmlab/mmpose/releases/download/v1.0.0/rtmpose-l-coco-384x288.onnx", 110),
-        "rtmpose-l-halpe26-384x288.onnx": ("https://github.com/open-mmlab/mmpose/releases/download/v1.0.0/rtmpose-l-halpe26-384x288.onnx", 110)
+        "rtmpose-l-coco-384x288.onnx": ("https://github.com/pradeepj247/unifiedposepipeline/releases/download/v1.0.0/rtmpose-l-coco-384x288.onnx", 110),
+        "rtmpose-l-halpe26-384x288.onnx": ("https://github.com/pradeepj247/unifiedposepipeline/releases/download/v1.0.0/rtmpose-l-halpe26-384x288.onnx", 110)
     }
     
     for model_name, (url, size_mb) in models.items():
@@ -246,8 +246,20 @@ def download_wb3d_models():
     if is_colab_environment() and os.path.exists("/content/drive/MyDrive"):
         drive_path = "/content/drive/MyDrive/rtmw3d_onnx_exports/rtmw3d-l.onnx"
         if os.path.exists(drive_path):
-            print("  Copying from Drive: rtmw3d-l.onnx")
-            run_command(f"cp '{drive_path}' '{model_path}'")
+            if not VERBOSE:
+                print("  Copying from Drive: rtmw3d-l.onnx")
+            else:
+                print("  Copying from Drive: rtmw3d-l.onnx")
+                print(f"  Running: cp '{drive_path}' '{model_path}'")
+            
+            # Run copy silently in non-verbose mode
+            if VERBOSE:
+                run_command(f"cp '{drive_path}' '{model_path}'")
+            else:
+                subprocess.run(f"cp '{drive_path}' '{model_path}'", shell=True, check=True, capture_output=True)
+            
+            if not VERBOSE:
+                print("  ✓ Copied rtmw3d-l.onnx")
             return
         else:
             print_warning("rtmw3d-l.onnx not found in Drive")
