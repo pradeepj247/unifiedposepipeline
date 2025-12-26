@@ -46,7 +46,8 @@ input:
   max_frames: 0  # Process all frames (0 = no limit)
 
 output:
-  detections_file: demo_data/outputs/detections_tracking_reid.npz  # NPZ output
+  detections_file: demo_data/outputs/detections_tracking_reid.npz  # Single bbox per frame (largest)
+  raw_detections_file: demo_data/outputs/raw_detections.npz  # All tracked persons (multi-person)
   save_visualization: true  # Save annotated video with track IDs
   visualization_path: demo_data/outputs/campus_walk_tracking_reid.mp4  # Output video
 

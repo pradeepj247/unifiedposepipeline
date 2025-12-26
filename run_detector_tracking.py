@@ -588,6 +588,63 @@ def save_detections(detections_data, output_path, verbose=True):
         print(f"  Format: frame_numbers (int64), bboxes (int64, 4 values per frame)")
 
 
+def save_raw_detections(detections_data, output_path, verbose=True):
+    """
+    Save raw multi-person tracking detections to NPZ file
+    
+    Args:
+        detections_data: Dictionary with all_tracks data
+        output_path: Path to output NPZ file
+        verbose: Print save confirmation
+    """
+    # Create output directory if needed
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Extract all tracks from all_tracks_per_frame
+    all_tracks = detections_data.get('all_tracks', [])
+    
+    if len(all_tracks) == 0:
+        print(f"\n⚠️  No tracking data found. Skipping raw_detections.npz")
+        return
+    
+    # Build multi-person arrays
+    frame_numbers_list = []
+    bboxes_list = []
+    track_ids_list = []
+    scores_list = []
+    
+    for frame_idx, tracks in enumerate(all_tracks):
+        if len(tracks) > 0:
+            for track in tracks:
+                # track format: [x1, y1, x2, y2, track_id, conf, cls, det_ind]
+                frame_numbers_list.append(frame_idx)
+                bboxes_list.append(track[:4])  # [x1, y1, x2, y2]
+                track_ids_list.append(int(track[4]))  # track_id
+                scores_list.append(track[5])  # confidence
+    
+    # Convert to numpy arrays
+    frame_numbers_raw = np.array(frame_numbers_list, dtype=np.int64)
+    bboxes_raw = np.array(bboxes_list, dtype=np.int64)
+    track_ids_raw = np.array(track_ids_list, dtype=np.int64)
+    scores_raw = np.array(scores_list, dtype=np.float32)
+    
+    # Save NPZ with all tracking data
+    np.savez_compressed(
+        output_path,
+        frame_numbers=frame_numbers_raw,
+        bboxes=bboxes_raw,
+        track_ids=track_ids_raw,
+        scores=scores_raw
+    )
+    
+    if verbose:
+        print(f"\n✓ Saved raw detections to: {output_path}")
+        print(f"  Total detections: {len(frame_numbers_raw)}")
+        print(f"  Unique track IDs: {len(np.unique(track_ids_raw))}")
+        print(f"  Format: frame_numbers, bboxes, track_ids, scores")
+
+
 def save_visualization(video_path, detections_data, output_path, max_frames=0, verbose=True):
     """
     Save video with tracking visualization (bboxes + track IDs)
@@ -695,9 +752,14 @@ def main():
     # Process video
     detections_data = process_video(config)
     
-    # Save detections
+    # Save detections (single bbox per frame - largest)
     output_path = config['output']['detections_file']
     save_detections(detections_data, output_path, verbose=config['advanced']['verbose'])
+    
+    # Save raw detections (all tracked persons)
+    if 'raw_detections_file' in config['output']:
+        raw_output_path = config['output']['raw_detections_file']
+        save_raw_detections(detections_data, raw_output_path, verbose=config['advanced']['verbose'])
     
     # Save visualization if enabled
     if config['output'].get('save_visualization', False):
