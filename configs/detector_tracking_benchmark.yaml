@@ -57,7 +57,27 @@ output:
 # ============================================================================
 advanced:
   batch_size: 1  # Batch size for detection
-  verbose: true  # Print detailed progress and benchmarking info
+  verbose: false  # Print detailed progress and benchmarking info
+  # 
+  # Silent mode (verbose: false) shows:
+  #   - Video info (path, resolution, frames)
+  #   - Detector/tracker type
+  #   - Processing progress bar with FPS
+  #   - Frames processed count
+  #   - Overall FPS and time taken
+  #   - Unique track IDs count
+  #   - Writing progress bar
+  #   - Saved file confirmations
+  # 
+  # Verbose mode (verbose: true) additionally shows:
+  #   - Model loading messages
+  #   - Detailed FPS breakdown (detection/tracking/combined)
+  #   - Success rate and valid detections count
+  #   - Full track ID table with frame ranges
+  #   - File format details
+  # 
+  # Note: BoxMOT library prints "SUCCESS | ByteTrack:..." message that
+  # cannot be suppressed (library-level output, not controlled by our code)
 
 # ============================================================================
 # BENCHMARK EXPECTATIONS:

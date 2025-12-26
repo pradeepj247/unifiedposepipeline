@@ -437,8 +437,8 @@ def process_video(config):
     # Start timing
     t_start = time.time()
     
-    # Process frames
-    pbar = tqdm(total=num_frames, desc="Processing", disable=not verbose)
+    # Process frames (always show progress bar - it's critical info)
+    pbar = tqdm(total=num_frames, desc="Processing")
     
     frame_idx = 0
     
@@ -525,70 +525,74 @@ def process_video(config):
         'all_tracks': all_tracks_per_frame  # For visualization
     }
     
+    # Always show processing summary (critical info even in silent mode)
+    # Count valid detections (bboxes where x2 > 0)
+    valid_detections = np.sum(bboxes[:, 2] > 0)
+    
+    # Calculate average times
+    avg_det_time = np.mean(detection_times) if detection_times else 0
+    avg_track_time = np.mean(tracking_times) if tracking_times else 0
+    avg_total_time = avg_det_time + avg_track_time
+    
+    # Calculate component FPS
+    det_fps = 1.0 / avg_det_time if avg_det_time > 0 else 0
+    track_fps = 1.0 / avg_track_time if avg_track_time > 0 else 0
+    total_fps = 1.0 / avg_total_time if avg_total_time > 0 else 0
+    
+    print(f"\n✓ Processing complete!")
+    print(f"  Frames processed: {len(frame_numbers)}")
+    
     if verbose:
-        # Count valid detections (bboxes where x2 > 0)
-        valid_detections = np.sum(bboxes[:, 2] > 0)
-        
-        # Calculate average times
-        avg_det_time = np.mean(detection_times) if detection_times else 0
-        avg_track_time = np.mean(tracking_times) if tracking_times else 0
-        avg_total_time = avg_det_time + avg_track_time
-        
-        # Calculate component FPS
-        det_fps = 1.0 / avg_det_time if avg_det_time > 0 else 0
-        track_fps = 1.0 / avg_track_time if avg_track_time > 0 else 0
-        total_fps = 1.0 / avg_total_time if avg_total_time > 0 else 0
-        
-        print(f"\n✓ Processing complete!")
-        print(f"  Total frames processed: {len(frame_numbers)}")
         print(f"  Frames with valid output: {valid_detections}")
         print(f"  Success rate: {valid_detections / len(frame_numbers) * 100:.1f}%")
-        print(f"\n⏱️  Performance Breakdown:")
+    
+    print(f"\n⏱️  Performance:")
+    if verbose:
+        # Detailed breakdown in verbose mode
         print(f"  Detection FPS: {det_fps:.1f} ({avg_det_time*1000:.1f}ms/frame)")
         if tracking_enabled:
             print(f"  Tracking FPS:  {track_fps:.1f} ({avg_track_time*1000:.1f}ms/frame)")
             print(f"  Combined FPS:  {total_fps:.1f} ({avg_total_time*1000:.1f}ms/frame)")
-            print(f"  Overall FPS:   {processing_fps:.1f} (including I/O)")
-        else:
-            print(f"  Overall FPS:   {processing_fps:.1f}")
-        print(f"  Time taken: {total_time:.2f}s")
+        print(f"  Overall FPS:   {processing_fps:.1f} (including I/O)")
+    else:
+        # Simple summary in silent mode
+        print(f"  Overall FPS:   {processing_fps:.1f}")
+    print(f"  Time taken: {total_time:.2f}s")
+    
+    # Track ID statistics (always show if tracking enabled - critical info)
+    if tracking_enabled and len(all_tracks_per_frame) > 0:
+        # Build per-ID statistics: frame appearances, start/end frames
+        track_id_stats = {}  # {track_id: {'frames': [frame_nums], 'start': int, 'end': int, 'count': int}}
         
-        # Track ID statistics (if tracking enabled)
-        if tracking_enabled and len(all_tracks_per_frame) > 0:
-            # Build per-ID statistics: frame appearances, start/end frames
-            track_id_stats = {}  # {track_id: {'frames': [frame_nums], 'start': int, 'end': int, 'count': int}}
+        for frame_num, tracks in enumerate(all_tracks_per_frame):
+            if len(tracks) > 0:
+                for track in tracks:
+                    track_id = int(track[4])
+                    if track_id not in track_id_stats:
+                        track_id_stats[track_id] = {
+                            'frames': [],
+                            'start': frame_num,
+                            'end': frame_num,
+                            'count': 0
+                        }
+                    track_id_stats[track_id]['frames'].append(frame_num)
+                    track_id_stats[track_id]['end'] = frame_num
+                    track_id_stats[track_id]['count'] += 1
+        
+        # Always show basic tracking statistics
+        print(f"\n📊 Tracking Statistics:")
+        print(f"  Unique track IDs: {len(track_id_stats)}")
+        
+        # Detailed table only in verbose mode
+        if verbose:
+            print(f"  Track IDs seen: {sorted(track_id_stats.keys())}")
             
-            for frame_num, tracks in enumerate(all_tracks_per_frame):
-                if len(tracks) > 0:
-                    for track in tracks:
-                        track_id = int(track[4])
-                        if track_id not in track_id_stats:
-                            track_id_stats[track_id] = {
-                                'frames': [],
-                                'start': frame_num,
-                                'end': frame_num,
-                                'count': 0
-                            }
-                        track_id_stats[track_id]['frames'].append(frame_num)
-                        track_id_stats[track_id]['end'] = frame_num
-                        track_id_stats[track_id]['count'] += 1
-            
-            # Print summary
-            if verbose:
-                print(f"\n📊 Tracking Statistics:")
-                print(f"  Unique track IDs: {len(track_id_stats)}")
-                print(f"  Track IDs seen: {sorted(track_id_stats.keys())}")
-                
-                # Print detailed table
-                if len(track_id_stats) > 0:
-                    print(f"\n  {'Person ID':<12} {'# Frames':<12} {'Start Frame':<12} {'End Frame':<12}")
-                    print(f"  {'-'*12} {'-'*12} {'-'*12} {'-'*12}")
-                    for track_id in sorted(track_id_stats.keys()):
-                        stats = track_id_stats[track_id]
-                        print(f"  {track_id:<12} {stats['count']:<12} {stats['start']:<12} {stats['end']:<12}")
-            else:
-                # Non-verbose: only show unique track IDs count
-                print(f"Unique track IDs: {len(track_id_stats)}")
+            if len(track_id_stats) > 0:
+                print(f"\n  {'Person ID':<12} {'# Frames':<12} {'Start Frame':<12} {'End Frame':<12}")
+                print(f"  {'-'*12} {'-'*12} {'-'*12} {'-'*12}")
+                for track_id in sorted(track_id_stats.keys()):
+                    stats = track_id_stats[track_id]
+                    print(f"  {track_id:<12} {stats['count']:<12} {stats['start']:<12} {stats['end']:<12}")
     
     return detections_data
 
@@ -613,8 +617,9 @@ def save_detections(detections_data, output_path, verbose=True):
         bboxes=detections_data['bboxes']
     )
     
+    # Always show save confirmation (critical info)
+    print(f"\n✓ Saved detections to: {output_path}")
     if verbose:
-        print(f"\n✓ Saved detections to: {output_path}")
         print(f"  Shape: bboxes={detections_data['bboxes'].shape}")
         print(f"  Format: frame_numbers (int64), bboxes (int64, 4 values per frame)")
 
@@ -669,9 +674,10 @@ def save_raw_detections(detections_data, output_path, verbose=True):
         scores=scores_raw
     )
     
+    # Always show save confirmation with detection count (critical info)
+    print(f"\n✓ Saved raw detections to: {output_path}")
+    print(f"  Total detections: {len(frame_numbers_raw)}")
     if verbose:
-        print(f"\n✓ Saved raw detections to: {output_path}")
-        print(f"  Total detections: {len(frame_numbers_raw)}")
         print(f"  Format: frame_numbers, bboxes, track_ids, scores")
 
 
@@ -732,9 +738,12 @@ def save_visualization(video_path, detections_data, output_path, max_frames=0, v
         print(f"Output: {output_path}")
         print(f"Frames: {num_frames}")
         print(f"{'='*70}\n")
+    else:
+        # Silent mode: just show we're writing output
+        print(f"\nWriting visualization video...")
     
-    # Process frames
-    pbar = tqdm(total=num_frames, desc="Writing output", disable=not verbose)
+    # Process frames (always show progress bar - critical info)
+    pbar = tqdm(total=num_frames, desc="Writing output")
     
     frame_idx = 0
     while frame_idx < num_frames:
@@ -770,8 +779,8 @@ def save_visualization(video_path, detections_data, output_path, max_frames=0, v
     cap.release()
     out.release()
     
-    if verbose:
-        print(f"\n✓ Saved visualization to: {output_path}")
+    # Always show save confirmation (critical info)
+    print(f"\n✓ Saved visualization to: {output_path}")
 
 
 def main():
