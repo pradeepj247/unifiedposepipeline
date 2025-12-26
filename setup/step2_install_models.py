@@ -6,12 +6,14 @@ This script downloads all required model weights and checkpoints.
 Corresponds to Step 8 in the original setup_unified.py.
 
 Usage:
-    python step2_install_models.py [--skip-existing]
+    python step2_install_models.py [--skip-existing] [--verbose]
 """
 
 import os
 import sys
 import argparse
+import subprocess
+import re
 from setup_utils import (
     is_colab_environment, print_header, print_step, run_command,
     check_file_exists, print_success, print_error, print_warning, COLOR_YELLOW
@@ -23,6 +25,54 @@ REPO_ROOT = "/content/unifiedposepipeline" if is_colab_environment() else os.get
 MODELS_DIR = "/content/models"
 DRIVE_MODELS = "/content/drive/MyDrive/models" if is_colab_environment() else None
 
+# Global verbose flag
+VERBOSE = False
+
+
+def run_command_with_progress(cmd, description, expected_size_mb=None):
+    """Run command with progress tracking for silent mode"""
+    if VERBOSE:
+        # Verbose mode: show all output
+        return run_command(cmd)
+    
+    # Silent mode: show progress
+    if expected_size_mb:
+        print(f"  Downloading {description} (~{expected_size_mb} MB)")
+    else:
+        print(f"  Downloading {description}...")
+    
+    try:
+        # Run command and capture output
+        result = subprocess.run(
+            cmd, 
+            shell=True, 
+            check=True, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.STDOUT,
+            text=True
+        )
+        
+        # Parse gdown output for progress (if applicable)
+        output = result.stdout
+        if 'Downloading' in output or 'To:' in output:
+            # Extract progress info from gdown output
+            progress_lines = [line for line in output.split('\n') if '%' in line]
+            if progress_lines:
+                # Show last progress line
+                print(f"  Progress: 100%")
+        
+        print(f"  ✓ Downloaded {description} successfully")
+        return 0
+        
+    except subprocess.CalledProcessError as e:
+        print_error(f"Failed to download {description}")
+        if VERBOSE:
+            print(e.output)
+        return e.returncode
+    except Exception as e:
+        print_error(f"Error downloading {description}: {e}")
+        return 1
+
 
 def download_yolo_models():
     """Download YOLO detection models"""
@@ -31,14 +81,17 @@ def download_yolo_models():
     yolo_dir = os.path.join(MODELS_DIR, "yolo")
     
     models = {
-        "yolov8s.pt": "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8s.pt"
+        "yolov8s.pt": ("https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8s.pt", 11.5)
     }
     
-    for model_name, url in models.items():
+    for model_name, (url, size_mb) in models.items():
         model_path = os.path.join(yolo_dir, model_name)
         
         if check_file_exists(model_path):
-            print(f"  Skipping {model_name} (already exists)")
+            if not VERBOSE:
+                print(f"  ✓ {model_name} (already exists)")
+            else:
+                print(f"  Skipping {model_name} (already exists)")
             continue
         
         # Check Drive backup
@@ -50,13 +103,16 @@ def download_yolo_models():
                 continue
         
         # Download from GitHub
-        print(f"  Downloading {model_name}...")
         cmd = f"curl -L '{url}' -o '{model_path}'"
-        try:
-            run_command(cmd)
-            print(f"  ✓ Downloaded {model_name}")
-        except Exception as e:
-            print_warning(f"Failed to download {model_name}: {e}")
+        if VERBOSE:
+            print(f"  Downloading {model_name}...")
+            try:
+                run_command(cmd)
+                print(f"  ✓ Downloaded {model_name}")
+            except Exception as e:
+                print_warning(f"Failed to download {model_name}: {e}")
+        else:
+            run_command_with_progress(cmd, model_name, size_mb)
 
 
 def download_vitpose_models():
@@ -67,7 +123,10 @@ def download_vitpose_models():
     model_path = os.path.join(vitpose_dir, "vitpose-b.pth")
     
     if check_file_exists(model_path):
-        print("  Skipping ViTPose-b (already exists)")
+        if not VERBOSE:
+            print("  ✓ vitpose-b.pth (already exists)")
+        else:
+            print("  Skipping ViTPose-b (already exists)")
         return
     
     # Check Drive backup
@@ -79,15 +138,18 @@ def download_vitpose_models():
             return
     
     # Download from GitHub releases
-    print("  Downloading ViTPose-b (343 MB)...")
     url = "https://github.com/ViTAE-Transformer/ViTPose/releases/download/v1.0/vitpose-b.pth"
     cmd = f"curl -L '{url}' -o '{model_path}'"
     
-    try:
-        run_command(cmd)
-        print("  ✓ Downloaded vitpose-b.pth")
-    except Exception as e:
-        print_warning(f"Failed to download ViTPose: {e}")
+    if VERBOSE:
+        print("  Downloading ViTPose-b (343 MB)...")
+        try:
+            run_command(cmd)
+            print("  ✓ Downloaded vitpose-b.pth")
+        except Exception as e:
+            print_warning(f"Failed to download ViTPose: {e}")
+    else:
+        run_command_with_progress(cmd, "vitpose-b.pth", 343)
 
 
 def download_rtmpose_models():
@@ -97,15 +159,18 @@ def download_rtmpose_models():
     rtmpose_dir = os.path.join(MODELS_DIR, "rtmlib")
     
     models = {
-        "rtmpose-l-coco-384x288.onnx": "https://github.com/open-mmlab/mmpose/releases/download/v1.0.0/rtmpose-l-coco-384x288.onnx",
-        "rtmpose-l-halpe26-384x288.onnx": "https://github.com/open-mmlab/mmpose/releases/download/v1.0.0/rtmpose-l-halpe26-384x288.onnx"
+        "rtmpose-l-coco-384x288.onnx": ("https://github.com/open-mmlab/mmpose/releases/download/v1.0.0/rtmpose-l-coco-384x288.onnx", 110),
+        "rtmpose-l-halpe26-384x288.onnx": ("https://github.com/open-mmlab/mmpose/releases/download/v1.0.0/rtmpose-l-halpe26-384x288.onnx", 110)
     }
     
-    for model_name, url in models.items():
+    for model_name, (url, size_mb) in models.items():
         model_path = os.path.join(rtmpose_dir, model_name)
         
         if check_file_exists(model_path):
-            print(f"  Skipping {model_name} (already exists)")
+            if not VERBOSE:
+                print(f"  ✓ {model_name} (already exists)")
+            else:
+                print(f"  Skipping {model_name} (already exists)")
             continue
         
         # Check Drive backup
@@ -117,13 +182,16 @@ def download_rtmpose_models():
                 continue
         
         # Download from GitHub
-        print(f"  Downloading {model_name} (~110 MB)...")
         cmd = f"curl -L '{url}' -o '{model_path}'"
-        try:
-            run_command(cmd)
-            print(f"  ✓ Downloaded {model_name}")
-        except Exception as e:
-            print_warning(f"Failed to download {model_name}: {e}")
+        if VERBOSE:
+            print(f"  Downloading {model_name} (~{size_mb} MB)...")
+            try:
+                run_command(cmd)
+                print(f"  ✓ Downloaded {model_name}")
+            except Exception as e:
+                print_warning(f"Failed to download {model_name}: {e}")
+        else:
+            run_command_with_progress(cmd, model_name, size_mb)
 
 
 def download_motionagformer_models():
@@ -134,7 +202,10 @@ def download_motionagformer_models():
     model_path = os.path.join(magf_dir, "motionagformer-base-h36m.pth.tr")
     
     if check_file_exists(model_path):
-        print("  Skipping MotionAGFormer (already exists)")
+        if not VERBOSE:
+            print("  ✓ motionagformer-base-h36m.pth.tr (already exists)")
+        else:
+            print("  Skipping MotionAGFormer (already exists)")
         return
     
     # Check Drive backup
@@ -145,15 +216,19 @@ def download_motionagformer_models():
             run_command(f"cp '{drive_path}' '{model_path}'")
             return
     
-    # Download from Google Drive using gdown
-    print("  Downloading MotionAGFormer checkpoint (~200 MB)...")
+    # Download from Google Drive using gdown with --fuzzy flag
     gdrive_id = "1Iii5EwsFFm9_9lKBUPfN8bV5LmfkNUMP"
     
-    try:
-        run_command(f"gdown {gdrive_id} -O '{model_path}'")
-        print("  ✓ Downloaded motionagformer-base-h36m.pth.tr")
-    except Exception as e:
-        print_warning(f"Failed to download MotionAGFormer: {e}")
+    if VERBOSE:
+        print("  Downloading MotionAGFormer checkpoint (~200 MB)...")
+        try:
+            run_command(f"gdown --fuzzy {gdrive_id} -O '{model_path}'")
+            print("  ✓ Downloaded motionagformer-base-h36m.pth.tr")
+        except Exception as e:
+            print_warning(f"Failed to download MotionAGFormer: {e}")
+    else:
+        cmd = f"gdown --fuzzy {gdrive_id} -O '{model_path}'"
+        run_command_with_progress(cmd, "motionagformer-base-h36m.pth.tr", 200)
 
 
 def download_wb3d_models():
@@ -193,7 +268,10 @@ def download_reid_models():
     model_path = os.path.join(reid_dir, "osnet_x1_0_msmt17.pt")
     
     if check_file_exists(model_path):
-        print("  Skipping OSNet x1.0 (already exists)")
+        if not VERBOSE:
+            print("  ✓ osnet_x1_0_msmt17.pt (already exists)")
+        else:
+            print("  Skipping OSNet x1.0 (already exists)")
         return
     
     # Check Drive backup
@@ -204,26 +282,38 @@ def download_reid_models():
             run_command(f"cp '{drive_path}' '{model_path}'")
             return
     
-    # Download from Google Drive using gdown
-    print("  Downloading OSNet x1.0 MSMT17 (~25 MB)...")
+    # Download from Google Drive using gdown with --fuzzy flag
     gdrive_id = "1LaG1EJpHrxdAxKnSCJ_i0u-nbxSAeiFY"
     
-    try:
-        run_command(f"gdown {gdrive_id} -O '{model_path}'")
-        print("  ✓ Downloaded osnet_x1_0_msmt17.pt")
-    except Exception as e:
-        print_warning(f"Failed to download ReID model: {e}")
+    if VERBOSE:
+        print("  Downloading OSNet x1.0 MSMT17 (~25 MB)...")
+        try:
+            run_command(f"gdown --fuzzy {gdrive_id} -O '{model_path}'")
+            print("  ✓ Downloaded osnet_x1_0_msmt17.pt")
+        except Exception as e:
+            print_warning(f"Failed to download ReID model: {e}")
+    else:
+        cmd = f"gdown --fuzzy {gdrive_id} -O '{model_path}'"
+        run_command_with_progress(cmd, "osnet_x1_0_msmt17.pt", 25)
 
 
 def main():
     """Main execution function"""
+    global VERBOSE
+    
     parser = argparse.ArgumentParser(description="Download all model files")
     parser.add_argument("--skip-existing", action="store_true",
                        help="Skip downloads if models already exist")
+    parser.add_argument("--verbose", action="store_true",
+                       help="Show detailed download output (default: silent mode)")
     args = parser.parse_args()
+    
+    VERBOSE = args.verbose
     
     print_header("STEP 2: Download Model Files", color=COLOR_YELLOW)
     
+    if not VERBOSE:
+        print("Running in silent mode. Use --verbose for detailed output.")
     print("This script will download all required model weights.")
     print(f"Models directory: {MODELS_DIR}")
     if DRIVE_MODELS:
