@@ -60,7 +60,7 @@ def print_step(step_num, description, indent=False):
     print(f"{indent_str}{'─' * 66}\n")
 
 
-def run_command(cmd, shell=True, check=True):
+def run_command(cmd, shell=True, check=True, message=None, indent=False):
     """
     Execute a shell command and handle errors.
     
@@ -68,6 +68,8 @@ def run_command(cmd, shell=True, check=True):
         cmd (str): Command to execute
         shell (bool): Whether to use shell execution
         check (bool): Whether to raise exception on non-zero exit
+        message (str, optional): Custom message to display instead of full command
+        indent (bool): Whether to indent the message (for sub-steps)
         
     Returns:
         subprocess.CompletedProcess: Result of command execution
@@ -75,7 +77,11 @@ def run_command(cmd, shell=True, check=True):
     Raises:
         subprocess.CalledProcessError: If command fails and check=True
     """
-    print(f"Running: {cmd}")
+    indent_str = "  " if indent else ""
+    if message:
+        print(f"{indent_str}{message}")
+    else:
+        print(f"{indent_str}Running: {cmd}")
     result = subprocess.run(cmd, shell=shell, check=check, 
                           capture_output=False, text=True)
     return result
@@ -90,9 +96,9 @@ def create_directory(path):
     """
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
-        print(f"✓ Created directory: {path}")
+        print(f"  ✓ Created directory: {path}")
     else:
-        print(f"✓ Directory exists: {path}")
+        print(f"  ✓ Directory exists: {path}")
 
 
 def check_file_exists(filepath):

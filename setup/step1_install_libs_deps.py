@@ -27,21 +27,21 @@ def step0_mount_drive():
     print_step("1.0", "Mount Google Drive", indent=True)
     
     if not is_colab_environment():
-        print("⊘ Skipping (not in Colab environment)")
+        print("  ⊘ Skipping (not in Colab environment)")
         return
     
     # Check if Drive is already mounted
     if os.path.exists('/content/drive/MyDrive'):
-        print("✓ Google Drive already mounted")
+        print("  ✓ Google Drive already mounted")
         return
     
     try:
         from google.colab import drive
         drive.mount('/content/drive')
-        print("✓ Google Drive mounted successfully")
+        print("  ✓ Google Drive mounted successfully")
     except Exception as e:
-        print(f"✗ Failed to mount Drive: {e}")
-        print("Continuing without Drive (some features may be unavailable)")
+        print(f"  ✗ Failed to mount Drive: {e}")
+        print("  Continuing without Drive (some features may be unavailable)")
 
 
 def step1_install_core_dependencies():
@@ -60,8 +60,8 @@ def step1_install_core_dependencies():
     
     cmd = f"pip install -q {' '.join(packages)}"
     try:
-        run_command(cmd)
-        print("✓ Core dependencies installed")
+        run_command(cmd, message=f"  Installing {' '.join(packages)}")
+        print("  ✓ Core dependencies installed")
     except Exception as e:
         print_error(f"Failed to install core dependencies: {e}")
         sys.exit(1)
@@ -74,8 +74,8 @@ def step2_install_pytorch():
     cmd = "pip install -q torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118"
     
     try:
-        run_command(cmd)
-        print("✓ PyTorch installed")
+        run_command(cmd, message="  Installing torch torchvision torchaudio")
+        print("  ✓ PyTorch installed")
         
         # Verify installation
         import torch
@@ -102,8 +102,8 @@ def step3_install_opencv_yolo():
     cmd = f"pip install -q {' '.join(packages)}"
     
     try:
-        run_command(cmd)
-        print("✓ OpenCV and YOLO installed")
+        run_command(cmd, message=f"  Installing {' '.join(packages)}")
+        print("  ✓ OpenCV and YOLO installed")
     except Exception as e:
         print_error(f"Failed to install OpenCV/YOLO: {e}")
         sys.exit(1)
@@ -121,17 +121,17 @@ def step4_install_pose_estimation():
         has_cuda = False
     
     if has_cuda:
-        print("GPU detected, installing ONNX Runtime GPU")
+        print("  GPU detected, installing ONNX Runtime GPU")
         packages = ["onnx", "onnxruntime-gpu"]
     else:
-        print("No GPU detected, installing ONNX Runtime CPU")
+        print("  No GPU detected, installing ONNX Runtime CPU")
         packages = ["onnx", "onnxruntime"]
     
     cmd = f"pip install -q {' '.join(packages)}"
     
     try:
-        run_command(cmd)
-        print("✓ Pose estimation libraries installed")
+        run_command(cmd, message=f"  Installing {' '.join(packages)}")
+        print("  ✓ Pose estimation libraries installed")
     except Exception as e:
         print_error(f"Failed to install pose estimation libraries: {e}")
         sys.exit(1)
@@ -152,8 +152,8 @@ def step5_install_tracking():
     cmd = f"pip install -q {' '.join(packages)}"
     
     try:
-        run_command(cmd)
-        print("✓ Tracking libraries installed")
+        run_command(cmd, message=f"  Installing {' '.join(packages)}")
+        print("  ✓ Tracking libraries installed")
     except Exception as e:
         print_error(f"Failed to install tracking libraries: {e}")
         sys.exit(1)
@@ -174,8 +174,8 @@ def step6_install_motionagformer_deps():
     cmd = f"pip install -q {' '.join(packages)}"
     
     try:
-        run_command(cmd)
-        print("✓ MotionAGFormer dependencies installed")
+        run_command(cmd, message=f"  Installing {' '.join(packages)}")
+        print("  ✓ MotionAGFormer dependencies installed")
     except Exception as e:
         print(f"⚠ Some MotionAGFormer dependencies failed: {e}")
         print("  (This may not be critical if you don't use 3D lifting)")
@@ -203,7 +203,7 @@ def step7_create_directories():
     for directory in directories:
         create_directory(directory)
     
-    print("✓ Directory structure created")
+    print("  ✓ Directory structure created")
 
 
 def main():
