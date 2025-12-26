@@ -9,6 +9,13 @@ import sys
 import subprocess
 
 
+# ANSI color codes
+COLOR_RESET = "\033[0m"
+COLOR_YELLOW = "\033[93m"
+COLOR_GREEN = "\033[92m"
+COLOR_RED = "\033[91m"
+
+
 def is_colab_environment():
     """
     Check if running in Google Colab environment.
@@ -23,29 +30,34 @@ def is_colab_environment():
         return False
 
 
-def print_header(title):
+def print_header(title, color=None):
     """
     Print a formatted header for section titles.
     
     Args:
         title (str): The title to display
+        color (str, optional): ANSI color code for the title
     """
+    color_code = color or ""
+    reset_code = COLOR_RESET if color else ""
     print("\n" + "=" * 70)
-    print(f"  {title}")
+    print(f"{color_code}  {title}{reset_code}")
     print("=" * 70 + "\n")
 
 
-def print_step(step_num, description):
+def print_step(step_num, description, indent=False):
     """
     Print a formatted step header.
     
     Args:
-        step_num (int): Step number
+        step_num (str or int): Step number (can be like "1.0", "1.1", etc.)
         description (str): Step description
+        indent (bool): Whether to indent the step (for sub-steps)
     """
-    print(f"\n{'─' * 70}")
-    print(f"STEP {step_num}: {description}")
-    print(f"{'─' * 70}\n")
+    indent_str = "  " if indent else ""
+    print(f"\n{indent_str}{'─' * 66}")
+    print(f"{indent_str}STEP {step_num}: {description}")
+    print(f"{indent_str}{'─' * 66}\n")
 
 
 def run_command(cmd, shell=True, check=True):
@@ -123,15 +135,17 @@ def check_import(module_name, package_name=None):
         return False
 
 
-def print_success(message):
+def print_success(message, color=None):
     """
     Print a success message.
     
     Args:
         message (str): Success message to display
+        color (str, optional): ANSI color code for the message
     """
+    color_code = color or COLOR_GREEN
     print(f"\n{'=' * 70}")
-    print(f"✓ SUCCESS: {message}")
+    print(f"{color_code}✓ SUCCESS: {message}{COLOR_RESET}")
     print(f"{'=' * 70}\n")
 
 

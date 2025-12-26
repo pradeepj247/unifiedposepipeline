@@ -14,7 +14,7 @@ import sys
 import argparse
 from setup_utils import (
     is_colab_environment, print_header, print_step, run_command,
-    check_file_exists, print_success, print_error, print_warning
+    check_file_exists, print_success, print_error, print_warning, COLOR_YELLOW
 )
 
 
@@ -26,13 +26,12 @@ DRIVE_MODELS = "/content/drive/MyDrive/models" if is_colab_environment() else No
 
 def download_yolo_models():
     """Download YOLO detection models"""
-    print_step("8.1", "Download YOLO Models")
+    print_step("2.1", "Download YOLO Models", indent=True)
     
     yolo_dir = os.path.join(MODELS_DIR, "yolo")
     
     models = {
-        "yolov8s.pt": "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8s.pt",
-        "yolov8x.pt": "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8x.pt"
+        "yolov8s.pt": "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8s.pt"
     }
     
     for model_name, url in models.items():
@@ -62,7 +61,7 @@ def download_yolo_models():
 
 def download_vitpose_models():
     """Download ViTPose models"""
-    print_step("8.2", "Download ViTPose Models")
+    print_step("2.2", "Download ViTPose Models", indent=True)
     
     vitpose_dir = os.path.join(MODELS_DIR, "vitpose")
     model_path = os.path.join(vitpose_dir, "vitpose-b.pth")
@@ -93,7 +92,7 @@ def download_vitpose_models():
 
 def download_rtmpose_models():
     """Download RTMPose ONNX models"""
-    print_step("8.3", "Download RTMPose Models")
+    print_step("2.3", "Download RTMPose Models", indent=True)
     
     rtmpose_dir = os.path.join(MODELS_DIR, "rtmlib")
     
@@ -129,10 +128,10 @@ def download_rtmpose_models():
 
 def download_motionagformer_models():
     """Download MotionAGFormer checkpoint"""
-    print_step("8.4", "Download MotionAGFormer Checkpoint")
+    print_step("2.4", "Download MotionAGFormer Checkpoint", indent=True)
     
     magf_dir = os.path.join(MODELS_DIR, "motionagformer")
-    model_path = os.path.join(magf_dir, "motionagformer-l.pth.tar")
+    model_path = os.path.join(magf_dir, "motionagformer-base-h36m.pth.tr")
     
     if check_file_exists(model_path):
         print("  Skipping MotionAGFormer (already exists)")
@@ -140,26 +139,26 @@ def download_motionagformer_models():
     
     # Check Drive backup
     if DRIVE_MODELS:
-        drive_path = os.path.join(DRIVE_MODELS, "motionagformer", "motionagformer-l.pth.tar")
+        drive_path = os.path.join(DRIVE_MODELS, "motionagformer", "motionagformer-base-h36m.pth.tr")
         if os.path.exists(drive_path):
-            print("  Copying from Drive: motionagformer-l.pth.tar")
+            print("  Copying from Drive: motionagformer-base-h36m.pth.tr")
             run_command(f"cp '{drive_path}' '{model_path}'")
             return
     
     # Download from Google Drive using gdown
     print("  Downloading MotionAGFormer checkpoint (~200 MB)...")
-    gdrive_id = "1RJKHZsNaLhZSYwcY0ofWgU_LI-_-s81F"
+    gdrive_id = "1Iii5EwsFFm9_9lKBUPfN8bV5LmfkNUMP"
     
     try:
         run_command(f"gdown {gdrive_id} -O '{model_path}'")
-        print("  ✓ Downloaded motionagformer-l.pth.tar")
+        print("  ✓ Downloaded motionagformer-base-h36m.pth.tr")
     except Exception as e:
         print_warning(f"Failed to download MotionAGFormer: {e}")
 
 
 def download_wb3d_models():
     """Download Wholebody 3D models"""
-    print_step("8.5", "Download Wholebody 3D Models")
+    print_step("2.5", "Download Wholebody 3D Models", indent=True)
     
     wb3d_dir = os.path.join(MODELS_DIR, "wb3d")
     model_path = os.path.join(wb3d_dir, "rtmw3d-l.onnx")
@@ -188,7 +187,7 @@ def download_wb3d_models():
 
 def download_reid_models():
     """Download ReID models"""
-    print_step("8.6", "Download ReID Models")
+    print_step("2.6", "Download ReID Models", indent=True)
     
     reid_dir = os.path.join(MODELS_DIR, "reid")
     model_path = os.path.join(reid_dir, "osnet_x1_0_msmt17.pt")
@@ -207,7 +206,7 @@ def download_reid_models():
     
     # Download from Google Drive using gdown
     print("  Downloading OSNet x1.0 MSMT17 (~25 MB)...")
-    gdrive_id = "1IosIFlLiulGIjwbXkxQF0EF_eY9S5p-4"
+    gdrive_id = "1LaG1EJpHrxdAxKnSCJ_i0u-nbxSAeiFY"
     
     try:
         run_command(f"gdown {gdrive_id} -O '{model_path}'")
@@ -223,7 +222,7 @@ def main():
                        help="Skip downloads if models already exist")
     args = parser.parse_args()
     
-    print_header("STEP 2: Download Model Files")
+    print_header("STEP 2: Download Model Files", color=COLOR_YELLOW)
     
     print("This script will download all required model weights.")
     print(f"Models directory: {MODELS_DIR}")
@@ -239,7 +238,7 @@ def main():
         download_wb3d_models()
         download_reid_models()
         
-        print_success("Model download complete!")
+        print_success("Model download complete!", color=COLOR_YELLOW)
         print("\nNext steps:")
         print("  python step3_pull_demodata.py    # Setup demo data")
         print("  python step4_verify_envt.py      # Verify installation")

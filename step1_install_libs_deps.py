@@ -13,7 +13,7 @@ import os
 import sys
 from setup_utils import (
     is_colab_environment, print_header, print_step, run_command,
-    create_directory, print_success, print_error
+    create_directory, print_success, print_error, COLOR_YELLOW
 )
 
 
@@ -24,7 +24,7 @@ MODELS_DIR = "/content/models"  # Parent directory to persist across repo deleti
 
 def step0_mount_drive():
     """Mount Google Drive (Colab only)"""
-    print_step(0, "Mount Google Drive")
+    print_step("1.0", "Mount Google Drive", indent=True)
     
     if not is_colab_environment():
         print("⊘ Skipping (not in Colab environment)")
@@ -46,7 +46,7 @@ def step0_mount_drive():
 
 def step1_install_core_dependencies():
     """Install core Python packages"""
-    print_step(1, "Install Core Dependencies")
+    print_step("1.1", "Install Core Dependencies", indent=True)
     
     packages = [
         "numpy",
@@ -69,7 +69,7 @@ def step1_install_core_dependencies():
 
 def step2_install_pytorch():
     """Install PyTorch with CUDA support"""
-    print_step(2, "Install PyTorch with CUDA")
+    print_step("1.2", "Install PyTorch with CUDA", indent=True)
     
     cmd = "pip install -q torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118"
     
@@ -91,7 +91,7 @@ def step2_install_pytorch():
 
 def step3_install_opencv_yolo():
     """Install OpenCV and YOLO (Ultralytics)"""
-    print_step(3, "Install OpenCV and YOLO")
+    print_step("1.3", "Install OpenCV and YOLO", indent=True)
     
     packages = [
         "opencv-python",
@@ -111,7 +111,7 @@ def step3_install_opencv_yolo():
 
 def step4_install_pose_estimation():
     """Install pose estimation libraries (ONNX Runtime)"""
-    print_step(4, "Install Pose Estimation Libraries")
+    print_step("1.4", "Install Pose Estimation Libraries", indent=True)
     
     # Check if GPU is available
     try:
@@ -139,7 +139,7 @@ def step4_install_pose_estimation():
 
 def step5_install_tracking():
     """Install tracking and ReID libraries"""
-    print_step(5, "Install Tracking Libraries")
+    print_step("1.5", "Install Tracking Libraries", indent=True)
     
     packages = [
         "boxmot",
@@ -161,7 +161,7 @@ def step5_install_tracking():
 
 def step6_install_motionagformer_deps():
     """Install MotionAGFormer dependencies"""
-    print_step(6, "Install MotionAGFormer Dependencies")
+    print_step("1.6", "Install MotionAGFormer Dependencies", indent=True)
     
     packages = [
         "timm",
@@ -183,7 +183,7 @@ def step6_install_motionagformer_deps():
 
 def step7_create_directories():
     """Create necessary directory structure"""
-    print_step(7, "Create Directory Structure")
+    print_step("1.7", "Create Directory Structure", indent=True)
     
     directories = [
         MODELS_DIR,
@@ -208,7 +208,7 @@ def step7_create_directories():
 
 def main():
     """Main execution function"""
-    print_header("STEP 1: Install Libraries and Dependencies")
+    print_header("STEP 1: Install Libraries and Dependencies", color=COLOR_YELLOW)
     
     print("This script will install all required Python packages.")
     print(f"Repository root: {REPO_ROOT}")
@@ -224,7 +224,7 @@ def main():
         step6_install_motionagformer_deps()
         step7_create_directories()
         
-        print_success("All libraries and dependencies installed successfully!")
+        print_success("All libraries and dependencies installed successfully!", color=COLOR_YELLOW)
         print("\nNext steps:")
         print("  python step2_install_models.py   # Download model files")
         print("  python step3_pull_demodata.py    # Setup demo data")

@@ -13,7 +13,7 @@ import os
 import sys
 from setup_utils import (
     is_colab_environment, print_header, print_step, run_command,
-    check_file_exists, print_success, print_error, print_warning
+    check_file_exists, print_success, print_error, print_warning, COLOR_YELLOW
 )
 
 
@@ -25,7 +25,7 @@ DRIVE_ROOT = "/content/drive/MyDrive" if is_colab_environment() else None
 
 def setup_demo_videos():
     """Copy demo videos from Google Drive"""
-    print_step("9.1", "Setup Demo Videos")
+    print_step("3.1", "Setup Demo Videos", indent=True)
     
     videos_dir = os.path.join(DEMO_DATA_DIR, "videos")
     
@@ -41,46 +41,60 @@ def setup_demo_videos():
     # Source directory in Google Drive
     drive_videos_dir = os.path.join(DRIVE_ROOT, "samplevideos") if DRIVE_ROOT else None
     
+    # Count files
+    existing_count = 0
+    copied_count = 0
+    missing_count = 0
+    
+    if not drive_videos_dir:
+        print_warning("Drive not mounted, cannot copy videos")
+        print(f"  Please manually download and place in: {videos_dir}")
+        return
+    
+    print("  Fetching demo videos from Google Drive backup...")
+    
     for video_name in video_files:
         local_path = os.path.join(videos_dir, video_name)
         
         if check_file_exists(local_path):
-            print(f"  Skipping {video_name} (already exists)")
+            existing_count += 1
             continue
         
         # Check Drive
-        if drive_videos_dir:
-            drive_path = os.path.join(drive_videos_dir, video_name)
-            if os.path.exists(drive_path):
-                print(f"  Copying from Drive: {video_name}")
-                try:
-                    run_command(f"cp '{drive_path}' '{local_path}'")
-                    print(f"  ✓ Copied {video_name}")
-                except Exception as e:
-                    print_warning(f"Failed to copy {video_name}: {e}")
-            else:
-                print_warning(f"{video_name} not found in Drive")
-                print(f"  Expected location: {drive_path}")
-                print(f"  Please manually place video in: {local_path}")
+        drive_path = os.path.join(drive_videos_dir, video_name)
+        if os.path.exists(drive_path):
+            try:
+                run_command(f"cp '{drive_path}' '{local_path}'")
+                copied_count += 1
+            except Exception as e:
+                print_warning(f"Failed to copy {video_name}: {e}")
+                missing_count += 1
         else:
-            print_warning("Drive not mounted, cannot copy videos")
-            print(f"  Please manually download and place in: {videos_dir}")
-            break  # No need to repeat warning for each file
+            missing_count += 1
+    
+    # Print summary
+    if copied_count > 0:
+        print(f"  ✓ Copied: {copied_count} video(s)")
+    if existing_count > 0:
+        print(f"  ✓ Already present: {existing_count} video(s)")
+    if missing_count > 0:
+        print_warning(f"{missing_count} video(s) not found in Drive")
+        print(f"  Please manually place videos in: {videos_dir}")
 
 
 def setup_demo_images():
     """Download demo images"""
-    print_step("9.2", "Setup Demo Images")
+    print_step("3.2", "Setup Demo Images", indent=True)
     
     images_dir = os.path.join(DEMO_DATA_DIR, "images")
     image_path = os.path.join(images_dir, "sample.jpg")
     
     if check_file_exists(image_path):
-        print("  Skipping sample.jpg (already exists)")
+        print("  ✓ Already present: sample.jpg")
         return
     
     # Download a sample image from internet
-    print("  Downloading sample image...")
+    print("  Fetching demo image from internet...")
     url = "https://raw.githubusercontent.com/ultralytics/yolov5/master/data/images/bus.jpg"
     
     try:
@@ -94,7 +108,7 @@ def setup_demo_images():
 
 def main():
     """Main execution function"""
-    print_header("STEP 3: Pull Demo Data")
+    print_header("STEP 3: Pull Demo Data", color=COLOR_YELLOW)
     
     print("This script will setup demo videos and images.")
     print(f"Demo data directory: {DEMO_DATA_DIR}")
@@ -106,7 +120,7 @@ def main():
         setup_demo_videos()
         setup_demo_images()
         
-        print_success("Demo data setup complete!")
+        print_success("Demo data setup complete!", color=COLOR_YELLOW)
         print("\nNext steps:")
         print("  python step4_verify_envt.py      # Verify installation")
         print("\nOr start using the pipeline:")
