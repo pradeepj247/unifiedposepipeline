@@ -574,17 +574,21 @@ def process_video(config):
                         track_id_stats[track_id]['count'] += 1
             
             # Print summary
-            print(f"\n📊 Tracking Statistics:")
-            print(f"  Unique track IDs: {len(track_id_stats)}")
-            print(f"  Track IDs seen: {sorted(track_id_stats.keys())}")
-            
-            # Print detailed table
-            if len(track_id_stats) > 0:
-                print(f"\n  {'Person ID':<12} {'# Frames':<12} {'Start Frame':<12} {'End Frame':<12}")
-                print(f"  {'-'*12} {'-'*12} {'-'*12} {'-'*12}")
-                for track_id in sorted(track_id_stats.keys()):
-                    stats = track_id_stats[track_id]
-                    print(f"  {track_id:<12} {stats['count']:<12} {stats['start']:<12} {stats['end']:<12}")
+            if verbose:
+                print(f"\n📊 Tracking Statistics:")
+                print(f"  Unique track IDs: {len(track_id_stats)}")
+                print(f"  Track IDs seen: {sorted(track_id_stats.keys())}")
+                
+                # Print detailed table
+                if len(track_id_stats) > 0:
+                    print(f"\n  {'Person ID':<12} {'# Frames':<12} {'Start Frame':<12} {'End Frame':<12}")
+                    print(f"  {'-'*12} {'-'*12} {'-'*12} {'-'*12}")
+                    for track_id in sorted(track_id_stats.keys()):
+                        stats = track_id_stats[track_id]
+                        print(f"  {track_id:<12} {stats['count']:<12} {stats['start']:<12} {stats['end']:<12}")
+            else:
+                # Non-verbose: only show unique track IDs count
+                print(f"Unique track IDs: {len(track_id_stats)}")
     
     return detections_data
 
@@ -668,7 +672,6 @@ def save_raw_detections(detections_data, output_path, verbose=True):
     if verbose:
         print(f"\n✓ Saved raw detections to: {output_path}")
         print(f"  Total detections: {len(frame_numbers_raw)}")
-        print(f"  Unique track IDs: {len(np.unique(track_ids_raw))}")
         print(f"  Format: frame_numbers, bboxes, track_ids, scores")
 
 
@@ -706,13 +709,21 @@ def save_visualization(video_path, detections_data, output_path, max_frames=0, v
     else:
         num_frames = total_frames
     
+    # Reduce output resolution to 720p to save time and space
+    # Maintain aspect ratio
+    output_height = 720
+    output_width = int(width * (output_height / height))
+    # Ensure width is even (required for some codecs)
+    if output_width % 2 != 0:
+        output_width += 1
+    
     # Create output directory
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
-    # Create video writer
+    # Create video writer (same FPS as input)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(str(output_path), fourcc, fps, (width, height))
+    out = cv2.VideoWriter(str(output_path), fourcc, fps, (output_width, output_height))
     
     if verbose:
         print(f"\n{'='*70}")
@@ -723,7 +734,7 @@ def save_visualization(video_path, detections_data, output_path, max_frames=0, v
         print(f"{'='*70}\n")
     
     # Process frames
-    pbar = tqdm(total=num_frames, desc="Rendering", disable=not verbose)
+    pbar = tqdm(total=num_frames, desc="Writing output", disable=not verbose)
     
     frame_idx = 0
     while frame_idx < num_frames:
@@ -745,6 +756,9 @@ def save_visualization(video_path, detections_data, output_path, max_frames=0, v
                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
         else:
             frame_vis = frame
+        
+        # Resize to 720p before writing
+        frame_vis = cv2.resize(frame_vis, (output_width, output_height))
         
         # Write frame
         out.write(frame_vis)
@@ -779,14 +793,23 @@ def main():
     # Process video
     detections_data = process_video(config)
     
-    # Save detections (single bbox per frame - largest)
-    output_path = config['output']['detections_file']
-    save_detections(detections_data, output_path, verbose=config['advanced']['verbose'])
+    # Determine if we should save detections.npz or raw_detections.npz
+    tracking_enabled = config['tracking']['enabled']
+    largest_bbox_only = config['tracking']['largest_bbox_only']
     
-    # Save raw detections (all tracked persons)
-    if 'raw_detections_file' in config['output']:
-        raw_output_path = config['output']['raw_detections_file']
-        save_raw_detections(detections_data, raw_output_path, verbose=config['advanced']['verbose'])
+    # Only save detections.npz if:
+    # 1. Tracking is disabled, OR
+    # 2. Tracking is enabled BUT largest_bbox_only is true
+    if not tracking_enabled or (tracking_enabled and largest_bbox_only):
+        # Save detections (single bbox per frame - largest)
+        output_path = config['output']['detections_file']
+        save_detections(detections_data, output_path, verbose=config['advanced']['verbose'])
+    
+    # Save raw detections (all tracked persons) if tracking is enabled and largest_bbox_only is false
+    if tracking_enabled and not largest_bbox_only:
+        if 'raw_detections_file' in config['output']:
+            raw_output_path = config['output']['raw_detections_file']
+            save_raw_detections(detections_data, raw_output_path, verbose=config['advanced']['verbose'])
     
     # Save visualization if enabled
     if config['output'].get('save_visualization', False):
