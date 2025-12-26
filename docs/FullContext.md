@@ -484,28 +484,329 @@ pose_estimation:
 
 ---
 
-## 12. Known Issues & Future Work
+## 12. Major Refactoring (December 2025)
+
+### 12.1 Setup Script Modularization
+
+**Problem:** `setup_unified.py` was a monolithic 602-line script that was difficult to maintain, debug, and iterate on.
+
+**Solution:** Split into 6 modular scripts with clear separation of concerns:
+
+| Script | Lines | Purpose |
+|--------|-------|---------|
+| `setup_utils.py` | 161 | Shared utility functions (environment detection, logging, command execution) |
+| `step1_install_libs_deps.py` | 187 | Steps 0-7: Install all Python packages, create directories |
+| `step2_install_models.py` | 225 | Step 8: Download all model weights with Drive backup support |
+| `step3_pull_demodata.py` | 96 | Step 9: Copy demo videos and images from Google Drive |
+| `step4_verify_envt.py` | 248 | Step 10: Comprehensive environment verification with optional tests |
+| `setup_all.py` | 160 | Master orchestrator with CLI flags (`--skip-models`, `--skip-data`, etc.) |
+| `setup_unified.py` | 142 | Legacy wrapper with deprecation notice (backward compatibility) |
+
+**Key Improvements:**
+- Each script is self-contained and can be run independently
+- Clearer error messages and progress tracking
+- Easier to debug individual setup stages
+- Command-line flags for flexible execution
+- Backward compatibility maintained via wrapper
+
+**Demo Data Updates:**
+- Changed source: `/content/drive/MyDrive/` → `/content/drive/MyDrive/samplevideos/`
+- Expanded from 2 to 5 videos: `campus_walk.mp4`, `dance.mp4`, `kohli_nets.mp4`, `practice1.mp4`, `practice2.mp4`
+- Improved error handling (single warning instead of repetitive messages)
+
+**Commit:** f505ecd (December 26, 2025)
+
+---
+
+### 12.2 Pipeline Modularization: Detection & Tracking
+
+**Original Design:**
+- `udp_video.py`: Monolithic script handling detection → 2D pose → visualization in one run
+- Tight coupling between stages made debugging difficult
+- No support for multi-person scenarios or person selection
+
+**New Modular Design:**
+
+#### Stage 1A: Detection with Tracking (`run_detector_tracking.py`)
+
+**Purpose:** Detect and track multiple people across video frames
+
+**Configuration:** `configs/detector_tracking.yaml` or `configs/detector_tracking_benchmark.yaml`
+
+**Key Features:**
+- **Detector Options:** YOLOv8 (small/medium/large/x)
+- **Tracker Options:** BoT-SORT, DeepOCSORT, ByteTrack, StrongSORT, OCSORT (5 trackers available)
+- **ReID Integration:** OSNet x1.0 MSMT17 model for person re-identification
+- **Output Modes:**
+  - `raw_detections.npz`: All tracked persons with IDs (multi-person data)
+  - `detections.npz`: Single-person detections (after manual selection)
+
+**Performance:** Achieved 67.5 FPS on dance.mp4 (yolov8s + BoT-SORT + ReID)
+
+**Output Format (raw_detections.npz):**
+```python
+{
+    'frame_numbers': np.array(shape=(N,), dtype=int),
+    'all_detections': list of dicts [
+        {
+            'bbox': [x1, y1, x2, y2],
+            'track_id': int,
+            'confidence': float,
+            'class_id': int
+        },
+        ...
+    ]
+}
+```
+
+#### Stage 1B: Person Selection (`select_person.py`)
+
+**Purpose:** Interactive tool to select which person to track from multi-person detections
+
+**Usage:**
+```bash
+python select_person.py \
+    --input demo_data/outputs/raw_detections.npz \
+    --video demo_data/videos/dance.mp4 \
+    --output demo_data/outputs/detections.npz
+```
+
+**Features:**
+- Displays first frame with all tracked persons labeled by ID
+- User selects person ID interactively
+- Extracts single-person trajectory for downstream processing
+- Handles occlusions and track ID consistency
+
+**Two-Step Workflow:**
+1. **Run detection/tracking:** Generate `raw_detections.npz` with all persons
+2. **Select person:** Use `select_person.py` to create `detections.npz` for target person
+
+**Benefits:**
+- Supports multi-person videos
+- User control over which person to analyze
+- Maintains tracking consistency across frames
+- Enables re-processing without re-running detection
+
+---
+
+#### Stage 2: Modular 2D Pose Estimation
+
+**Changes:**
+- Separated 2D pose estimation from visualization
+- Now produces NPZ output only (no automatic video generation)
+- Visualization moved to separate scripts
+- Reads `detections.npz` from Stage 1 (single-person trajectory)
+
+**Decoupled Scripts:**
+- `udp_video.py`: Stage 1 (detection) + Stage 2 (2D pose) only
+- `vis_wb3d.py`: Standalone visualization for wholebody 3D results
+- Future: Separate visualization scripts for each model type
+
+**Benefits:**
+- Faster iteration (skip visualization when testing models)
+- Easier debugging of pose estimation quality
+- Flexible visualization options
+- Reduced memory usage during inference
+
+---
+
+### 12.3 Tracking Integration Details
+
+**New Models Downloaded:**
+- **ReID Model:** `osnet_x1_0_msmt17.pt` (~25 MB)
+  - Appearance-based person re-identification
+  - Used by BoT-SORT, DeepOCSORT, StrongSORT trackers
+  - Improves tracking across occlusions
+
+**BoxMOT Integration:**
+- Installed via `pip install boxmot`
+- Added to `step1_install_libs_deps.py`
+- ReID model download automated in `step2_install_models.py`
+- Model stored in `/content/models/reid/` (Colab) or `models/reid/` (local)
+
+**Tracker Configuration:**
+```yaml
+tracking:
+  enabled: true
+  tracker_type: botsort  # Options: botsort, deepocsort, bytetrack, strongsort, ocsort
+  reid_model: models/reid/osnet_x1_0_msmt17.pt
+  confidence_threshold: 0.3
+  iou_threshold: 0.7
+  max_age: 30  # Frames to keep lost tracks
+```
+
+**Case Sensitivity Fixes:**
+- Fixed tracker name matching: `botsort` → `BoTSORT`, `deepocsort` → `DeepOCSORT`
+- Fixed ReID model path resolution on case-sensitive filesystems
+- Added validation for model paths
+
+---
+
+### 12.4 Pipeline Workflow Evolution
+
+**Before (Monolithic):**
+```
+udp_video.py [video.mp4]
+  ↓
+  Stage 1: YOLO detection (single person, largest bbox)
+  ↓
+  Stage 2: 2D pose estimation
+  ↓
+  Stage 3: Visualization (always runs)
+  ↓
+Output: detections.npz, kps_2d_*.npz, result_2D.mp4
+```
+
+**After (Modular, Multi-Person):**
+```
+run_detector_tracking.py [video.mp4]
+  ↓
+  Stage 1A: YOLO detection + BoxMOT tracking (multi-person)
+  ↓
+Output: raw_detections.npz (all persons with track IDs)
+
+select_person.py [raw_detections.npz] [video.mp4]
+  ↓
+  Stage 1B: User selects person ID
+  ↓
+Output: detections.npz (single person trajectory)
+
+udp_video.py [detections.npz] [video.mp4]
+  ↓
+  Stage 2: 2D pose estimation (reads detections.npz)
+  ↓
+Output: kps_2d_*.npz (no visualization)
+
+vis_wb3d.py [kps_2d_*.npz] [kps_3d_*.npz] [video.mp4]  # Optional
+  ↓
+  Stage 3: Visualization (standalone)
+  ↓
+Output: result_wb_2D3D.mp4
+```
+
+**Key Advantages:**
+1. **Multi-person support:** Track all people, select target person
+2. **Modular stages:** Run detection once, test multiple pose models
+3. **Skip visualization:** Faster iteration during development
+4. **Reusable detections:** Process same detections with different models
+5. **Parallel experimentation:** Compare trackers, pose models, visualizations independently
+
+---
+
+### 12.5 Configuration Updates
+
+**New Config Files:**
+- `configs/detector_tracking.yaml`: Standard tracking setup
+- `configs/detector_tracking_benchmark.yaml`: Performance benchmarking with 5 trackers
+
+**Updated Configs:**
+- `configs/udp_video.yaml`: Now expects `detections.npz` input (optional stage 1 skip)
+
+**Example Multi-Person Workflow Config:**
+```yaml
+# Step 1: Detection + Tracking
+video:
+  input_path: demo_data/videos/dance.mp4
+  max_frames: 360
+
+detection:
+  model_path: models/yolo/yolov8s.pt
+  confidence: 0.3
+
+tracking:
+  enabled: true
+  tracker_type: botsort
+  reid_model: models/reid/osnet_x1_0_msmt17.pt
+
+output:
+  raw_detections: demo_data/outputs/raw_detections.npz
+  benchmark_csv: demo_data/outputs/tracking_benchmark.csv
+```
+
+---
+
+## 13. Known Issues & Future Work
 
 ### Current Limitations
 1. **Backward Compatibility:** Old config files with `rtmpose_halpe26` or `wb3d` need manual updating
 2. **File Naming:** Existing output files with old names (`kps_2d_wb3d.npz`) won't be auto-detected
+3. **Visualization:** Not yet separated for all model types (only wholebody has standalone viz)
+4. **Person Selection:** Currently manual via `select_person.py` (could be automated based on criteria)
 
 ### Potential Improvements
 1. Add deprecation warnings for old model names
 2. Implement file name migration tool
-3. Add config validation
-4. Support batch video processing
-5. Add more 3D lifting models (beyond MAGF)
+3. Add config validation with schema
+4. Support batch video processing (multiple videos at once)
+5. Add more 3D lifting models (beyond MotionAGFormer)
+6. Automate person selection based on:
+   - Most visible person (fewest occlusions)
+   - Person in center of frame
+   - Largest person (closest to camera)
+   - Person ID consistency across frames
+7. Create visualization scripts for rtmpose and vitpose models
+8. Add tracking visualization overlay showing all person IDs
+9. Support multi-person 3D lifting (currently single-person only)
 
 ---
 
-## 13. Git Repository
+## 14. Git Repository
 
 - **GitHub:** `pradeepj247/unifiedposepipeline`
 - **Branch:** `main`
-- **Latest Commit:** a60b59b (Model naming refactor)
+- **Recent Commits:**
+  - f505ecd: Modularize setup scripts and update demo data source (Dec 26, 2025)
+  - aeff192: Add multi-person tracking with BoxMOT and person selection (Dec 26, 2025)
+  - a60b59b: Model naming refactor (Dec 24, 2025)
+  - c197c63: vis_wb3d.py fixes (Dec 24, 2025)
 - **Working Directory (Local):** `D:\trials\unifiedpipeline\newrepo\`
 
 ---
 
-**Document generated from conversation history spanning pipeline development, bug fixes, and refactoring efforts through December 24, 2025.**
+## 15. Recent Development Summary (Last 100 Messages)
+
+### Phase 1: Initial Tracking Integration
+- Integrated BoxMOT library for multi-object tracking
+- Added support for 5 trackers: BoT-SORT, DeepOCSORT, ByteTrack, StrongSORT, OCSORT
+- Implemented ReID-based person re-identification using OSNet model
+- Created `run_detector_tracking.py` as standalone detection+tracking script
+
+### Phase 2: Path Resolution & Case Sensitivity Fixes
+- Fixed tracker name case sensitivity issues (botsort → BoTSORT)
+- Resolved ReID model path issues on case-sensitive filesystems
+- Fixed YOLO model path resolution in configs
+- Fixed video input path handling (absolute paths in Colab)
+
+### Phase 3: Performance Benchmarking
+- Created `detector_tracking_benchmark.yaml` to test all 5 trackers
+- Measured performance: 67.5 FPS average (yolov8s + BoT-SORT)
+- Generated benchmark CSV with per-tracker timing
+
+### Phase 4: Multi-Person Workflow Implementation
+- Designed two-stage detection workflow:
+  - Stage 1A: Generate `raw_detections.npz` with all tracked persons
+  - Stage 1B: User selects person ID via `select_person.py`
+- Implemented `select_person.py` for interactive person selection
+- Modified output format to store per-frame multi-person detections
+
+### Phase 5: Setup Script Modularization
+- Split 602-line `setup_unified.py` into 6 modular scripts
+- Created utility module `setup_utils.py` with shared functions
+- Added `setup_all.py` master orchestrator with CLI flags
+- Converted original `setup_unified.py` to legacy wrapper
+- Updated demo data source and expanded video collection (2→5 videos)
+
+### Phase 6: Pipeline Decoupling
+- Separated 2D pose estimation from visualization
+- Modified `udp_video.py` to produce NPZ-only output
+- Moved wholebody visualization to standalone `vis_wb3d.py`
+- Removed automatic video generation from pose estimation stage
+- Enabled flexible visualization workflows
+
+### All Changes Committed ✅
+- **Commit aeff192:** Multi-person tracking with BoxMOT integration
+- **Commit f505ecd:** Setup script modularization and demo data updates
+
+---
+
+**Document generated from conversation history spanning pipeline development, bug fixes, and refactoring efforts through December 26, 2025.**
