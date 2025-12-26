@@ -120,24 +120,41 @@ def check_file_exists(filepath):
     return exists
 
 
-def check_import(module_name, package_name=None):
+def check_import(module_name, package_name=None, silent=False):
     """
     Check if a Python module can be imported.
     
     Args:
         module_name (str): Name of module to import
         package_name (str, optional): Display name if different from module_name
+        silent (bool): If True, suppress verbose output from the import
         
     Returns:
         bool: True if import successful, False otherwise
     """
     display_name = package_name or module_name
     try:
-        __import__(module_name)
-        print(f"✓ {display_name}")
+        if silent:
+            # Suppress stdout/stderr during import
+            import sys
+            import os
+            old_stdout = sys.stdout
+            old_stderr = sys.stderr
+            sys.stdout = open(os.devnull, 'w')
+            sys.stderr = open(os.devnull, 'w')
+            try:
+                __import__(module_name)
+            finally:
+                sys.stdout.close()
+                sys.stderr.close()
+                sys.stdout = old_stdout
+                sys.stderr = old_stderr
+        else:
+            __import__(module_name)
+        print(f"  ✓ {display_name}")
         return True
     except ImportError as e:
-        print(f"✗ {display_name}: {e}")
+        print(f"  ✗ {display_name}: {e}")
         return False
 
 

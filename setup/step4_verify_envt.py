@@ -14,7 +14,7 @@ import sys
 import argparse
 from setup_utils import (
     is_colab_environment, print_header, print_step, check_import,
-    check_file_exists, print_success, print_error, print_warning
+    check_file_exists, print_success, print_error, print_warning, COLOR_YELLOW
 )
 
 
@@ -25,37 +25,37 @@ MODELS_DIR = "/content/models"
 
 def verify_python_packages():
     """Verify all required Python packages are installed"""
-    print_step("10.1", "Verify Python Packages")
+    print_step("4.1", "Verify Python Packages", indent=True)
     
     packages = [
-        ("numpy", None),
-        ("torch", "PyTorch"),
-        ("cv2", "OpenCV"),
-        ("ultralytics", "YOLO"),
-        ("onnx", None),
-        ("onnxruntime", "ONNX Runtime"),
-        ("boxmot", "BoxMOT"),
-        ("supervision", None),
-        ("timm", None),
-        ("easydict", None),
-        ("yaml", "PyYAML"),
-        ("matplotlib", None),
-        ("PIL", "Pillow"),
-        ("scipy", None),
-        ("pandas", None),
-        ("tqdm", None)
+        ("numpy", None, False),
+        ("torch", "PyTorch", False),
+        ("cv2", "OpenCV", False),
+        ("ultralytics", "YOLO", True),  # Silent mode to suppress settings message
+        ("onnx", None, False),
+        ("onnxruntime", "ONNX Runtime", False),
+        ("boxmot", "BoxMOT", False),
+        ("supervision", None, False),
+        ("timm", None, False),
+        ("easydict", None, False),
+        ("yaml", "PyYAML", False),
+        ("matplotlib", None, False),
+        ("PIL", "Pillow", False),
+        ("scipy", None, False),
+        ("pandas", None, False),
+        ("tqdm", None, False)
     ]
     
     success_count = 0
     failed_packages = []
     
-    for module_name, display_name in packages:
-        if check_import(module_name, display_name):
+    for module_name, display_name, silent in packages:
+        if check_import(module_name, display_name, silent=silent):
             success_count += 1
         else:
             failed_packages.append(display_name or module_name)
     
-    print(f"\n✓ {success_count}/{len(packages)} packages verified")
+    print(f"\n  ✓ {success_count}/{len(packages)} packages verified")
     
     if failed_packages:
         print_warning(f"Missing packages: {', '.join(failed_packages)}")
@@ -66,37 +66,36 @@ def verify_python_packages():
 
 def verify_cuda_gpu():
     """Verify CUDA and GPU availability"""
-    print_step("10.2", "Verify CUDA and GPU")
+    print_step("4.2", "Verify CUDA and GPU", indent=True)
     
     try:
         import torch
         
-        print(f"PyTorch version: {torch.__version__}")
-        print(f"CUDA available: {torch.cuda.is_available()}")
+        print(f"  PyTorch version: {torch.__version__}")
+        print(f"  CUDA available: {torch.cuda.is_available()}")
         
         if torch.cuda.is_available():
-            print(f"CUDA version: {torch.version.cuda}")
-            print(f"GPU count: {torch.cuda.device_count()}")
-            print(f"GPU device: {torch.cuda.get_device_name(0)}")
-            print(f"GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+            print(f"  CUDA version: {torch.version.cuda}")
+            print(f"  GPU count: {torch.cuda.device_count()}")
+            print(f"  GPU device: {torch.cuda.get_device_name(0)}")
+            print(f"  GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
             return True
         else:
-            print_warning("CUDA not available - will use CPU (slower)")
+            print("  ⚠ CUDA not available - will use CPU (slower)")
             return False
             
     except Exception as e:
-        print_error(f"Failed to check CUDA: {e}")
+        print(f"  ✗ Failed to check CUDA: {e}")
         return False
 
 
 def verify_model_files():
     """Verify all required model files exist"""
-    print_step("10.3", "Verify Model Files")
+    print_step("4.3", "Verify Model Files", indent=True)
     
     models = [
         # YOLO models
         (os.path.join(MODELS_DIR, "yolo", "yolov8s.pt"), "YOLO Small"),
-        (os.path.join(MODELS_DIR, "yolo", "yolov8x.pt"), "YOLO Extra Large"),
         
         # RTMPose models
         (os.path.join(MODELS_DIR, "rtmlib", "rtmpose-l-coco-384x288.onnx"), "RTMPose COCO"),
@@ -109,7 +108,7 @@ def verify_model_files():
         (os.path.join(MODELS_DIR, "wb3d", "rtmw3d-l.onnx"), "Wholebody 3D"),
         
         # MotionAGFormer model
-        (os.path.join(MODELS_DIR, "motionagformer", "motionagformer-l.pth.tar"), "MotionAGFormer"),
+        (os.path.join(MODELS_DIR, "motionagformer", "motionagformer-base-h36m.pth.tr"), "MotionAGFormer"),
         
         # ReID model
         (os.path.join(MODELS_DIR, "reid", "osnet_x1_0_msmt17.pt"), "ReID OSNet x1.0")
@@ -124,7 +123,7 @@ def verify_model_files():
         else:
             missing_models.append(model_name)
     
-    print(f"\n✓ {success_count}/{len(models)} model files verified")
+    print(f"\n  ✓ {success_count}/{len(models)} model files verified")
     
     if missing_models:
         print_warning(f"Missing models: {', '.join(missing_models)}")
@@ -135,7 +134,7 @@ def verify_model_files():
 
 def verify_demo_data():
     """Verify demo data files exist"""
-    print_step("10.4", "Verify Demo Data")
+    print_step("4.4", "Verify Demo Data", indent=True)
     
     demo_files = [
         (os.path.join(REPO_ROOT, "demo_data", "videos", "dance.mp4"), "dance.mp4"),
@@ -152,7 +151,7 @@ def verify_demo_data():
         else:
             missing_files.append(file_name)
     
-    print(f"\n✓ {success_count}/{len(demo_files)} demo files verified")
+    print(f"\n  ✓ {success_count}/{len(demo_files)} demo files verified")
     
     if missing_files:
         print_warning(f"Missing demo files: {', '.join(missing_files)}")
@@ -163,7 +162,7 @@ def verify_demo_data():
 
 def verify_directories():
     """Verify directory structure"""
-    print_step("10.5", "Verify Directory Structure")
+    print_step("4.5", "Verify Directory Structure", indent=True)
     
     directories = [
         (MODELS_DIR, "Models root"),
@@ -185,13 +184,13 @@ def verify_directories():
     
     for dir_path, dir_name in directories:
         if os.path.isdir(dir_path):
-            print(f"✓ {dir_name}")
+            print(f"  ✓ {dir_name}")
             success_count += 1
         else:
-            print(f"✗ {dir_name}")
+            print(f"  ✗ {dir_name}")
             missing_dirs.append(dir_name)
     
-    print(f"\n✓ {success_count}/{len(directories)} directories verified")
+    print(f"\n  ✓ {success_count}/{len(directories)} directories verified")
     
     if missing_dirs:
         print_warning(f"Missing directories: {', '.join(missing_dirs)}")
@@ -200,45 +199,14 @@ def verify_directories():
     return True
 
 
-def run_quick_inference_test():
-    """Run quick inference tests (optional)"""
-    print_step("10.6", "Quick Inference Test (Optional)")
-    
-    print("Testing YOLO detection...")
-    try:
-        from ultralytics import YOLO
-        model_path = os.path.join(MODELS_DIR, "yolo", "yolov8s.pt")
-        
-        if not os.path.exists(model_path):
-            print("⊘ YOLO model not found, skipping test")
-            return False
-        
-        model = YOLO(model_path)
-        print("✓ YOLO model loaded successfully")
-        
-        # Test on sample image if available
-        sample_image = os.path.join(REPO_ROOT, "demo_data", "images", "sample.jpg")
-        if os.path.exists(sample_image):
-            results = model(sample_image, verbose=False)
-            print(f"✓ YOLO inference successful ({len(results[0].boxes)} detections)")
-        
-        return True
-        
-    except Exception as e:
-        print_warning(f"YOLO test failed: {e}")
-        return False
-
-
 def main():
     """Main execution function"""
     parser = argparse.ArgumentParser(description="Verify environment setup")
-    parser.add_argument("--quick", action="store_true",
-                       help="Skip optional inference tests")
     parser.add_argument("--detailed", action="store_true",
                        help="Show detailed information for all checks")
     args = parser.parse_args()
     
-    print_header("STEP 4: Verify Environment")
+    print_header("STEP 4: Verify Environment", color=COLOR_YELLOW)
     
     print("This script will verify your installation.")
     print(f"Repository root: {REPO_ROOT}")
@@ -255,9 +223,6 @@ def main():
         results["models"] = verify_model_files()
         results["demo_data"] = verify_demo_data()
         
-        if not args.quick:
-            results["inference"] = run_quick_inference_test()
-        
         # Summary
         print("\n" + "=" * 70)
         print("VERIFICATION SUMMARY")
@@ -273,7 +238,7 @@ def main():
         print(f"\nOverall: {passed}/{total} checks passed")
         
         if passed == total:
-            print_success("Environment verification complete! All checks passed.")
+            print_success("Environment verification complete! All checks passed.", color=COLOR_YELLOW)
             print("\nYou can now use the pipeline:")
             print("  python udp_video.py --config configs/udp_video.yaml")
             print("  python run_detector_tracking.py --config configs/detector_tracking_benchmark.yaml")
