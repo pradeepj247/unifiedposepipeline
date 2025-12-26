@@ -30,6 +30,11 @@ def step0_mount_drive():
         print("⊘ Skipping (not in Colab environment)")
         return
     
+    # Check if Drive is already mounted
+    if os.path.exists('/content/drive/MyDrive'):
+        print("✓ Google Drive already mounted")
+        return
+    
     try:
         from google.colab import drive
         drive.mount('/content/drive')
