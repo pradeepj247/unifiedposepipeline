@@ -35,7 +35,7 @@ except ImportError as e:
 
 # Step 2: Check video file
 print("\n[2/5] Checking input video...")
-video_path = "/content/campus_walk.mp4"
+video_path = "demo_data/videos/campus_walk.mp4"
 if os.path.exists(video_path):
     import cv2
     cap = cv2.VideoCapture(video_path)
@@ -54,7 +54,7 @@ if os.path.exists(video_path):
         sys.exit(1)
 else:
     print(f"   ❌ Video not found: {video_path}")
-    print(f"   Please ensure campus_walk.mp4 is at /content/")
+    print(f"   Please ensure video is at demo_data/videos/campus_walk.mp4")
     sys.exit(1)
 
 # Step 3: Check config file
