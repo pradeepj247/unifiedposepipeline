@@ -42,7 +42,7 @@ tracking:
 # Input/Output Settings
 # ============================================================================
 input:
-  video_path: /content/campus_walk.mp4  # Input video with multiple people
+  video_path: demo_data/videos/campus_walk.mp4  # Input video with multiple people
   max_frames: 0  # Process all frames (0 = no limit)
 
 output:
