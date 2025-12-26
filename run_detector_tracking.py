@@ -41,7 +41,7 @@ def load_config(config_path):
     return config
 
 
-def load_yolo_detector(model_path, device='cuda', confidence=0.3):
+def load_yolo_detector(model_path, device='cuda', confidence=0.3, verbose=False):
     """
     Load YOLOv8 detector
     
@@ -49,6 +49,7 @@ def load_yolo_detector(model_path, device='cuda', confidence=0.3):
         model_path: Path to YOLO model (.pt file)
         device: Device to run on ('cuda' or 'cpu')
         confidence: Confidence threshold
+        verbose: Print loading messages
     
     Returns:
         YOLO model object
@@ -72,7 +73,6 @@ def load_yolo_detector(model_path, device='cuda', confidence=0.3):
     for path in candidate_paths:
         if os.path.exists(path):
             resolved_path = path
-            print(f"   ✅ YOLO model found: {path}")
             break
     
     if resolved_path is None:
@@ -81,14 +81,17 @@ def load_yolo_detector(model_path, device='cuda', confidence=0.3):
             print(f"      - {path}")
         raise FileNotFoundError(f"YOLO model not found: {model_path}")
     
-    print(f"Loading YOLO model from: {resolved_path}")
+    if verbose:
+        print(f"   ✅ YOLO model found: {resolved_path}")
+        print(f"Loading YOLO model from: {resolved_path}")
+    
     model = YOLO(resolved_path)
     model.to(device)
     
     return model
 
 
-def load_tracker(tracker_name, reid_config, device='cuda', half=False):
+def load_tracker(tracker_name, reid_config, device='cuda', half=False, verbose=False):
     """
     Load BoxMOT tracker
     
@@ -97,6 +100,7 @@ def load_tracker(tracker_name, reid_config, device='cuda', half=False):
         reid_config: ReID configuration dict
         device: Device to run on
         half: Use FP16 half precision
+        verbose: Print loading messages
     
     Returns:
         Tracker object
@@ -133,7 +137,8 @@ def load_tracker(tracker_name, reid_config, device='cuda', half=False):
         available = list(tracker_map.keys())
         raise ValueError(f"Unknown tracker: '{tracker_name}'. Available: {available}")
     
-    print(f"Loading {tracker_name.upper()} tracker...")
+    if verbose:
+        print(f"Loading {tracker_name.upper()} tracker...")
     
     # Check if ReID is enabled
     if reid_config.get('enabled', False):
@@ -156,12 +161,14 @@ def load_tracker(tracker_name, reid_config, device='cuda', half=False):
                     reid_weights = reid_weights_abs
         
         if not reid_weights.exists():
-            print(f"   ⚠️  ReID weights not found: {reid_weights}")
-            print(f"   Tried: {reid_weights_str}, ../{reid_weights_str}, /content/{reid_weights_str}")
-            print(f"   Using motion-only tracking (no appearance features)")
+            if verbose:
+                print(f"   ⚠️  ReID weights not found: {reid_weights}")
+                print(f"   Tried: {reid_weights_str}, ../{reid_weights_str}, /content/{reid_weights_str}")
+                print(f"   Using motion-only tracking (no appearance features)")
             tracker = tracker_class(device=device, half=half)
         else:
-            print(f"   ✅ ReID weights found: {reid_weights}")
+            if verbose:
+                print(f"   ✅ ReID weights found: {reid_weights}")
             tracker = tracker_class(
                 reid_weights=reid_weights,
                 device=device,
@@ -169,7 +176,8 @@ def load_tracker(tracker_name, reid_config, device='cuda', half=False):
             )
     else:
         # Motion-only tracking
-        print(f"   Using motion-only tracking (ReID disabled)")
+        if verbose:
+            print(f"   Using motion-only tracking (ReID disabled)")
         tracker = tracker_class(device=device, half=half)
     
     return tracker
@@ -361,7 +369,7 @@ def process_video(config):
     
     # Load detector
     if detector_type.lower() == 'yolo':
-        detector = load_yolo_detector(model_path, device, confidence)
+        detector = load_yolo_detector(model_path, device, confidence, verbose=verbose)
     else:
         raise NotImplementedError(f"Detector type '{detector_type}' not yet supported")
     
@@ -369,8 +377,9 @@ def process_video(config):
     tracker = None
     if tracking_enabled:
         try:
-            tracker = load_tracker(tracker_name, reid_config, device=device, half=False)
-            print(f"   ✅ {tracker_name.upper()} tracker loaded successfully")
+            tracker = load_tracker(tracker_name, reid_config, device=device, half=False, verbose=verbose)
+            if verbose:
+                print(f"   ✅ {tracker_name.upper()} tracker loaded successfully")
         except Exception as e:
             print(f"   ❌ Failed to load tracker: {e}")
             print(f"   Falling back to detection-only mode")
@@ -393,6 +402,7 @@ def process_video(config):
     else:
         num_frames = total_frames
     
+    # Print video info
     if verbose:
         print(f"\n{'='*70}")
         print(f"Video: {video_path}")
@@ -402,10 +412,18 @@ def process_video(config):
         print(f"Detector: {detector_type.upper()}")
         if tracking_enabled:
             print(f"Tracking: {tracker_name.upper()} (ReID: {'ON' if reid_config.get('enabled') else 'OFF'})")
-            print(f"Output mode: Largest tracked bbox per frame")
         else:
             print(f"Tracking: Disabled (largest detection per frame)")
         print(f"{'='*70}\n")
+    else:
+        # Simple non-verbose header
+        print(f"Video: {video_path}")
+        print(f"Resolution: {width}x{height} @ {fps:.2f} fps")
+        print(f"Total frames: {total_frames}")
+        print(f"Processing: {num_frames} frames")
+        print(f"Detector: {detector_type.upper()}")
+        if tracking_enabled:
+            print(f"Tracking: {tracker_name.upper()} (ReID: {'ON' if reid_config.get('enabled') else 'OFF'})")
     
     # Storage for detections and tracking data
     frame_numbers = []
