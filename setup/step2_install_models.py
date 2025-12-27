@@ -39,7 +39,8 @@ MODEL_NAMES = {
     "yolov8s.pt": "YOLOv8s",
     "rtmpose-l-coco-384x288.onnx": "RTMPose (COCO)",
     "rtmw3d-l.onnx": "RTM WholeBody 3D",
-    "osnet_x1_0_msmt17.pt": "OSNet x1.0",
+    "osnet_x1_0_msmt17.pt": "OSNet x1.0 (PyTorch)",
+    "osnet_x0_25_msmt17.onnx": "OSNet x0.25 (ONNX)",
     "motionagformer-base-h36m.pth.tr": "MotionAGFormer",
     "rtmpose-l-halpe26-384x288.onnx": "RTMPose (Halpe26)"
 }
@@ -309,44 +310,100 @@ def download_wb3d_models():
 
 
 def download_reid_models():
-    """Download ReID models"""
+    """Download ReID models (both PyTorch and ONNX variants)"""
     print_step("2.6", "Download ReID Models", indent=True)
     
     reid_dir = os.path.join(MODELS_DIR, "reid")
-    model_name = "osnet_x1_0_msmt17.pt"
-    model_path = os.path.join(reid_dir, model_name)
-    display_name = get_model_display_name(model_name)
     
-    if check_file_exists(model_path):
-        # Get file size
-        file_size_bytes = os.path.getsize(model_path)
+    # Model 1: OSNet x1.0 (PyTorch) - for high accuracy
+    model_name_pt = "osnet_x1_0_msmt17.pt"
+    model_path_pt = os.path.join(reid_dir, model_name_pt)
+    display_name_pt = get_model_display_name(model_name_pt)
+    
+    if check_file_exists(model_path_pt):
+        file_size_bytes = os.path.getsize(model_path_pt)
         file_size_mb = file_size_bytes / (1024 * 1024)
-        print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} already exists: {model_path} ({file_size_mb:.1f} MB)")
-        return
-    
-    print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name} not found")
-    
-    # Check Drive backup
-    if DRIVE_MODELS:
-        drive_path = os.path.join(DRIVE_MODELS, "reid", model_name)
-        if os.path.exists(drive_path):
-            print(f"  Copying from Drive: {display_name}")
-            run_command(f"cp '{drive_path}' '{model_path}'")
-            return
-    
-    # Download from Google Drive using gdown with --fuzzy flag
-    gdrive_id = "1LaG1EJpHrxdAxKnSCJ_i0u-nbxSAeiFY"
-    
-    if VERBOSE:
-        print(f"  Downloading {display_name} (~25 MB)...")
-        try:
-            run_command(f"gdown --fuzzy {gdrive_id} -O '{model_path}'")
-            print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name}")
-        except Exception as e:
-            print_warning(f"Failed to download {display_name}: {e}")
+        print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name_pt} already exists: {model_path_pt} ({file_size_mb:.1f} MB)")
     else:
-        cmd = f"gdown --fuzzy {gdrive_id} -O '{model_path}'"
-        run_command_with_progress(cmd, model_name, model_path, 25)
+        print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name_pt} not found")
+        
+        # Check Drive backup
+        if DRIVE_MODELS:
+            drive_path = os.path.join(DRIVE_MODELS, "reid", model_name_pt)
+            if os.path.exists(drive_path):
+                print(f"  Copying from Drive: {display_name_pt}")
+                run_command(f"cp '{drive_path}' '{model_path_pt}'")
+            else:
+                # Download from Google Drive
+                gdrive_id = "1LaG1EJpHrxdAxKnSCJ_i0u-nbxSAeiFY"
+                if VERBOSE:
+                    print(f"  Downloading {display_name_pt} (~25 MB)...")
+                    try:
+                        run_command(f"gdown --fuzzy {gdrive_id} -O '{model_path_pt}'")
+                        print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name_pt}")
+                    except Exception as e:
+                        print_warning(f"Failed to download {display_name_pt}: {e}")
+                else:
+                    cmd = f"gdown --fuzzy {gdrive_id} -O '{model_path_pt}'"
+                    run_command_with_progress(cmd, model_name_pt, model_path_pt, 25)
+        else:
+            # Download from Google Drive
+            gdrive_id = "1LaG1EJpHrxdAxKnSCJ_i0u-nbxSAeiFY"
+            if VERBOSE:
+                print(f"  Downloading {display_name_pt} (~25 MB)...")
+                try:
+                    run_command(f"gdown --fuzzy {gdrive_id} -O '{model_path_pt}'")
+                    print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name_pt}")
+                except Exception as e:
+                    print_warning(f"Failed to download {display_name_pt}: {e}")
+            else:
+                cmd = f"gdown --fuzzy {gdrive_id} -O '{model_path_pt}'"
+                run_command_with_progress(cmd, model_name_pt, model_path_pt, 25)
+    
+    # Model 2: OSNet x0.25 (ONNX) - for speed (3-5x faster)
+    model_name_onnx = "osnet_x0_25_msmt17.onnx"
+    model_path_onnx = os.path.join(reid_dir, model_name_onnx)
+    display_name_onnx = get_model_display_name(model_name_onnx)
+    
+    if check_file_exists(model_path_onnx):
+        file_size_bytes = os.path.getsize(model_path_onnx)
+        file_size_mb = file_size_bytes / (1024 * 1024)
+        print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name_onnx} already exists: {model_path_onnx} ({file_size_mb:.1f} MB)")
+    else:
+        print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name_onnx} not found")
+        
+        # Check Drive backup
+        if DRIVE_MODELS:
+            drive_path = os.path.join(DRIVE_MODELS, "reid", model_name_onnx)
+            if os.path.exists(drive_path):
+                print(f"  Copying from Drive: {display_name_onnx}")
+                run_command(f"cp '{drive_path}' '{model_path_onnx}'")
+            else:
+                # Download from HuggingFace
+                hf_url = "https://huggingface.co/anriha/osnet_x0_25_msmt17/resolve/main/osnet_x0_25_msmt17.onnx"
+                if VERBOSE:
+                    print(f"  Downloading {display_name_onnx} (~2 MB)...")
+                    try:
+                        run_command(f"wget -O '{model_path_onnx}' {hf_url}")
+                        print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name_onnx}")
+                    except Exception as e:
+                        print_warning(f"Failed to download {display_name_onnx}: {e}")
+                else:
+                    cmd = f"wget -q -O '{model_path_onnx}' {hf_url}"
+                    run_command_with_progress(cmd, model_name_onnx, model_path_onnx, 2)
+        else:
+            # Download from HuggingFace
+            hf_url = "https://huggingface.co/anriha/osnet_x0_25_msmt17/resolve/main/osnet_x0_25_msmt17.onnx"
+            if VERBOSE:
+                print(f"  Downloading {display_name_onnx} (~2 MB)...")
+                try:
+                    run_command(f"wget -O '{model_path_onnx}' {hf_url}")
+                    print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name_onnx}")
+                except Exception as e:
+                    print_warning(f"Failed to download {display_name_onnx}: {e}")
+            else:
+                cmd = f"wget -q -O '{model_path_onnx}' {hf_url}"
+                run_command_with_progress(cmd, model_name_onnx, model_path_onnx, 2)
 
 
 def main():

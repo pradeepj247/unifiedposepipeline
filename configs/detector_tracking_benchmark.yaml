@@ -9,7 +9,7 @@ detector:
   type: yolo  # Options: yolo, rtmdet
   model_path: models/yolo/yolov8s.pt  # Path to detector model
   confidence: 0.3  # Confidence threshold for detections
-  device: cuda  # Device to use: cuda or cpu
+  device: 0  # Device to use: 0 (GPU 0), 1 (GPU 1), or cpu
   detect_only_humans: true  # Only detect person class (COCO class 0)
 
 # ============================================================================
@@ -36,9 +36,9 @@ processing:
 tracking:
   enabled: true  # Enable tracking
   
-  # Tracker selection: Using ByteTrack (fastest: 1265 Hz motion-only)
+  # Tracker selection: Using BoT-SORT (best for occlusion handling)
   # Options: botsort, bytetrack, boosttrack, deepocsort, strongsort, ocsort, hybridsort
-  tracker: bytetrack  # Fastest tracker for baseline
+  tracker: botsort  # Best ID consistency with ReID
   
   # Re-Identification (ReID) Settings - ENABLED FOR BENCHMARK
   reid:
@@ -51,16 +51,13 @@ tracking:
     #   - osnet_x1_0_msmt17.pt   (large, ~2.2M params, ~12 FPS) <- Current
     #   - mobilenetv2_x1_4_msmt17.pt (large, ~6M params)
     # 
-    # ONNX variants (1.5-2x faster with onnxruntime):
-    #   - osnet_x0_25_msmt17.onnx  (~40-60 FPS) <- Fastest
-    #     Download: https://huggingface.co/anriha/osnet_x0_25_msmt17/resolve/main/osnet_x0_25_msmt17.onnx
+    # ONNX variants (3-5x faster with onnxruntime):
+    #   - osnet_x0_25_msmt17.onnx  (~40-60 FPS) <- Default (best speed/accuracy)
     #   - osnet_x1_0_msmt17.onnx  (~18-24 FPS)
     # 
-    # To use ONNX models:
-    # 1. Download ONNX file to models/reid/ directory
-    # 2. Update weights_path to point to .onnx file
-    # 3. BoxMOT will automatically use ONNXRuntime backend
-    weights_path: models/reid/osnet_x1_0_msmt17.pt
+    # BoxMOT auto-detects format by file extension (.pt or .onnx)
+    # ONNX models are downloaded automatically by step2_install_models.py
+    weights_path: models/reid/osnet_x0_25_msmt17.onnx  # ONNX for speed
     
     # Note: ReID model will be auto-downloaded if not found
   
