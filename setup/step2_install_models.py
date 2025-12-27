@@ -111,10 +111,10 @@ def download_yolo_models():
         display_name = get_model_display_name(model_name)
         
         if check_file_exists(model_path):
-            if not VERBOSE:
-                print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} (already exists)")
-            else:
-                print(f"  Skipping {display_name} (already exists)")
+            # Get file size
+            file_size_bytes = os.path.getsize(model_path)
+            file_size_mb = file_size_bytes / (1024 * 1024)
+            print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} already exists: {model_path} ({file_size_mb:.1f} MB)")
             continue
         
         print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name} not found")
@@ -150,10 +150,10 @@ def download_vitpose_models():
     display_name = get_model_display_name(model_name)
     
     if check_file_exists(model_path):
-        if not VERBOSE:
-            print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} (already exists)")
-        else:
-            print(f"  Skipping {display_name} (already exists)")
+        # Get file size
+        file_size_bytes = os.path.getsize(model_path)
+        file_size_mb = file_size_bytes / (1024 * 1024)
+        print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} already exists: {model_path} ({file_size_mb:.1f} MB)")
         return
     
     print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name} not found")
@@ -197,10 +197,10 @@ def download_rtmpose_models():
         display_name = get_model_display_name(model_name)
         
         if check_file_exists(model_path):
-            if not VERBOSE:
-                print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} (already exists)")
-            else:
-                print(f"  Skipping {display_name} (already exists)")
+            # Get file size
+            file_size_bytes = os.path.getsize(model_path)
+            file_size_mb = file_size_bytes / (1024 * 1024)
+            print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} already exists: {model_path} ({file_size_mb:.1f} MB)")
             continue
         
         print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name} not found")
@@ -236,10 +236,10 @@ def download_motionagformer_models():
     display_name = get_model_display_name(model_name)
     
     if check_file_exists(model_path):
-        if not VERBOSE:
-            print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} (already exists)")
-        else:
-            print(f"  Skipping {display_name} (already exists)")
+        # Get file size
+        file_size_bytes = os.path.getsize(model_path)
+        file_size_mb = file_size_bytes / (1024 * 1024)
+        print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} already exists: {model_path} ({file_size_mb:.1f} MB)")
         return
     
     print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name} not found")
@@ -318,10 +318,10 @@ def download_reid_models():
     display_name = get_model_display_name(model_name)
     
     if check_file_exists(model_path):
-        if not VERBOSE:
-            print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} (already exists)")
-        else:
-            print(f"  Skipping {display_name} (already exists)")
+        # Get file size
+        file_size_bytes = os.path.getsize(model_path)
+        file_size_mb = file_size_bytes / (1024 * 1024)
+        print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} already exists: {model_path} ({file_size_mb:.1f} MB)")
         return
     
     print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name} not found")
