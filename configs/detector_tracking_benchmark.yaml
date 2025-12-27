@@ -44,22 +44,16 @@ tracking:
   reid:
     enabled: true  # Enable appearance-based tracking with ReID
     
-    # Using OSNet x1.0 model (better accuracy than x0.25)
-    # Available models (PyTorch):
-    #   - osnet_x0_25_msmt17.pt  (lightweight, ~0.2M params, ~30-40 FPS)
-    #   - osnet_x0_5_msmt17.pt   (medium, ~0.6M params, ~20-24 FPS)
-    #   - osnet_x1_0_msmt17.pt   (large, ~2.2M params, ~12 FPS) <- Current
-    #   - mobilenetv2_x1_4_msmt17.pt (large, ~6M params)
+    # Available ReID models (PyTorch - all support dynamic batching):
+    #   - osnet_x0_25_msmt17.pt  (lightweight, ~0.2M params, ~20-25 FPS) <- Default
+    #   - osnet_x1_0_msmt17.pt   (large, ~2.2M params, ~12 FPS, better accuracy)
     # 
-    # ONNX variants (3-5x faster with onnxruntime):
-    #   - osnet_x0_25_msmt17.onnx  (~40-60 FPS) - Fixed batch size, not compatible
-    #   - osnet_x1_0_msmt17.onnx  (~18-24 FPS) - Fixed batch size, not compatible
+    # Default is x0.25 for 2x speed improvement with minimal accuracy loss
+    # Switch to x1.0 if you need maximum accuracy and don't mind slower speed
     # 
-    # Note: Pre-built ONNX models have fixed batch sizes and don't work with BoxMOT
-    # Use PyTorch models instead (BoxMOT handles dynamic batching)
-    # 
-    # For speed, use lighter PyTorch model:
-    weights_path: models/reid/osnet_x1_0_msmt17.pt  # PyTorch (dynamic batching)
+    # Note: ONNX models (osnet_x0_25_msmt17.onnx) have fixed batch sizes
+    # and are not compatible with BoxMOT's dynamic batching
+    weights_path: models/reid/osnet_x0_25_msmt17.pt  # Fast & accurate
     
     # Note: ReID model will be auto-downloaded if not found
   
