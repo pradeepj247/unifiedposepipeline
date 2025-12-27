@@ -112,7 +112,7 @@ def download_yolo_models():
         model_path = os.path.join(yolo_dir, model_name)
         display_name = get_model_display_name(model_name)
         
-        if check_file_exists(model_path):
+        if check_file_exists(model_path, quiet=True):
             # Get file size
             file_size_bytes = os.path.getsize(model_path)
             file_size_mb = file_size_bytes / (1024 * 1024)
@@ -151,7 +151,7 @@ def download_vitpose_models():
     model_path = os.path.join(vitpose_dir, model_name)
     display_name = get_model_display_name(model_name)
     
-    if check_file_exists(model_path):
+    if check_file_exists(model_path, quiet=True):
         # Get file size
         file_size_bytes = os.path.getsize(model_path)
         file_size_mb = file_size_bytes / (1024 * 1024)
@@ -198,7 +198,7 @@ def download_rtmpose_models():
         model_path = os.path.join(rtmpose_dir, model_name)
         display_name = get_model_display_name(model_name)
         
-        if check_file_exists(model_path):
+        if check_file_exists(model_path, quiet=True):
             # Get file size
             file_size_bytes = os.path.getsize(model_path)
             file_size_mb = file_size_bytes / (1024 * 1024)
@@ -237,7 +237,7 @@ def download_motionagformer_models():
     model_path = os.path.join(magf_dir, model_name)
     display_name = get_model_display_name(model_name)
     
-    if check_file_exists(model_path):
+    if check_file_exists(model_path, quiet=True):
         # Get file size
         file_size_bytes = os.path.getsize(model_path)
         file_size_mb = file_size_bytes / (1024 * 1024)
@@ -276,7 +276,7 @@ def download_wb3d_models():
     wb3d_dir = os.path.join(MODELS_DIR, "wb3d")
     model_path = os.path.join(wb3d_dir, "rtmw3d-l.onnx")
     
-    if check_file_exists(model_path):
+    if check_file_exists(model_path, quiet=True):
         print("  Skipping rtmw3d-l.onnx (already exists)")
         return
     
@@ -321,7 +321,7 @@ def download_reid_models():
     model_path_pt = os.path.join(reid_dir, model_name_pt)
     display_name_pt = get_model_display_name(model_name_pt)
     
-    if check_file_exists(model_path_pt):
+    if check_file_exists(model_path_pt, quiet=True):
         file_size_bytes = os.path.getsize(model_path_pt)
         file_size_mb = file_size_bytes / (1024 * 1024)
         print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name_pt} already exists: {model_path_pt} ({file_size_mb:.1f} MB)")
@@ -366,7 +366,7 @@ def download_reid_models():
     model_path_x025 = os.path.join(reid_dir, model_name_x025)
     display_name_x025 = get_model_display_name(model_name_x025)
     
-    if check_file_exists(model_path_x025):
+    if check_file_exists(model_path_x025, quiet=True):
         file_size_bytes = os.path.getsize(model_path_x025)
         file_size_mb = file_size_bytes / (1024 * 1024)
         print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name_x025} already exists: {model_path_x025} ({file_size_mb:.1f} MB)")
@@ -411,7 +411,7 @@ def download_reid_models():
     model_path_onnx = os.path.join(reid_dir, model_name_onnx)
     display_name_onnx = get_model_display_name(model_name_onnx)
     
-    if check_file_exists(model_path_onnx):
+    if check_file_exists(model_path_onnx, quiet=True):
         file_size_bytes = os.path.getsize(model_path_onnx)
         file_size_mb = file_size_bytes / (1024 * 1024)
         print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name_onnx} already exists: {model_path_onnx} ({file_size_mb:.1f} MB)")

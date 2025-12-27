@@ -101,17 +101,20 @@ def create_directory(path):
         print(f"  ✓ Directory exists: {path}")
 
 
-def check_file_exists(filepath):
+def check_file_exists(filepath, quiet=False):
     """
     Check if a file exists.
     
     Args:
         filepath (str): Path to file
+        quiet (bool): Suppress stdout logging when True
         
     Returns:
         bool: True if file exists, False otherwise
     """
     exists = os.path.isfile(filepath)
+    if quiet:
+        return exists
     if exists:
         size_mb = os.path.getsize(filepath) / (1024 * 1024)
         print(f"  ✓ Found: {filepath} ({size_mb:.1f} MB)")
