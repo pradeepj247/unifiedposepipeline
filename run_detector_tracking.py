@@ -631,6 +631,80 @@ def save_detections(detections_data, output_path, verbose=True):
         print(f"  Format: frame_numbers (int64), bboxes (int64, 4 values per frame)")
 
 
+def save_debug_detections(detections_data, output_path, config, verbose=True):
+    """
+    Save debug-friendly NPZ file with per-frame structured data
+    
+    Args:
+        detections_data: Dictionary with all_tracks data
+        output_path: Path to output debug NPZ file
+        config: Config dict with metadata
+        verbose: Print save confirmation
+    """
+    # Create output directory if needed
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Extract all tracks
+    all_tracks = detections_data.get('all_tracks', [])
+    
+    if len(all_tracks) == 0:
+        print(f"\n⚠️  No tracking data found. Skipping debug NPZ file.")
+        return
+    
+    # Build per-frame structured data
+    frame_numbers = []
+    detections_per_frame = []
+    
+    for frame_idx, tracks in enumerate(all_tracks):
+        frame_numbers.append(frame_idx)
+        frame_detections = []
+        
+        if len(tracks) > 0:
+            for track in tracks:
+                # track format: [x1, y1, x2, y2, track_id, conf, cls, det_ind]
+                frame_detections.append({
+                    'track_id': int(track[4]),
+                    'bbox': track[:4].tolist(),
+                    'confidence': float(track[5]),
+                    'class_id': int(track[6])
+                })
+        
+        detections_per_frame.append(frame_detections)
+    
+    # Collect metadata
+    video_filename = config['input'].get('video_filename', 'unknown')
+    
+    # Collect unique track IDs
+    unique_ids = set()
+    for frame_dets in detections_per_frame:
+        for det in frame_dets:
+            unique_ids.add(det['track_id'])
+    
+    metadata = {
+        'video_name': video_filename,
+        'tracker_type': config['tracking']['tracker'],
+        'reid_enabled': config['tracking']['reid']['enabled'],
+        'total_frames': len(frame_numbers),
+        'unique_track_ids': sorted(list(unique_ids)),
+        'tracker_params': config['tracking'].get('params', {})
+    }
+    
+    # Save as compressed NPZ with pickle support for nested structures
+    np.savez_compressed(
+        output_path,
+        frame_numbers=np.array(frame_numbers, dtype=np.int64),
+        detections_per_frame=np.array(detections_per_frame, dtype=object),
+        metadata=np.array([metadata], dtype=object)
+    )
+    
+    print(f"\n✓ Saved debug detections to: {output_path}")
+    print(f"  Frames: {len(frame_numbers)}, Unique IDs: {len(unique_ids)}")
+    if verbose:
+        print(f"  Format: Per-frame structured data with metadata")
+        print(f"  Unique track IDs: {sorted(list(unique_ids))}")
+
+
 def save_raw_detections(detections_data, output_path, verbose=True):
     """
     Save raw multi-person tracking detections to NPZ file
@@ -800,6 +874,16 @@ def main():
         required=True,
         help='Path to detector configuration YAML file'
     )
+    parser.add_argument(
+        '--debug',
+        action='store_true',
+        help='Save additional debug NPZ file with per-frame structured data for analysis'
+    )
+    parser.add_argument(
+        '--no-visualization',
+        action='store_true',
+        help='Skip visualization video generation (overrides config setting)'
+    )
     
     args = parser.parse_args()
     
@@ -826,9 +910,15 @@ def main():
         if 'raw_detections_file' in config['output']:
             raw_output_path = config['output']['raw_detections_file']
             save_raw_detections(detections_data, raw_output_path, verbose=config['advanced']['verbose'])
+            
+            # Save debug detections if --debug flag is set
+            if args.debug:
+                debug_output_path = raw_output_path.replace('raw_detections.npz', 'raw_detections_debug.npz')
+                save_debug_detections(detections_data, debug_output_path, config, verbose=config['advanced']['verbose'])
     
-    # Save visualization if enabled
-    if config['output'].get('save_visualization', False):
+    # Save visualization if enabled (respect --no-visualization flag)
+    save_visualization_enabled = config['output'].get('save_visualization', False) and not args.no_visualization
+    if save_visualization_enabled:
         import os
         # Reconstruct full video path
         video_dir = config['input'].get('video_path', 'demo_data/videos/')
