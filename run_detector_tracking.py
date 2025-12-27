@@ -368,6 +368,7 @@ def process_video(config):
     tracker_name = config['tracking'].get('tracker', 'botsort')
     reid_config = config['tracking'].get('reid', {'enabled': False})
     largest_bbox_only = config['tracking']['largest_bbox_only']
+    tracker_half = config['tracking'].get('half', True)
     
     # Get tracker parameters (with defaults)
     tracker_params = config['tracking'].get('params', {})
@@ -383,10 +384,12 @@ def process_video(config):
     # Load tracker if enabled
     tracker = None
     if tracking_enabled:
+        # Disable half precision on CPU to avoid issues
+        half_flag = tracker_half and (device != 'cpu')
         try:
-            tracker = load_tracker(tracker_name, reid_config, tracker_params, device=device, half=False, verbose=verbose)
+            tracker = load_tracker(tracker_name, reid_config, tracker_params, device=device, half=half_flag, verbose=verbose)
             if verbose:
-                print(f"   ✅ {tracker_name.upper()} tracker loaded successfully")
+                print(f"   ✅ {tracker_name.upper()} tracker loaded successfully (half={'on' if half_flag else 'off'})")
         except Exception as e:
             print(f"   ❌ Failed to load tracker: {e}")
             print(f"   Falling back to detection-only mode")

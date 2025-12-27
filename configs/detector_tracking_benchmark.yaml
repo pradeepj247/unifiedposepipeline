@@ -35,6 +35,7 @@ processing:
 # ============================================================================
 tracking:
   enabled: true  # Enable tracking
+  half: true     # Use FP16 for tracker/ReID when on GPU (faster); auto-disabled on CPU
   
   # Tracker selection: Using BoT-SORT (best for occlusion handling)
   # Options: botsort, bytetrack, boosttrack, deepocsort, strongsort, ocsort, hybridsort
