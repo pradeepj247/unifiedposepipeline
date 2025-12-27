@@ -54,6 +54,7 @@ tracking:
     max_age: 30            # Frames to keep lost track alive (waiting for reappearance)
     min_hits: 3            # Minimum detections before outputting track
     track_buffer: 25       # Buffer size for track history
+    max_obs: 50            # Maximum observations to store per track (should be >= max_age)
     
     # Other settings
     per_class: false       # Track per class separately (keep false for person tracking)
