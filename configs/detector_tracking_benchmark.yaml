@@ -1,6 +1,6 @@
 # Detector Configuration for Tracking Benchmark
-# Testing BoxMOT tracking with ReID on campus_walk.mp4
-# Goal: Observe track ID stability and FPS impact with ReID enabled
+# Testing BoxMOT tracking without ReID (ByteTrack) on campus_walk.mp4
+# Goal: Maximize speed using ByteTrack without appearance ReID
 
 # ============================================================================
 # Detector Settings
@@ -37,13 +37,13 @@ tracking:
   enabled: true  # Enable tracking
   half: true     # Use FP16 for tracker/ReID when on GPU (faster); auto-disabled on CPU
   
-  # Tracker selection: Using BoT-SORT (best for occlusion handling)
+  # Tracker selection: Using ByteTrack for speed (no ReID needed)
   # Options: botsort, bytetrack, boosttrack, deepocsort, strongsort, ocsort, hybridsort
-  tracker: botsort  # Best ID consistency with ReID
+  tracker: bytetrack  # Fastest option; no appearance model
   
   # Re-Identification (ReID) Settings - ENABLED FOR BENCHMARK
   reid:
-    enabled: true  # Enable appearance-based tracking with ReID
+    enabled: false  # Disable ReID for maximum speed (ByteTrack works motion-only)
     
     # Available ReID models (PyTorch - all support dynamic batching):
     #   - osnet_x0_25_msmt17.pt  (lightweight, ~0.2M params, ~20-25 FPS) <- Default
@@ -129,21 +129,18 @@ advanced:
 # ============================================================================
 # Without tracking/ReID (raw YOLO): ~70 FPS (baseline)
 # 
-# With ByteTrack + OSNet x1.0 ReID:
+# With ByteTrack (no ReID):
 #   - Detection FPS: ~70 FPS (unchanged)
-#   - Tracking FPS: ~100-200 FPS (ByteTrack is fast)
-#   - ReID overhead: ~20-30ms per frame
-#   - Combined FPS: ~30-40 FPS (expected drop due to ReID)
-#   - Overall FPS: ~25-35 FPS (including I/O)
+#   - Tracking FPS: Very high (motion-only)
+#   - Combined FPS: Largely detector-bound; expect minimal overhead from tracking
+#   - Overall FPS: Close to detector FPS (including I/O)
 #
 # Track ID Stability:
-#   - Without ReID: Frequent ID switches during occlusions
-#   - With ReID: Consistent IDs even after occlusions
+#   - Without ReID: Possible ID switches during heavy occlusions
 #   - Unique track IDs: Depends on number of people in video
 #
 # Output Visualization:
 #   - Each person gets unique colored bbox
 #   - Track ID shown above bbox
-#   - Same ID maintained across frames (with ReID)
 #
 # ============================================================================
