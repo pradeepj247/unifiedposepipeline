@@ -52,12 +52,14 @@ tracking:
     #   - mobilenetv2_x1_4_msmt17.pt (large, ~6M params)
     # 
     # ONNX variants (3-5x faster with onnxruntime):
-    #   - osnet_x0_25_msmt17.onnx  (~40-60 FPS) <- Default (best speed/accuracy)
-    #   - osnet_x1_0_msmt17.onnx  (~18-24 FPS)
+    #   - osnet_x0_25_msmt17.onnx  (~40-60 FPS) - Fixed batch size, not compatible
+    #   - osnet_x1_0_msmt17.onnx  (~18-24 FPS) - Fixed batch size, not compatible
     # 
-    # BoxMOT auto-detects format by file extension (.pt or .onnx)
-    # ONNX models are downloaded automatically by step2_install_models.py
-    weights_path: models/reid/osnet_x0_25_msmt17.onnx  # ONNX for speed
+    # Note: Pre-built ONNX models have fixed batch sizes and don't work with BoxMOT
+    # Use PyTorch models instead (BoxMOT handles dynamic batching)
+    # 
+    # For speed, use lighter PyTorch model:
+    weights_path: models/reid/osnet_x1_0_msmt17.pt  # PyTorch (dynamic batching)
     
     # Note: ReID model will be auto-downloaded if not found
   
