@@ -28,18 +28,40 @@ DRIVE_MODELS = "/content/drive/MyDrive/models" if is_colab_environment() else No
 # Global verbose flag
 VERBOSE = False
 
+# Color codes for output
+COLOR_ORANGE = "\033[38;5;208m"  # Orange color for missing files
+COLOR_GREEN = "\033[92m"  # Green color for success
+COLOR_RESET = "\033[0m"  # Reset color
 
-def run_command_with_progress(cmd, description, expected_size_mb=None):
+# Model name mapping (filename -> friendly display name)
+MODEL_NAMES = {
+    "vitpose-b.pth": "VITPose",
+    "yolov8s.pt": "YOLOv8s",
+    "rtmpose-l-coco-384x288.onnx": "RTMPose (COCO)",
+    "rtmw3d-l.onnx": "RTM WholeBody 3D",
+    "osnet_x1_0_msmt17.pt": "OSNet x1.0",
+    "motionagformer-base-h36m.pth.tr": "MotionAGFormer",
+    "rtmpose-l-halpe26-384x288.onnx": "RTMPose (Halpe26)"
+}
+
+def get_model_display_name(filename):
+    """Get friendly display name for a model file"""
+    return MODEL_NAMES.get(filename, filename)
+
+
+def run_command_with_progress(cmd, filename, model_path, expected_size_mb=None):
     """Run command with progress tracking for silent mode"""
+    display_name = get_model_display_name(filename)
+    
     if VERBOSE:
         # Verbose mode: show all output
         return run_command(cmd)
     
-    # Silent mode: show progress
+    # Silent mode: show progress with rocket emoji
     if expected_size_mb:
-        print(f"  Downloading {description} (~{expected_size_mb} MB)")
+        print(f"  🚀 Downloading {display_name} (~{expected_size_mb} MB)")
     else:
-        print(f"  Downloading {description}...")
+        print(f"  🚀 Downloading {display_name}...")
     
     try:
         # Run command and capture output
@@ -61,7 +83,7 @@ def run_command_with_progress(cmd, description, expected_size_mb=None):
                 # Show last progress line
                 print(f"  Progress: 100%")
         
-        print(f"  ✓ Downloaded {description} successfully")
+        print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name} successfully to {model_path}")
         return 0
         
     except subprocess.CalledProcessError as e:
@@ -81,38 +103,41 @@ def download_yolo_models():
     yolo_dir = os.path.join(MODELS_DIR, "yolo")
     
     models = {
-        "yolov8s.pt": ("https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8s.pt", 11.5)
+        "yolov8s.pt": ("https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8s.pt", 22)
     }
     
     for model_name, (url, size_mb) in models.items():
         model_path = os.path.join(yolo_dir, model_name)
+        display_name = get_model_display_name(model_name)
         
         if check_file_exists(model_path):
             if not VERBOSE:
-                print(f"  ✓ {model_name} (already exists)")
+                print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} (already exists)")
             else:
-                print(f"  Skipping {model_name} (already exists)")
+                print(f"  Skipping {display_name} (already exists)")
             continue
+        
+        print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name} not found")
         
         # Check Drive backup
         if DRIVE_MODELS:
             drive_path = os.path.join(DRIVE_MODELS, "yolo", model_name)
             if os.path.exists(drive_path):
-                print(f"  Copying from Drive: {model_name}")
+                print(f"  Copying from Drive: {display_name}")
                 run_command(f"cp '{drive_path}' '{model_path}'")
                 continue
         
         # Download from GitHub
         cmd = f"curl -L '{url}' -o '{model_path}'"
         if VERBOSE:
-            print(f"  Downloading {model_name}...")
+            print(f"  Downloading {display_name}...")
             try:
                 run_command(cmd)
-                print(f"  ✓ Downloaded {model_name}")
+                print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name}")
             except Exception as e:
-                print_warning(f"Failed to download {model_name}: {e}")
+                print_warning(f"Failed to download {display_name}: {e}")
         else:
-            run_command_with_progress(cmd, model_name, size_mb)
+            run_command_with_progress(cmd, model_name, model_path, size_mb)
 
 
 def download_vitpose_models():
@@ -120,20 +145,24 @@ def download_vitpose_models():
     print_step("2.2", "Download ViTPose Models", indent=True)
     
     vitpose_dir = os.path.join(MODELS_DIR, "vitpose")
-    model_path = os.path.join(vitpose_dir, "vitpose-b.pth")
+    model_name = "vitpose-b.pth"
+    model_path = os.path.join(vitpose_dir, model_name)
+    display_name = get_model_display_name(model_name)
     
     if check_file_exists(model_path):
         if not VERBOSE:
-            print("  ✓ vitpose-b.pth (already exists)")
+            print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} (already exists)")
         else:
-            print("  Skipping ViTPose-b (already exists)")
+            print(f"  Skipping {display_name} (already exists)")
         return
+    
+    print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name} not found")
     
     # Check Drive backup
     if DRIVE_MODELS:
-        drive_path = os.path.join(DRIVE_MODELS, "vitpose", "vitpose-b.pth")
+        drive_path = os.path.join(DRIVE_MODELS, "vitpose", model_name)
         if os.path.exists(drive_path):
-            print("  Copying from Drive: vitpose-b.pth")
+            print(f"  Copying from Drive: {display_name}")
             run_command(f"cp '{drive_path}' '{model_path}'")
             return
     
@@ -142,14 +171,14 @@ def download_vitpose_models():
     cmd = f"curl -L '{url}' -o '{model_path}'"
     
     if VERBOSE:
-        print("  Downloading ViTPose-b (343 MB)...")
+        print(f"  Downloading {display_name} (343 MB)...")
         try:
             run_command(cmd)
-            print("  ✓ Downloaded vitpose-b.pth")
+            print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name}")
         except Exception as e:
-            print_warning(f"Failed to download ViTPose: {e}")
+            print_warning(f"Failed to download {display_name}: {e}")
     else:
-        run_command_with_progress(cmd, "vitpose-b.pth", 343)
+        run_command_with_progress(cmd, model_name, model_path, 343)
 
 
 def download_rtmpose_models():
@@ -165,33 +194,36 @@ def download_rtmpose_models():
     
     for model_name, (url, size_mb) in models.items():
         model_path = os.path.join(rtmpose_dir, model_name)
+        display_name = get_model_display_name(model_name)
         
         if check_file_exists(model_path):
             if not VERBOSE:
-                print(f"  ✓ {model_name} (already exists)")
+                print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} (already exists)")
             else:
-                print(f"  Skipping {model_name} (already exists)")
+                print(f"  Skipping {display_name} (already exists)")
             continue
+        
+        print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name} not found")
         
         # Check Drive backup
         if DRIVE_MODELS:
             drive_path = os.path.join(DRIVE_MODELS, "rtmlib", model_name)
             if os.path.exists(drive_path):
-                print(f"  Copying from Drive: {model_name}")
+                print(f"  Copying from Drive: {display_name}")
                 run_command(f"cp '{drive_path}' '{model_path}'")
                 continue
         
         # Download from GitHub
         cmd = f"curl -L '{url}' -o '{model_path}'"
         if VERBOSE:
-            print(f"  Downloading {model_name} (~{size_mb} MB)...")
+            print(f"  Downloading {display_name} (~{size_mb} MB)...")
             try:
                 run_command(cmd)
-                print(f"  ✓ Downloaded {model_name}")
+                print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name}")
             except Exception as e:
-                print_warning(f"Failed to download {model_name}: {e}")
+                print_warning(f"Failed to download {display_name}: {e}")
         else:
-            run_command_with_progress(cmd, model_name, size_mb)
+            run_command_with_progress(cmd, model_name, model_path, size_mb)
 
 
 def download_motionagformer_models():
@@ -199,20 +231,24 @@ def download_motionagformer_models():
     print_step("2.4", "Download MotionAGFormer Checkpoint", indent=True)
     
     magf_dir = os.path.join(MODELS_DIR, "motionagformer")
-    model_path = os.path.join(magf_dir, "motionagformer-base-h36m.pth.tr")
+    model_name = "motionagformer-base-h36m.pth.tr"
+    model_path = os.path.join(magf_dir, model_name)
+    display_name = get_model_display_name(model_name)
     
     if check_file_exists(model_path):
         if not VERBOSE:
-            print("  ✓ motionagformer-base-h36m.pth.tr (already exists)")
+            print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} (already exists)")
         else:
-            print("  Skipping MotionAGFormer (already exists)")
+            print(f"  Skipping {display_name} (already exists)")
         return
+    
+    print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name} not found")
     
     # Check Drive backup
     if DRIVE_MODELS:
-        drive_path = os.path.join(DRIVE_MODELS, "motionagformer", "motionagformer-base-h36m.pth.tr")
+        drive_path = os.path.join(DRIVE_MODELS, "motionagformer", model_name)
         if os.path.exists(drive_path):
-            print("  Copying from Drive: motionagformer-base-h36m.pth.tr")
+            print(f"  Copying from Drive: {display_name}")
             run_command(f"cp '{drive_path}' '{model_path}'")
             return
     
@@ -220,15 +256,15 @@ def download_motionagformer_models():
     gdrive_id = "1Iii5EwsFFm9_9lKBUPfN8bV5LmfkNUMP"
     
     if VERBOSE:
-        print("  Downloading MotionAGFormer checkpoint (~200 MB)...")
+        print(f"  Downloading {display_name} (~200 MB)...")
         try:
             run_command(f"gdown --fuzzy {gdrive_id} -O '{model_path}'")
-            print("  ✓ Downloaded motionagformer-base-h36m.pth.tr")
+            print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name}")
         except Exception as e:
-            print_warning(f"Failed to download MotionAGFormer: {e}")
+            print_warning(f"Failed to download {display_name}: {e}")
     else:
         cmd = f"gdown --fuzzy {gdrive_id} -O '{model_path}'"
-        run_command_with_progress(cmd, "motionagformer-base-h36m.pth.tr", 200)
+        run_command_with_progress(cmd, model_name, model_path, 200)
 
 
 def download_wb3d_models():
@@ -277,20 +313,24 @@ def download_reid_models():
     print_step("2.6", "Download ReID Models", indent=True)
     
     reid_dir = os.path.join(MODELS_DIR, "reid")
-    model_path = os.path.join(reid_dir, "osnet_x1_0_msmt17.pt")
+    model_name = "osnet_x1_0_msmt17.pt"
+    model_path = os.path.join(reid_dir, model_name)
+    display_name = get_model_display_name(model_name)
     
     if check_file_exists(model_path):
         if not VERBOSE:
-            print("  ✓ osnet_x1_0_msmt17.pt (already exists)")
+            print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} (already exists)")
         else:
-            print("  Skipping OSNet x1.0 (already exists)")
+            print(f"  Skipping {display_name} (already exists)")
         return
+    
+    print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name} not found")
     
     # Check Drive backup
     if DRIVE_MODELS:
-        drive_path = os.path.join(DRIVE_MODELS, "reid", "osnet_x1_0_msmt17.pt")
+        drive_path = os.path.join(DRIVE_MODELS, "reid", model_name)
         if os.path.exists(drive_path):
-            print("  Copying from Drive: osnet_x1_0_msmt17.pt")
+            print(f"  Copying from Drive: {display_name}")
             run_command(f"cp '{drive_path}' '{model_path}'")
             return
     
@@ -298,15 +338,15 @@ def download_reid_models():
     gdrive_id = "1LaG1EJpHrxdAxKnSCJ_i0u-nbxSAeiFY"
     
     if VERBOSE:
-        print("  Downloading OSNet x1.0 MSMT17 (~25 MB)...")
+        print(f"  Downloading {display_name} (~25 MB)...")
         try:
             run_command(f"gdown --fuzzy {gdrive_id} -O '{model_path}'")
-            print("  ✓ Downloaded osnet_x1_0_msmt17.pt")
+            print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name}")
         except Exception as e:
-            print_warning(f"Failed to download ReID model: {e}")
+            print_warning(f"Failed to download {display_name}: {e}")
     else:
         cmd = f"gdown --fuzzy {gdrive_id} -O '{model_path}'"
-        run_command_with_progress(cmd, "osnet_x1_0_msmt17.pt", 25)
+        run_command_with_progress(cmd, model_name, model_path, 25)
 
 
 def main():
