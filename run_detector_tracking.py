@@ -403,6 +403,21 @@ def process_video(config):
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
+    # Get processing resolution (for downscaling)
+    processing_config = config.get('processing', {})
+    processing_resolution = processing_config.get('processing_resolution', None)
+    
+    # Determine processing dimensions and scaling factors
+    if processing_resolution is not None:
+        proc_width, proc_height = processing_resolution
+        scale_x = width / proc_width
+        scale_y = height / proc_height
+        use_downscaling = True
+    else:
+        proc_width, proc_height = width, height
+        scale_x, scale_y = 1.0, 1.0
+        use_downscaling = False
+    
     # Determine number of frames to process
     if max_frames > 0:
         num_frames = min(max_frames, total_frames)
@@ -414,6 +429,8 @@ def process_video(config):
         print(f"\n{'='*70}")
         print(f"Video: {video_path}")
         print(f"Resolution: {width}x{height} @ {fps:.2f} fps")
+        if use_downscaling:
+            print(f"Processing resolution: {proc_width}x{proc_height} (downscaled {scale_x:.2f}x)")
         print(f"Total frames: {total_frames}")
         print(f"Processing: {num_frames} frames")
         print(f"Detector: {detector_type.upper()}")
@@ -426,6 +443,8 @@ def process_video(config):
         # Simple non-verbose header
         print(f"Video: {video_path}")
         print(f"Resolution: {width}x{height} @ {fps:.2f} fps")
+        if use_downscaling:
+            print(f"Processing resolution: {proc_width}x{proc_height} (downscaled {scale_x:.2f}x)")
         print(f"Total frames: {total_frames}")
         print(f"Processing: {num_frames} frames")
         print(f"Detector: {detector_type.upper()}")
@@ -455,14 +474,27 @@ def process_video(config):
         if not ret:
             break
         
+        # Downscale frame if needed (for faster processing)
+        if use_downscaling:
+            frame_proc = cv2.resize(frame, (proc_width, proc_height), interpolation=cv2.INTER_LINEAR)
+        else:
+            frame_proc = frame
+        
         # Run detection (timed)
         t_det_start = time.time()
         if detector_type.lower() == 'yolo':
-            detections, classes = detect_yolo(detector, frame, confidence, detect_only_humans)
+            detections, classes = detect_yolo(detector, frame_proc, confidence, detect_only_humans)
         else:
             raise NotImplementedError(f"Detector type '{detector_type}' not supported")
         t_det_end = time.time()
         detection_times.append(t_det_end - t_det_start)
+        
+        # Scale detections back to original resolution if downscaling was used
+        if use_downscaling and len(detections) > 0:
+            detections[:, 0] *= scale_x  # x1
+            detections[:, 1] *= scale_y  # y1
+            detections[:, 2] *= scale_x  # x2
+            detections[:, 3] *= scale_y  # y2
         
         # Handle tracking vs largest bbox selection
         if tracking_enabled and tracker is not None:
@@ -475,6 +507,7 @@ def process_video(config):
             
             # Update tracker (timed)
             # Returns: (N, 8) array of [x1, y1, x2, y2, track_id, conf, cls, det_ind]
+            # Note: Pass original frame for ReID (appearance features need full resolution)
             t_track_start = time.time()
             try:
                 tracked_bboxes = tracker.update(dets_for_tracker, frame)

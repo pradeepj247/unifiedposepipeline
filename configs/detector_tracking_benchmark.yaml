@@ -13,6 +13,24 @@ detector:
   detect_only_humans: true  # Only detect person class (COCO class 0)
 
 # ============================================================================
+# Processing Settings
+# ============================================================================
+processing:
+  # Resolution for detection/tracking processing
+  # Options:
+  #   - [width, height]: Process at specific resolution (e.g., [1280, 720])
+  #   - null: Use original video resolution (no downscaling)
+  # 
+  # Lower resolution = faster processing (2.25x speedup for 720p vs 1080p)
+  # Bboxes are automatically scaled back to original resolution
+  # 
+  # Recommended resolutions:
+  #   - [1920, 1080]: Original (slowest, best accuracy)
+  #   - [1280, 720]: 720p (2x faster, good accuracy) <- Recommended
+  #   - [960, 540]: 540p (3x faster, may miss small persons)
+  processing_resolution: [1280, 720]  # Process at 720p for 2x speedup
+
+# ============================================================================
 # Tracking Settings - BENCHMARK CONFIGURATION
 # ============================================================================
 tracking:
