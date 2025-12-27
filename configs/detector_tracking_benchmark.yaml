@@ -102,7 +102,7 @@ output:
 # ============================================================================
 advanced:
   batch_size: 1  # Batch size for detection
-  verbose: true  # Print detailed progress and benchmarking info
+  verbose: false  # Print detailed progress and benchmarking info (set true if you need FPS breakdown)
   # 
   # Silent mode (verbose: false) shows:
   #   - Video info (path, resolution, frames)
