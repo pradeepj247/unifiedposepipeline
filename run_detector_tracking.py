@@ -91,13 +91,14 @@ def load_yolo_detector(model_path, device='cuda', confidence=0.3, verbose=False)
     return model
 
 
-def load_tracker(tracker_name, reid_config, device='cuda', half=False, verbose=False):
+def load_tracker(tracker_name, reid_config, tracker_params=None, device='cuda', half=False, verbose=False):
     """
     Load BoxMOT tracker
     
     Args:
         tracker_name: Name of tracker (botsort, deepocsort, bytetrack, strongsort, ocsort, hybridsort, boosttrack)
         reid_config: ReID configuration dict
+        tracker_params: Dict of tracker parameters (det_thresh, match_thresh, max_age, etc.)
         device: Device to run on
         half: Use FP16 half precision
         verbose: Print loading messages
@@ -105,6 +106,8 @@ def load_tracker(tracker_name, reid_config, device='cuda', half=False, verbose=F
     Returns:
         Tracker object
     """
+    if tracker_params is None:
+        tracker_params = {}
     try:
         # Import all 7 BoxMOT trackers (v16.0.4)
         # Note: Class names are case-sensitive! DeepOcSort, not DeepOCSORT!
@@ -165,20 +168,21 @@ def load_tracker(tracker_name, reid_config, device='cuda', half=False, verbose=F
                 print(f"   ⚠️  ReID weights not found: {reid_weights}")
                 print(f"   Tried: {reid_weights_str}, ../{reid_weights_str}, /content/{reid_weights_str}")
                 print(f"   Using motion-only tracking (no appearance features)")
-            tracker = tracker_class(device=device, half=half)
+            tracker = tracker_class(device=device, half=half, **tracker_params)
         else:
             if verbose:
                 print(f"   ✅ ReID weights found: {reid_weights}")
             tracker = tracker_class(
                 reid_weights=reid_weights,
                 device=device,
-                half=half
+                half=half,
+                **tracker_params
             )
     else:
         # Motion-only tracking
         if verbose:
             print(f"   Using motion-only tracking (ReID disabled)")
-        tracker = tracker_class(device=device, half=half)
+        tracker = tracker_class(device=device, half=half, **tracker_params)
     
     return tracker
 
@@ -365,6 +369,9 @@ def process_video(config):
     reid_config = config['tracking'].get('reid', {'enabled': False})
     largest_bbox_only = config['tracking']['largest_bbox_only']
     
+    # Get tracker parameters (with defaults)
+    tracker_params = config['tracking'].get('params', {})
+    
     verbose = config['advanced']['verbose']
     
     # Load detector
@@ -377,7 +384,7 @@ def process_video(config):
     tracker = None
     if tracking_enabled:
         try:
-            tracker = load_tracker(tracker_name, reid_config, device=device, half=False, verbose=verbose)
+            tracker = load_tracker(tracker_name, reid_config, tracker_params, device=device, half=False, verbose=verbose)
             if verbose:
                 print(f"   ✅ {tracker_name.upper()} tracker loaded successfully")
         except Exception as e:

@@ -37,6 +37,27 @@ tracking:
   
   # Output mode
   largest_bbox_only: false  # Multi-person tracking (false = all persons, true = largest only)
+  
+  # Tracker Parameters (Advanced Tuning)
+  # These parameters control tracking behavior and can be adjusted based on video characteristics
+  params:
+    # Detection confidence thresholds
+    det_thresh: 0.3        # Minimum detection confidence (0.1-0.5)
+    min_conf: 0.1          # Minimum confidence for low-confidence matching (ByteTrack feature)
+    track_thresh: 0.45     # Confidence to start new track (0.4-0.6)
+    
+    # Matching thresholds
+    match_thresh: 0.8      # IoU threshold for matching (0.5-0.9, higher = stricter)
+    iou_threshold: 0.3     # NMS IoU threshold for removing overlapping detections
+    
+    # Temporal parameters
+    max_age: 30            # Frames to keep lost track alive (waiting for reappearance)
+    min_hits: 3            # Minimum detections before outputting track
+    track_buffer: 25       # Buffer size for track history
+    
+    # Other settings
+    per_class: false       # Track per class separately (keep false for person tracking)
+    frame_rate: 30         # Video frame rate (usually auto-detected)
 
 # ============================================================================
 # Input/Output Settings
