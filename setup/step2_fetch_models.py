@@ -59,7 +59,7 @@ def create_model_directories(models, base_dir):
     for d in dirs:
         os.makedirs(d, exist_ok=True)
     
-    print(f"  {COLOR_GREEN}✓{COLOR_RESET} Creating directory structure for models")
+    print(f"  🛠️ Creating directory structure for models")
     print()
 
 def download_from_github(url, destination, size_mb, model_name):
