@@ -37,3 +37,7 @@ outputs/
 # Temporary files
 temp/
 tmp/
+
+# Assistant local context (should not be committed)
+.assistant_context.yaml
+current_context.md
