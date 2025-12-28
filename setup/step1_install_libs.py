@@ -26,7 +26,7 @@ def is_colab_environment():
         return False
 
 
-def print_header(text, emoji="💡"):
+def print_header(text, emoji="🛠️"):
     """Print a formatted section header"""
     print("\n  " + "─" * 66)
     print(f"  {emoji} {text}")
@@ -212,10 +212,12 @@ def main():
         # Final success message
         total_time = time.time() - start_time
         print("\n" + "=" * 70)
+        print()
         print(f"\033[93m✅ SUCCESS: All libraries and dependencies installed!\033[0m")
         print(f"⏱️ TOTAL TIME TAKEN: {total_time:.2f}s")
         print("=" * 70 + "\n")
-        print("🛠️ Next steps to try:")
+        print()
+        print("💡 Next steps to try:")
         print("    ✓ python step2_fetch_models.py    # Download model files")
         print("    ✓ python step3_pull_demodata.py   # Setup demo data")
         print("    ✓ python step4_verify_envt.py     # Verify installation")
