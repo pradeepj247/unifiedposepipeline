@@ -40,7 +40,7 @@ def print_error(text):
 
 def print_success(text):
     """Print success message"""
-    print(f"      ✓ {text}")
+    print(f"  ✅ {text}")
 
 
 def print_info(text):
@@ -51,6 +51,7 @@ def print_info(text):
 def run_command(cmd, message=None, allow_failure=False):
     """Execute a shell command with optional message"""
     if message:
+        print()
         print(message)
     
     result = subprocess.run(
