@@ -100,11 +100,12 @@ def download_and_extract_demo_group(group, base_url, base_dest):
         print_error(f"Failed to download: {e}")
         return 0, 0
     
-    # Extract zip file
+    # Extract zip file to base_dest (parent folder)
+    # This avoids nested folder issue since zip already contains subfolder
     print(f"  📦 Extracting to: {dest_folder}")
     try:
         subprocess.run(
-            f"unzip -q -o '{temp_zip}' -d '{dest_folder}'",
+            f"unzip -q -o '{temp_zip}' -d '{base_dest}'",
             shell=True,
             check=True,
             capture_output=True
@@ -120,7 +121,7 @@ def download_and_extract_demo_group(group, base_url, base_dest):
     if os.path.exists(temp_zip):
         os.remove(temp_zip)
     
-    # Count extracted files
+    # Count extracted files in the correct location
     try:
         extracted_files = [f for f in os.listdir(dest_folder) 
                           if os.path.isfile(os.path.join(dest_folder, f))]
