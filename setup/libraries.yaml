@@ -1,0 +1,127 @@
+# Libraries and Dependencies Configuration
+# This file defines all Python packages to be installed for the unified pose estimation pipeline
+#
+# Each library group contains:
+#   - name: Display name for the installation group
+#   - sequence: Installation order (ascending)
+#   - description: Purpose of this library group
+#   - packages: List of packages to install
+#     - package_name: PyPI package name
+#     - version: Version constraint (empty for latest)
+#     - gpu_variant: Alternative package for GPU environments
+
+global_settings:
+  # Pip installation options
+  pip_flags: "-q"  # Quiet mode
+  
+  # PyTorch index URL for CUDA 11.8
+  pytorch_index_url: "https://download.pytorch.org/whl/cu118"
+  
+  # Timeout for installations (seconds)
+  timeout: 300
+
+library_groups:
+  - name: "Core Dependencies"
+    sequence: 1
+    description: "Essential Python packages for scientific computing and data handling"
+    packages:
+      - package_name: "numpy"
+        version: ""
+      
+      - package_name: "scipy"
+        version: ""
+      
+      - package_name: "pillow"
+        version: ""
+      
+      - package_name: "pyyaml"
+        version: ""
+      
+      - package_name: "tqdm"
+        version: ""
+      
+      - package_name: "matplotlib"
+        version: ""
+      
+      - package_name: "pandas"
+        version: ""
+
+  - name: "PyTorch with CUDA"
+    sequence: 2
+    description: "PyTorch deep learning framework with CUDA support"
+    requires_index_url: true
+    packages:
+      - package_name: "torch"
+        version: ""
+      
+      - package_name: "torchvision"
+        version: ""
+      
+      - package_name: "torchaudio"
+        version: ""
+
+  - name: "OpenCV and YOLO"
+    sequence: 3
+    description: "Computer vision libraries and object detection"
+    packages:
+      - package_name: "opencv-python"
+        version: ""
+    packages:
+      - package_name: "opencv-python"
+        version: ""
+      
+      - package_name: "opencv-contrib-python"
+        version: ""
+      
+      - package_name: "ultralytics"
+        version: ""
+    description: "ONNX Runtime for pose estimation models"
+    gpu_aware: true
+    packages:
+      - package_name: "onnx"
+        version: ""
+    packages:
+      - package_name: "onnx"
+        version: ""
+      
+      - package_name: "onnxruntime"
+        version: ""
+        gpu_variant: "onnxruntime-gpu"
+    description: "Multi-object tracking and ReID libraries"
+    packages:
+      - package_name: "boxmot"
+    packages:
+      - package_name: "boxmot"
+        version: ""
+      
+      - package_name: "gdown"
+        version: ""
+      
+      - package_name: "supervision"
+        version: ""
+      
+      - package_name: "filterpy"
+        version: ""
+      
+      - package_name: "scikit-learn"
+        version: ""
+
+  - name: "MotionAGFormer Dependencies"
+    sequence: 6
+    description: "Dependencies for 3D pose lifting with MotionAGFormer"
+    allow_failures: true
+    packages:
+      - package_name: "timm"
+        version: ""
+      
+      - package_name: "easydict"
+        version: ""
+      
+      - package_name: "yacs"
+        version: ""
+      
+      - package_name: "numba"
+        version: ""
+      
+      - package_name: "scikit-image"
+        version: ""
