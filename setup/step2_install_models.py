@@ -203,21 +203,21 @@ def download_vitpose_models():
     url = "https://github.com/pradeepj247/easy-pose-pipeline/releases/download/v1.0/vitpose-b.pth"
     cmd = f"curl -L '{url}' -o '{model_path}'"
 
-        if VERBOSE:
-            print(f"     ⚡ Downloading {display_name} (~343 MB)")
-            try:
-                run_command(cmd)
-                print(f"     ✔️ Downloaded {display_name} successfully to {model_path}")
-                print(f"     📡 Source: GitHub (curl)")
-            except Exception as e:
-                print_warning(f"Failed to download {display_name}: {e}")
-        else:
-            run_command_with_progress(cmd, model_name, model_path, 343)
+    if VERBOSE:
+        print(f"     ⚡ Downloading {display_name} (~343 MB)")
+        try:
+            run_command(cmd)
+            print(f"     ✔️ Downloaded {display_name} successfully to {model_path}")
             print(f"     📡 Source: GitHub (curl)")
-            elapsed = time.time() - start
-            print(f"     ⏱️ Time taken: {elapsed:.2f}s")
-            print()
+        except Exception as e:
+            print_warning(f"Failed to download {display_name}: {e}")
+    else:
+        run_command_with_progress(cmd, model_name, model_path, 343)
+        print(f"     📡 Source: GitHub (curl)")
+        elapsed = time.time() - start
+        print(f"     ⏱️ Time taken: {elapsed:.2f}s")
         print()
+    print()
 
 
 def download_rtmpose_models():
