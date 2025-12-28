@@ -14,6 +14,7 @@ import sys
 import argparse
 import subprocess
 import re
+import time
 from setup_utils import (
     is_colab_environment, print_header, print_step, run_command,
     check_file_exists, print_success, print_error, print_warning, COLOR_YELLOW
@@ -527,18 +528,15 @@ def main():
     
     VERBOSE = args.verbose
     
-    import time
+    # Top header with rocket emoji (yellow) - no indentation
     start_time = time.time()
 
-    print_header("STEP 2: Download Model Files", color=COLOR_YELLOW)
-    
+    print("\n" + "=" * 70)
+    print(f"{COLOR_YELLOW}🚀 STEP 2: Download Model Files{COLOR_RESET}")
+    print("=" * 70 + "\n")
+
     if not VERBOSE:
-        print("Running in silent mode. Use --verbose for detailed output.")
-    print("This script will download all required model weights.")
-    print(f"Models directory: {MODELS_DIR}")
-    if DRIVE_MODELS:
-        print(f"Drive backup: {DRIVE_MODELS}")
-    print()
+        print("  💡 Running in silent mode. Use --verbose for detailed output.\n")
     
     # Ensure model directories exist before attempting downloads
     create_model_directories()
