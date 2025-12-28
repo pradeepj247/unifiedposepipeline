@@ -12,8 +12,8 @@ Usage:
 import os
 import sys
 from setup_utils import (
-    is_colab_environment, print_header, print_step, run_command,
-    create_directory, print_success, print_error, COLOR_YELLOW
+    is_colab_environment, print_header, run_command,
+    print_error, COLOR_YELLOW, COLOR_RESET, COLOR_GREEN
 )
 
 
@@ -24,15 +24,18 @@ MODELS_DIR = "/content/models"  # Parent directory to persist across repo deleti
 
 def step0_mount_drive():
     """Mount Google Drive (Colab only)"""
-    print_step("1.0", "Mount Google Drive", indent=True)
+    # Step header (lightbulb)
+    print("\n  " + "─" * 66)
+    print("  💡 STEP 1.0: Mount Google Drive")
+    print("  " + "─" * 66 + "\n")
     
     if not is_colab_environment():
-        print("  ⊘ Skipping (not in Colab environment)")
+        print("      ⊘ Skipping (not in Colab environment)")
         return
     
     # Check if Drive is already mounted
     if os.path.exists('/content/drive/MyDrive'):
-        print("  ✓ Google Drive already mounted")
+        print("      ✓ Google Drive already mounted")
         return
     
     try:
@@ -46,7 +49,10 @@ def step0_mount_drive():
 
 def step1_install_core_dependencies():
     """Install core Python packages"""
-    print_step("1.1", "Install Core Dependencies", indent=True)
+    # Step header
+    print("\n  " + "─" * 66)
+    print("  💡 STEP 1.1: Install Core Dependencies")
+    print("  " + "─" * 66 + "\n")
     
     packages = [
         "numpy",
@@ -60,8 +66,8 @@ def step1_install_core_dependencies():
     
     cmd = f"pip install -q {' '.join(packages)}"
     try:
-        run_command(cmd, message=f"  Installing {' '.join(packages)}")
-        print("  ✓ Core dependencies installed")
+        run_command(cmd, message=f"  🛠️ Installing {' '.join(packages)}")
+        print("      ✓ Core dependencies installed")
     except Exception as e:
         print_error(f"Failed to install core dependencies: {e}")
         sys.exit(1)
@@ -69,21 +75,24 @@ def step1_install_core_dependencies():
 
 def step2_install_pytorch():
     """Install PyTorch with CUDA support"""
-    print_step("1.2", "Install PyTorch with CUDA", indent=True)
-    
+    # Step header
+    print("\n  " + "─" * 66)
+    print("  💡 STEP 1.2: Install PyTorch with CUDA")
+    print("  " + "─" * 66 + "\n")
+
     cmd = "pip install -q torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118"
-    
+
     try:
-        run_command(cmd, message="  Installing torch torchvision torchaudio")
-        print("  ✓ PyTorch installed")
-        
+        run_command(cmd, message="  🛠️ Installing torch torchvision torchaudio")
+        print("     ✓ PyTorch installed")
+
         # Verify installation
         import torch
-        print(f"  - PyTorch version: {torch.__version__}")
-        print(f"  - CUDA available: {torch.cuda.is_available()}")
+        print(f"\t- PyTorch version: {torch.__version__}")
+        print(f"\t- CUDA available: {torch.cuda.is_available()}")
         if torch.cuda.is_available():
-            print(f"  - CUDA version: {torch.version.cuda}")
-            print(f"  - GPU device: {torch.cuda.get_device_name(0)}")
+            print(f"\t- CUDA version: {torch.version.cuda}")
+            print(f"\t- GPU device: {torch.cuda.get_device_name(0)}")
     except Exception as e:
         print_error(f"Failed to install PyTorch: {e}")
         sys.exit(1)
@@ -91,7 +100,9 @@ def step2_install_pytorch():
 
 def step3_install_opencv_yolo():
     """Install OpenCV and YOLO (Ultralytics)"""
-    print_step("1.3", "Install OpenCV and YOLO", indent=True)
+    print("\n  " + "─" * 66)
+    print("  💡 STEP 1.3: Install OpenCV and YOLO")
+    print("  " + "─" * 66 + "\n")
     
     packages = [
         "opencv-python",
@@ -102,8 +113,8 @@ def step3_install_opencv_yolo():
     cmd = f"pip install -q {' '.join(packages)}"
     
     try:
-        run_command(cmd, message=f"  Installing {' '.join(packages)}")
-        print("  ✓ OpenCV and YOLO installed")
+        run_command(cmd, message=f"  🛠️ Installing {' '.join(packages)}")
+        print("     ✓ OpenCV and YOLO installed")
     except Exception as e:
         print_error(f"Failed to install OpenCV/YOLO: {e}")
         sys.exit(1)
@@ -111,7 +122,9 @@ def step3_install_opencv_yolo():
 
 def step4_install_pose_estimation():
     """Install pose estimation libraries (ONNX Runtime)"""
-    print_step("1.4", "Install Pose Estimation Libraries", indent=True)
+    print("\n  " + "─" * 66)
+    print("  💡 STEP 1.4: Install Pose Estimation Libraries")
+    print("  " + "─" * 66 + "\n")
     
     # Check if GPU is available
     try:
@@ -121,17 +134,17 @@ def step4_install_pose_estimation():
         has_cuda = False
     
     if has_cuda:
-        print("  GPU detected, installing ONNX Runtime GPU")
+        print("  🔍 GPU detected, installing ONNX Runtime GPU")
         packages = ["onnx", "onnxruntime-gpu"]
     else:
-        print("  No GPU detected, installing ONNX Runtime CPU")
+        print("  🔍 No GPU detected, installing ONNX Runtime CPU")
         packages = ["onnx", "onnxruntime"]
     
     cmd = f"pip install -q {' '.join(packages)}"
     
     try:
-        run_command(cmd, message=f"  Installing {' '.join(packages)}")
-        print("  ✓ Pose estimation libraries installed")
+        run_command(cmd, message=f"  🛠️ Installing {' '.join(packages)}")
+        print("     ✓ Pose estimation libraries installed")
     except Exception as e:
         print_error(f"Failed to install pose estimation libraries: {e}")
         sys.exit(1)
@@ -139,7 +152,9 @@ def step4_install_pose_estimation():
 
 def step5_install_tracking():
     """Install tracking and ReID libraries"""
-    print_step("1.5", "Install Tracking Libraries", indent=True)
+    print("\n  " + "─" * 66)
+    print("  💡 STEP 1.5: Install Tracking Libraries")
+    print("  " + "─" * 66 + "\n")
     
     packages = [
         "boxmot",
@@ -152,8 +167,8 @@ def step5_install_tracking():
     cmd = f"pip install -q {' '.join(packages)}"
     
     try:
-        run_command(cmd, message=f"  Installing {' '.join(packages)}")
-        print("  ✓ Tracking libraries installed")
+        run_command(cmd, message=f"  🛠️ Installing {' '.join(packages)}")
+        print("      ✓ Tracking libraries installed")
     except Exception as e:
         print_error(f"Failed to install tracking libraries: {e}")
         sys.exit(1)
@@ -161,7 +176,9 @@ def step5_install_tracking():
 
 def step6_install_motionagformer_deps():
     """Install MotionAGFormer dependencies"""
-    print_step("1.6", "Install MotionAGFormer Dependencies", indent=True)
+    print("\n  " + "─" * 66)
+    print("  💡 STEP 1.6: Install MotionAGFormer Dependencies")
+    print("  " + "─" * 66 + "\n")
     
     packages = [
         "timm",
@@ -174,8 +191,8 @@ def step6_install_motionagformer_deps():
     cmd = f"pip install -q {' '.join(packages)}"
     
     try:
-        run_command(cmd, message=f"  Installing {' '.join(packages)}")
-        print("  ✓ MotionAGFormer dependencies installed")
+        run_command(cmd, message=f"  🛠️ Installing {' '.join(packages)}")
+        print("      ✓ MotionAGFormer dependencies installed")
     except Exception as e:
         print(f"⚠ Some MotionAGFormer dependencies failed: {e}")
         print("  (This may not be critical if you don't use 3D lifting)")
@@ -183,7 +200,9 @@ def step6_install_motionagformer_deps():
 
 def step7_create_directories():
     """Create necessary directory structure"""
-    print_step("1.7", "Create Directory Structure", indent=True)
+    print("\n  " + "─" * 66)
+    print("  💡 STEP 1.7: Create Directory Structure")
+    print("  " + "─" * 66 + "\n")
     
     directories = [
         MODELS_DIR,
@@ -201,18 +220,23 @@ def step7_create_directories():
     ]
     
     for directory in directories:
-        create_directory(directory)
+        if not os.path.exists(directory):
+            os.makedirs(directory, exist_ok=True)
+            print(f"     ✓ Created directory: {directory}")
+        else:
+            print(f"     ✓ Directory exists: {directory}")
     
-    print("  ✓ Directory structure created")
+    print("     ✓ Directory structure created")
 
 
 def main():
     """Main execution function"""
-    print_header("STEP 1: Install Libraries and Dependencies", color=COLOR_YELLOW)
+    # Top header with rocket emoji (yellow)
+    print_header("🚀 STEP 1: Install Libraries and Dependencies", color=COLOR_YELLOW)
     
-    print("This script will install all required Python packages.")
-    print(f"Repository root: {REPO_ROOT}")
-    print(f"Models directory: {MODELS_DIR}")
+    print("   This script will install all required Python packages.")
+    print(f"   Repository root: {REPO_ROOT}")
+    print(f"   Models directory: {MODELS_DIR}")
     
     try:
         step0_mount_drive()
@@ -224,11 +248,13 @@ def main():
         step6_install_motionagformer_deps()
         step7_create_directories()
         
-        print_success("All libraries and dependencies installed successfully!", color=COLOR_YELLOW)
-        print("\nNext steps:")
-        print("  python step2_install_models.py   # Download model files")
-        print("  python step3_pull_demodata.py    # Setup demo data")
-        print("  python step4_verify_envt.py      # Verify installation")
+        # Final success message (yellow) with check emoji
+        print(f"{COLOR_YELLOW}✅ SUCCESS: All libraries and dependencies installed successfully!{COLOR_RESET}")
+        print(f"{COLOR_RESET}⏱️ TOTAL TIME TAKEN: <...>{COLOR_RESET}")
+        print("\n🛠️ Next steps to try:")
+        print("    ✓ python step2_install_models.py   # Download model files")
+        print("    ✓ python step3_pull_demodata.py    # Setup demo data")
+        print("    ✓ python step4_verify_envt.py      # Verify installation")
         
     except KeyboardInterrupt:
         print("\n\n⊘ Installation interrupted by user")
