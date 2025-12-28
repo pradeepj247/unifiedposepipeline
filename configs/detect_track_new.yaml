@@ -1,0 +1,38 @@
+# Minimal detector+tracker config (ByteTrack, no ReID)
+
+detection:
+  type: yolo
+  model_path: models/yolo/yolov8s.pt
+  confidence: 0.3
+  device: 0
+
+tracking:
+  enabled: true
+  tracker: bytetrack
+  half: true
+  reid:
+    enabled: false
+  largest_bbox_only: false
+  params:
+    det_thresh: 0.3
+    min_conf: 0.1
+    track_thresh: 0.45
+    max_age: 30
+    min_hits: 3
+    frame_rate: 30
+
+video_processing:
+  input:
+    video_path: demo_data/videos/
+    video_filename: kohli_nets.mp4
+    max_frames: 600
+  output:
+    processing_resolution: [1280, 720]
+    detections_file: demo_data/outputs/detections_tracking.npz
+    raw_detections_file: demo_data/outputs/raw_detections.npz
+    save_visualization: true
+    visualization_path: demo_data/outputs/
+
+advanced:
+  batch_size: 1
+  verbose: false
