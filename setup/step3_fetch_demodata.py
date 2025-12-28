@@ -2,18 +2,18 @@
 """
 Step 3: Pull Demo Data
 
-This script copies demo videos and images from Google Drive for testing.
+This script downloads demo videos and images from GitHub releases.
 Configuration is loaded from demodata.yaml for maintainability.
 
 Usage:
-    python step3_pull_demodata.py
+    python step3_fetch_demodata.py
 """
 
 import os
 import sys
 import time
 import yaml
-import shutil
+import subprocess
 from pathlib import Path
 
 
@@ -61,68 +61,76 @@ def load_demodata_config():
     return config
 
 
-def copy_demo_group(group, base_source, base_dest):
-    """Copy all files from a demo group source folder to destination"""
+def download_and_extract_demo_group(group, base_url, base_dest):
+    """Download and extract demo files from GitHub releases"""
     name = group['name']
     subfolder = group['subfolder']
-    description = group.get('description', '')
+    zip_filename = group['zip_filename']
     
-    # Construct full source and destination paths
-    source_folder = os.path.join(base_source, subfolder)
-    
-    print_header(f"Fetching {name} from: {source_folder}")
-    
-    # Build destination path
+    # Build paths
     dest_folder = os.path.join(base_dest, subfolder)
+    zip_url = f"{base_url}/{zip_filename}"
+    temp_zip = os.path.join("/tmp", zip_filename)
+    
+    print_header(f"Fetching {name}")
     
     # Create destination if it doesn't exist
     os.makedirs(dest_folder, exist_ok=True)
     
-    # Check if source exists
-    if not os.path.exists(source_folder):
-        print_warning(f"Source folder not found: {source_folder}")
-        print(f"  Please ensure Google Drive is mounted and folder exists")
-        return 0, 0
-    
-    # Get list of files in source
+    # Check if files already exist
     try:
-        source_files = [f for f in os.listdir(source_folder) 
-                       if os.path.isfile(os.path.join(source_folder, f))]
+        existing_files = [f for f in os.listdir(dest_folder) 
+                         if os.path.isfile(os.path.join(dest_folder, f))]
+        if existing_files:
+            print_success(f"Already present: {len(existing_files)} file(s)")
+            return 0, len(existing_files)
+    except:
+        pass
+    
+    # Download zip file
+    print(f"  ⬇️ Downloading from: {zip_url}")
+    try:
+        subprocess.run(
+            f"curl -sL '{zip_url}' -o '{temp_zip}'",
+            shell=True,
+            check=True,
+            capture_output=True
+        )
     except Exception as e:
-        print_error(f"Failed to read source folder: {e}")
+        print_error(f"Failed to download: {e}")
         return 0, 0
     
-    if not source_files:
-        print_warning(f"No files found in {source_folder}")
+    # Extract zip file
+    print(f"  📦 Extracting to: {dest_folder}")
+    try:
+        subprocess.run(
+            f"unzip -q -o '{temp_zip}' -d '{dest_folder}'",
+            shell=True,
+            check=True,
+            capture_output=True
+        )
+    except Exception as e:
+        print_error(f"Failed to extract: {e}")
+        # Clean up zip file
+        if os.path.exists(temp_zip):
+            os.remove(temp_zip)
         return 0, 0
     
-    # Copy files
-    copied_count = 0
-    existing_count = 0
+    # Clean up zip file
+    if os.path.exists(temp_zip):
+        os.remove(temp_zip)
     
-    for filename in source_files:
-        source_path = os.path.join(source_folder, filename)
-        dest_path = os.path.join(dest_folder, filename)
-        
-        if os.path.exists(dest_path):
-            existing_count += 1
-            continue
-        
-        try:
-            print(f"  ⬇️ Copying: {filename}")
-            shutil.copy2(source_path, dest_path)
-            copied_count += 1
-        except Exception as e:
-            print_warning(f"Failed to copy {filename}: {e}")
+    # Count extracted files
+    try:
+        extracted_files = [f for f in os.listdir(dest_folder) 
+                          if os.path.isfile(os.path.join(dest_folder, f))]
+        file_count = len(extracted_files)
+    except:
+        file_count = 0
     
-    # Print summary
-    print()
-    if copied_count > 0:
-        print_success(f"Copied {copied_count} file(s)")
-    if existing_count > 0:
-        print_success(f"Already present: {existing_count} file(s)")
+    print_success(f"Extracted {file_count} file(s)")
     
-    return copied_count, existing_count
+    return file_count, 0
 
 
 def main():
@@ -142,28 +150,18 @@ def main():
         config = load_demodata_config()
         print("   ✅ Loaded configuration from demodata.yaml")
         
-        base_source = config['global_settings']['source_folder']
+        base_url = config['global_settings']['github_release_url']
         base_dest = config['global_settings']['destination_folder']
         print(f"   📁 Demo data folder: {base_dest}")
         
-        # Check if Drive is mounted (Colab only)
-        if is_colab_environment():
-            if not os.path.exists('/content/drive/MyDrive'):
-                print_warning("Google Drive is not mounted!")
-                print("   Please mount Drive first by running:")
-                print("   from google.colab import drive")
-                print("   drive.mount('/content/drive')")
-                sys.exit(1)
-            print("   ✅ Google Drive is mounted")
-        
         # Process demo groups
         demo_groups = config.get('demo_groups', [])
-        total_copied = 0
+        total_downloaded = 0
         total_existing = 0
         
         for group in demo_groups:
-            copied, existing = copy_demo_group(group, base_source, base_dest)
-            total_copied += copied
+            downloaded, existing = download_and_extract_demo_group(group, base_url, base_dest)
+            total_downloaded += downloaded
             total_existing += existing
         
         # Final success message
@@ -171,7 +169,7 @@ def main():
         print("\n" + "=" * 70)
         print()
         print(f"\033[93m✅ SUCCESS: Demo data setup complete!\033[0m")
-        print(f"📊 Total files copied: {total_copied}")
+        print(f"📊 Total files downloaded: {total_downloaded}")
         print(f"📊 Total files already present: {total_existing}")
         print(f"⏱️ TOTAL TIME TAKEN: {total_time:.2f}s")
         print("=" * 70 + "\n")

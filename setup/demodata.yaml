@@ -1,18 +1,20 @@
 # Demo Data Configuration
-# This file defines demo videos and images to be copied from Google Drive
+# This file defines demo videos and images to be downloaded from GitHub releases
 
 global_settings:
   # Base destination folder for demo data
   destination_folder: "/content/unifiedposepipeline/demo_data"
   
-  # Google Drive source root
-  source_folder: "/content/drive/MyDrive/demo_data"
+  # GitHub release base URL
+  github_release_url: "https://github.com/pradeepj247/unifiedposepipeline/releases/download/v1.0.0"
 
 demo_groups:
   - name: "Demo Videos"
     subfolder: "videos"
     description: "📹 Sample video files for testing the pipeline"
+    zip_filename: "videos_2025.zip"
   
   - name: "Demo Images"
     subfolder: "images"
     description: "🖼️ Sample image files for testing the pipeline"
+    zip_filename: "images_2025.zip"
