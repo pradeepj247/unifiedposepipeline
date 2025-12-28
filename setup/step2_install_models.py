@@ -142,6 +142,7 @@ def download_yolo_models():
                 print(f"     ⚡ Copying from Drive: {display_name}")
                 run_command(f"cp '{drive_path}' '{model_path}'")
                 print(f"     ✔️ Copied {display_name}")
+                print(f"     📁 Source: Drive (copied)")
                 elapsed = time.time() - start
                 print(f"     ⏱️ Time taken: {elapsed:.2f}s")
                 print()
@@ -154,10 +155,12 @@ def download_yolo_models():
             try:
                 run_command(cmd)
                 print(f"     ✔️ Downloaded {display_name} successfully to {model_path}")
+                print(f"     📡 Source: GitHub (curl)")
             except Exception as e:
                 print_warning(f"Failed to download {display_name}: {e}")
         else:
             run_command_with_progress(cmd, model_name, model_path, size_mb)
+            print(f"     📡 Source: GitHub (curl)")
             elapsed = time.time() - start
             print(f"     ⏱️ Time taken: {elapsed:.2f}s")
             print()
@@ -190,6 +193,7 @@ def download_vitpose_models():
             print(f"     ⚡ Copying from Drive: {display_name}")
             run_command(f"cp '{drive_path}' '{model_path}'")
             print(f"     ✔️ Copied {display_name}")
+            print(f"     📁 Source: Drive (copied)")
             elapsed = time.time() - start
             print(f"     ⏱️ Time taken: {elapsed:.2f}s")
             print()
@@ -199,18 +203,20 @@ def download_vitpose_models():
     url = "https://github.com/pradeepj247/easy-pose-pipeline/releases/download/v1.0/vitpose-b.pth"
     cmd = f"curl -L '{url}' -o '{model_path}'"
 
-    if VERBOSE:
-        print(f"     ⚡ Downloading {display_name} (~343 MB)")
-        try:
-            run_command(cmd)
-            print(f"     ✔️ Downloaded {display_name} successfully to {model_path}")
-        except Exception as e:
-            print_warning(f"Failed to download {display_name}: {e}")
-    else:
-        run_command_with_progress(cmd, model_name, model_path, 343)
-        elapsed = time.time() - start
-        print(f"     ⏱️ Time taken: {elapsed:.2f}s")
-        print()
+        if VERBOSE:
+            print(f"     ⚡ Downloading {display_name} (~343 MB)")
+            try:
+                run_command(cmd)
+                print(f"     ✔️ Downloaded {display_name} successfully to {model_path}")
+                print(f"     📡 Source: GitHub (curl)")
+            except Exception as e:
+                print_warning(f"Failed to download {display_name}: {e}")
+        else:
+            run_command_with_progress(cmd, model_name, model_path, 343)
+            print(f"     📡 Source: GitHub (curl)")
+            elapsed = time.time() - start
+            print(f"     ⏱️ Time taken: {elapsed:.2f}s")
+            print()
         print()
 
 
@@ -247,6 +253,7 @@ def download_rtmpose_models():
                 print(f"     ⚡ Copying from Drive: {display_name}")
                 run_command(f"cp '{drive_path}' '{model_path}'")
                 print(f"     ✔️ Copied {display_name}")
+                print(f"     📁 Source: Drive (copied)")
                 elapsed = time.time() - start
                 print(f"     ⏱️ Time taken: {elapsed:.2f}s")
                 print()
@@ -259,10 +266,12 @@ def download_rtmpose_models():
             try:
                 run_command(cmd)
                 print(f"     ✔️ Downloaded {display_name} successfully to {model_path}")
+                print(f"     📡 Source: GitHub (curl)")
             except Exception as e:
                 print_warning(f"Failed to download {display_name}: {e}")
         else:
             run_command_with_progress(cmd, model_name, model_path, size_mb)
+            print(f"     📡 Source: GitHub (curl)")
             elapsed = time.time() - start
             print(f"     ⏱️ Time taken: {elapsed:.2f}s")
             print()
@@ -292,9 +301,10 @@ def download_motionagformer_models():
     if DRIVE_MODELS:
         drive_path = os.path.join(DRIVE_MODELS, "motionagformer", model_name)
         if os.path.exists(drive_path):
-            print(f"     ⚡ Copying from Drive: {display_name}")
+            print(f"     ⚡ Copying from Drive: {display_name} (~135 MB)")
             run_command(f"cp '{drive_path}' '{model_path}'")
             print(f"     ✔️ Copied {display_name}")
+            print(f"     📁 Source: Drive (copied)")
             elapsed = time.time() - start
             print(f"     ⏱️ Time taken: {elapsed:.2f}s")
             print()
@@ -304,18 +314,20 @@ def download_motionagformer_models():
     gdrive_id = "1Iii5EwsFFm9_9lKBUPfN8bV5LmfkNUMP"
 
     if VERBOSE:
-        print(f"     ⚡ Downloading {display_name} (~200 MB)")
+        print(f"     ⚡ Downloading {display_name} (~135 MB)")
         try:
             run_command(f"gdown --fuzzy {gdrive_id} -O '{model_path}'")
             print(f"     ✔️ Downloaded {display_name} successfully to {model_path}")
+            print(f"     📡 Source: Google Drive (gdown)")
         except Exception as e:
             print_warning(f"Failed to download {display_name}: {e}")
     else:
         cmd = f"gdown --fuzzy {gdrive_id} -O '{model_path}'"
         run_command_with_progress(cmd, model_name, model_path, 200)
+        print(f"     📡 Source: Google Drive (gdown)")
         elapsed = time.time() - start
         print(f"     ⏱️ Time taken: {elapsed:.2f}s")
-
+        print()
 
 def download_wb3d_models():
     """Download Wholebody 3D models"""
@@ -348,8 +360,10 @@ def download_wb3d_models():
                 subprocess.run(f"cp '{drive_path}' '{model_path}'", shell=True, check=True, capture_output=True)
 
             print(f"     ✔️ Copied rtmw3d-l.onnx")
+            print(f"     📁 Source: Drive (rtmw3d export copy)")
             elapsed = time.time() - start
             print(f"     ⏱️ Time taken: {elapsed:.2f}s")
+            print()
             return
         else:
             print_warning("rtmw3d-l.onnx not found in Drive")
@@ -390,6 +404,7 @@ def download_reid_models():
                 print(f"     ⚡ Copying from Drive: {display_name_pt}")
                 run_command(f"cp '{drive_path}' '{model_path_pt}'")
                 print(f"     ✔️ Copied {display_name_pt}")
+                print(f"     📁 Source: Drive (copied)")
                 elapsed = time.time() - start
                 print(f"     ⏱️ Time taken: {elapsed:.2f}s")
                 print()
@@ -401,11 +416,13 @@ def download_reid_models():
                     try:
                         run_command(f"gdown --fuzzy {gdrive_id} -O '{model_path_pt}'")
                         print(f"     ✔️ Downloaded {display_name_pt} successfully to {model_path_pt}")
+                        print(f"     📡 Source: Google Drive (gdown)")
                     except Exception as e:
                         print_warning(f"Failed to download {display_name_pt}: {e}")
                 else:
                     cmd = f"gdown --fuzzy {gdrive_id} -O '{model_path_pt}'"
                     run_command_with_progress(cmd, model_name_pt, model_path_pt, 25)
+                    print(f"     📡 Source: Google Drive (gdown)")
                     elapsed = time.time() - start
                     print(f"     ⏱️ Time taken: {elapsed:.2f}s")
                     print()
@@ -443,8 +460,10 @@ def download_reid_models():
                 print(f"     ⚡ Copying from Drive: {display_name_x025}")
                 run_command(f"cp '{drive_path}' '{model_path_x025}'")
                 print(f"     ✔️ Copied {display_name_x025}")
+                print(f"     📁 Source: Drive (copied)")
                 elapsed = time.time() - start
                 print(f"     ⏱️ Time taken: {elapsed:.2f}s")
+                print()
             else:
                 # Download from HuggingFace
                 hf_url = "https://huggingface.co/paulosantiago/osnet_x0_25_msmt17/resolve/main/osnet_x0_25_msmt17.pt"
@@ -453,12 +472,14 @@ def download_reid_models():
                     try:
                         run_command(f"wget -O '{model_path_x025}' {hf_url}")
                         print(f"     ✔️ Downloaded {display_name_x025} successfully to {model_path_x025}")
+                        print(f"     📡 Source: HuggingFace (wget)")
                     except Exception as e:
                         print_warning(f"Failed to download {display_name_x025}: {e}")
                 else:
                     cmd = f"wget -q -O '{model_path_x025}' {hf_url}"
                     run_command_with_progress(cmd, model_name_x025, model_path_x025, 2)
                     elapsed = time.time() - start
+                    print(f"     📡 Source: HuggingFace (wget)")
                     print(f"     ⏱️ Time taken: {elapsed:.2f}s")
                     print()
         else:
@@ -498,6 +519,7 @@ def download_reid_models():
                 print(f"     ✔️ Copied {display_name_onnx}")
                 elapsed = time.time() - start
                 print(f"     ⏱️ Time taken: {elapsed:.2f}s")
+                print()
             else:
                 # Download from HuggingFace
                 hf_url = "https://huggingface.co/anriha/osnet_x0_25_msmt17/resolve/main/osnet_x0_25_msmt17.onnx"
