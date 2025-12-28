@@ -60,7 +60,7 @@ def create_model_directories(models, base_dir):
         os.makedirs(d, exist_ok=True)
     
     print(f"  {COLOR_GREEN}✓{COLOR_RESET} Creating directory structure for models")
-
+    print()
 
 def download_from_github(url, destination, size_mb, model_name):
     """Download file from GitHub using curl"""
@@ -136,7 +136,7 @@ def fetch_model(model, preferred_source, base_dir):
     if check_file_exists(destination, quiet=True):
         file_size_bytes = os.path.getsize(destination)
         file_size_mb = file_size_bytes / (1024 * 1024)
-        print(f"✅  {name} already exists: {destination} ({file_size_mb:.1f} MB)")
+        print(f"  ✅  {name} already exists: {destination} ({file_size_mb:.1f} MB)")
         print("  " + "─" * 65 + "\n")
         return True
     
@@ -211,7 +211,7 @@ def main():
     
     try:
         for i, model in enumerate(models, 1):
-            print(f"⬇️  [{i}/{len(models)}] Fetching: {model['name']}")
+            print(f"  ⬇️  [{i}/{len(models)}] Fetching: {model['name']}")
             
             if fetch_model(model, preferred_source, base_dir):
                 success_count += 1
