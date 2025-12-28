@@ -51,6 +51,25 @@ def get_model_display_name(filename):
     return MODEL_NAMES.get(filename, filename)
 
 
+def create_model_directories():
+    """Create the common models directory structure (silent per-dir)."""
+    dirs = [
+        MODELS_DIR,
+        os.path.join(MODELS_DIR, "yolo"),
+        os.path.join(MODELS_DIR, "rtmlib"),
+        os.path.join(MODELS_DIR, "vitpose"),
+        os.path.join(MODELS_DIR, "wb3d"),
+        os.path.join(MODELS_DIR, "motionagformer"),
+        os.path.join(MODELS_DIR, "reid"),
+    ]
+
+    for d in dirs:
+        os.makedirs(d, exist_ok=True)
+
+    # Single summary message (green check)
+    print(f"  {COLOR_GREEN}✓{COLOR_RESET} Creating directory structure for models")
+
+
 def run_command_with_progress(cmd, filename, model_path, expected_size_mb=None):
     """Run command with progress tracking for silent mode"""
     display_name = get_model_display_name(filename)
@@ -475,6 +494,9 @@ def main():
         print(f"Drive backup: {DRIVE_MODELS}")
     print()
     
+    # Ensure model directories exist before attempting downloads
+    create_model_directories()
+
     try:
         download_yolo_models()
         download_vitpose_models()

@@ -205,13 +205,6 @@ def step7_create_directories():
     print("  " + "─" * 66 + "\n")
     
     directories = [
-        MODELS_DIR,
-        os.path.join(MODELS_DIR, "yolo"),
-        os.path.join(MODELS_DIR, "rtmlib"),
-        os.path.join(MODELS_DIR, "vitpose"),
-        os.path.join(MODELS_DIR, "wb3d"),
-        os.path.join(MODELS_DIR, "motionagformer"),
-        os.path.join(MODELS_DIR, "reid"),
         os.path.join(REPO_ROOT, "demo_data"),
         os.path.join(REPO_ROOT, "demo_data", "videos"),
         os.path.join(REPO_ROOT, "demo_data", "images"),
