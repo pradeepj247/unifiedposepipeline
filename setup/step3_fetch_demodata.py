@@ -70,10 +70,7 @@ def copy_demo_group(group, base_source, base_dest):
     # Construct full source and destination paths
     source_folder = os.path.join(base_source, subfolder)
     
-    print_header(f"Fetching {name}")
-    
-    if description:
-        print(f"  {description}")
+    print_header(f"Fetching {name} from: {source_folder}")
     
     # Build destination path
     dest_folder = os.path.join(base_dest, subfolder)
@@ -102,9 +99,6 @@ def copy_demo_group(group, base_source, base_dest):
     # Copy files
     copied_count = 0
     existing_count = 0
-    
-    print(f"  📂 Copying from: {source_folder}")
-    print(f"  📂 Copying to: {dest_folder}\n")
     
     for filename in source_files:
         source_path = os.path.join(source_folder, filename)
@@ -142,9 +136,6 @@ def main():
     print("\n" + "=" * 70)
     print(f"\033[93m🚀 STEP 3: Pull Demo Data\033[0m")
     print("=" * 70 + "\n")
-    
-    print("   This script will copy demo videos and images from Google Drive.")
-    print(f"   📁 Repository root: {repo_root}")
     
     try:
         # Load configuration
