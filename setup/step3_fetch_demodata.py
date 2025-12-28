@@ -171,7 +171,6 @@ def main():
         print()
         print(f"\033[93m✅ SUCCESS: Demo data setup complete!\033[0m")
         print(f"📊 Total files downloaded: {total_downloaded}")
-        print(f"📊 Total files already present: {total_existing}")
         print(f"⏱️ TOTAL TIME TAKEN: {total_time:.2f}s")
         print("=" * 70 + "\n")
         print()
