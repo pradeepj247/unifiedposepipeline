@@ -80,9 +80,9 @@ def run_command_with_progress(cmd, filename, model_path, expected_size_mb=None):
     
     # Silent mode: show progress with rocket emoji
     if expected_size_mb:
-        print(f"  🚀 Downloading {display_name} (~{expected_size_mb} MB)")
+        print(f"     ⚡ Downloading {display_name} (~{expected_size_mb} MB)")
     else:
-        print(f"  🚀 Downloading {display_name}...")
+        print(f"     ⚡ Downloading {display_name}...")
     
     try:
         # Run command and capture output
@@ -94,17 +94,8 @@ def run_command_with_progress(cmd, filename, model_path, expected_size_mb=None):
             stderr=subprocess.STDOUT,
             text=True
         )
-        
-        # Parse gdown output for progress (if applicable)
-        output = result.stdout
-        if 'Downloading' in output or 'To:' in output:
-            # Extract progress info from gdown output
-            progress_lines = [line for line in output.split('\n') if '%' in line]
-            if progress_lines:
-                # Show last progress line
-                print(f"  Progress: 100%")
-        
-        print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name} successfully to {model_path}")
+        # Do not print intermediate progress here (silent mode)
+        print(f"     {COLOR_GREEN}✔️{COLOR_RESET} Downloaded {display_name} successfully to {model_path}")
         return 0
         
     except subprocess.CalledProcessError as e:
@@ -119,204 +110,236 @@ def run_command_with_progress(cmd, filename, model_path, expected_size_mb=None):
 
 def download_yolo_models():
     """Download YOLO detection models"""
-    print_step("2.1", "Download YOLO Models", indent=True)
-    
+    print("  " + "─" * 65)
+    print("  ⬇️ STEP 2.1: Download YOLO Models")
+    print("  " + "─" * 65 + "\n")
+
     yolo_dir = os.path.join(MODELS_DIR, "yolo")
-    
+
     models = {
         "yolov8s.pt": ("https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8s.pt", 22)
     }
-    
+
     for model_name, (url, size_mb) in models.items():
         model_path = os.path.join(yolo_dir, model_name)
         display_name = get_model_display_name(model_name)
-        
+
         if check_file_exists(model_path, quiet=True):
-            # Get file size
             file_size_bytes = os.path.getsize(model_path)
             file_size_mb = file_size_bytes / (1024 * 1024)
-            print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} already exists: {model_path} ({file_size_mb:.1f} MB)")
+            print(f"  {COLOR_GREEN}✔️{COLOR_RESET} {display_name} already exists: {model_path} ({file_size_mb:.1f} MB)")
             continue
-        
-        print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name} not found")
-        
+
+        print(f"  ⚠️ {display_name} not found")
+        start = time.time()
+
         # Check Drive backup
         if DRIVE_MODELS:
             drive_path = os.path.join(DRIVE_MODELS, "yolo", model_name)
             if os.path.exists(drive_path):
-                print(f"  Copying from Drive: {display_name}")
+                print(f"     ⚡ Copying from Drive: {display_name}")
                 run_command(f"cp '{drive_path}' '{model_path}'")
+                print(f"     ✔️ Copied {display_name}")
+                elapsed = time.time() - start
+                print(f"     ⏱️ Time taken: {elapsed:.2f}s")
                 continue
-        
+
         # Download from GitHub
         cmd = f"curl -L '{url}' -o '{model_path}'"
         if VERBOSE:
-            print(f"  Downloading {display_name}...")
+            print(f"     ⚡ Downloading {display_name} (~{size_mb} MB)")
             try:
                 run_command(cmd)
-                print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name}")
+                print(f"     ✔️ Downloaded {display_name} successfully to {model_path}")
             except Exception as e:
                 print_warning(f"Failed to download {display_name}: {e}")
         else:
             run_command_with_progress(cmd, model_name, model_path, size_mb)
+            elapsed = time.time() - start
+            print(f"     ⏱️ Time taken: {elapsed:.2f}s")
 
 
 def download_vitpose_models():
     """Download ViTPose models"""
-    print_step("2.2", "Download ViTPose Models", indent=True)
-    
+    print("  " + "─" * 65)
+    print("  ⬇️ STEP 2.2: Download ViTPose Models")
+    print("  " + "─" * 65 + "\n")
+
     vitpose_dir = os.path.join(MODELS_DIR, "vitpose")
     model_name = "vitpose-b.pth"
     model_path = os.path.join(vitpose_dir, model_name)
     display_name = get_model_display_name(model_name)
-    
+
     if check_file_exists(model_path, quiet=True):
-        # Get file size
         file_size_bytes = os.path.getsize(model_path)
         file_size_mb = file_size_bytes / (1024 * 1024)
-        print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} already exists: {model_path} ({file_size_mb:.1f} MB)")
+        print(f"  {COLOR_GREEN}✔️{COLOR_RESET} {display_name} already exists: {model_path} ({file_size_mb:.1f} MB)")
         return
-    
-    print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name} not found")
-    
+
+    print(f"  ⚠️ {display_name} not found")
+    start = time.time()
+
     # Check Drive backup
     if DRIVE_MODELS:
         drive_path = os.path.join(DRIVE_MODELS, "vitpose", model_name)
         if os.path.exists(drive_path):
-            print(f"  Copying from Drive: {display_name}")
+            print(f"     ⚡ Copying from Drive: {display_name}")
             run_command(f"cp '{drive_path}' '{model_path}'")
+            print(f"     ✔️ Copied {display_name}")
+            elapsed = time.time() - start
+            print(f"     ⏱️ Time taken: {elapsed:.2f}s")
             return
-    
+
     # Download from GitHub releases
     url = "https://github.com/pradeepj247/easy-pose-pipeline/releases/download/v1.0/vitpose-b.pth"
     cmd = f"curl -L '{url}' -o '{model_path}'"
-    
+
     if VERBOSE:
-        print(f"  Downloading {display_name} (343 MB)...")
+        print(f"     ⚡ Downloading {display_name} (~343 MB)")
         try:
             run_command(cmd)
-            print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name}")
+            print(f"     ✔️ Downloaded {display_name} successfully to {model_path}")
         except Exception as e:
             print_warning(f"Failed to download {display_name}: {e}")
     else:
         run_command_with_progress(cmd, model_name, model_path, 343)
+        elapsed = time.time() - start
+        print(f"     ⏱️ Time taken: {elapsed:.2f}s")
 
 
 def download_rtmpose_models():
     """Download RTMPose ONNX models"""
-    print_step("2.3", "Download RTMPose Models", indent=True)
-    
+    print("  " + "─" * 65)
+    print("  ⬇️ STEP 2.3: Download RTMPose Models")
+    print("  " + "─" * 65 + "\n")
+
     rtmpose_dir = os.path.join(MODELS_DIR, "rtmlib")
-    
+
     models = {
         "rtmpose-l-coco-384x288.onnx": ("https://github.com/pradeepj247/unifiedposepipeline/releases/download/v1.0.0/rtmpose-l-coco-384x288.onnx", 110),
         "rtmpose-l-halpe26-384x288.onnx": ("https://github.com/pradeepj247/unifiedposepipeline/releases/download/v1.0.0/rtmpose-l-halpe26-384x288.onnx", 110)
     }
-    
+
     for model_name, (url, size_mb) in models.items():
         model_path = os.path.join(rtmpose_dir, model_name)
         display_name = get_model_display_name(model_name)
-        
+
         if check_file_exists(model_path, quiet=True):
-            # Get file size
             file_size_bytes = os.path.getsize(model_path)
             file_size_mb = file_size_bytes / (1024 * 1024)
-            print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} already exists: {model_path} ({file_size_mb:.1f} MB)")
+            print(f"  {COLOR_GREEN}✔️{COLOR_RESET} {display_name} already exists: {model_path} ({file_size_mb:.1f} MB)")
             continue
-        
-        print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name} not found")
-        
+
+        print(f"  ⚠️ {display_name} not found")
+        start = time.time()
+
         # Check Drive backup
         if DRIVE_MODELS:
             drive_path = os.path.join(DRIVE_MODELS, "rtmlib", model_name)
             if os.path.exists(drive_path):
-                print(f"  Copying from Drive: {display_name}")
+                print(f"     ⚡ Copying from Drive: {display_name}")
                 run_command(f"cp '{drive_path}' '{model_path}'")
+                print(f"     ✔️ Copied {display_name}")
+                elapsed = time.time() - start
+                print(f"     ⏱️ Time taken: {elapsed:.2f}s")
                 continue
-        
+
         # Download from GitHub
         cmd = f"curl -L '{url}' -o '{model_path}'"
         if VERBOSE:
-            print(f"  Downloading {display_name} (~{size_mb} MB)...")
+            print(f"     ⚡ Downloading {display_name} (~{size_mb} MB)")
             try:
                 run_command(cmd)
-                print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name}")
+                print(f"     ✔️ Downloaded {display_name} successfully to {model_path}")
             except Exception as e:
                 print_warning(f"Failed to download {display_name}: {e}")
         else:
             run_command_with_progress(cmd, model_name, model_path, size_mb)
+            elapsed = time.time() - start
+            print(f"     ⏱️ Time taken: {elapsed:.2f}s")
 
 
 def download_motionagformer_models():
     """Download MotionAGFormer checkpoint"""
-    print_step("2.4", "Download MotionAGFormer Checkpoint", indent=True)
-    
+    print("  " + "─" * 65)
+    print("  ⬇️ STEP 2.4: Download MotionAGFormer Checkpoint")
+    print("  " + "─" * 65 + "\n")
+
     magf_dir = os.path.join(MODELS_DIR, "motionagformer")
     model_name = "motionagformer-base-h36m.pth.tr"
     model_path = os.path.join(magf_dir, model_name)
     display_name = get_model_display_name(model_name)
-    
+
     if check_file_exists(model_path, quiet=True):
-        # Get file size
         file_size_bytes = os.path.getsize(model_path)
         file_size_mb = file_size_bytes / (1024 * 1024)
-        print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name} already exists: {model_path} ({file_size_mb:.1f} MB)")
+        print(f"  {COLOR_GREEN}✔️{COLOR_RESET} {display_name} already exists: {model_path} ({file_size_mb:.1f} MB)")
         return
-    
-    print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name} not found")
-    
+
+    print(f"  ⚠️ {display_name} not found")
+    start = time.time()
+
     # Check Drive backup
     if DRIVE_MODELS:
         drive_path = os.path.join(DRIVE_MODELS, "motionagformer", model_name)
         if os.path.exists(drive_path):
-            print(f"  Copying from Drive: {display_name}")
+            print(f"     ⚡ Copying from Drive: {display_name}")
             run_command(f"cp '{drive_path}' '{model_path}'")
+            print(f"     ✔️ Copied {display_name}")
+            elapsed = time.time() - start
+            print(f"     ⏱️ Time taken: {elapsed:.2f}s")
             return
-    
+
     # Download from Google Drive using gdown with --fuzzy flag
     gdrive_id = "1Iii5EwsFFm9_9lKBUPfN8bV5LmfkNUMP"
-    
+
     if VERBOSE:
-        print(f"  Downloading {display_name} (~200 MB)...")
+        print(f"     ⚡ Downloading {display_name} (~200 MB)")
         try:
             run_command(f"gdown --fuzzy {gdrive_id} -O '{model_path}'")
-            print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name}")
+            print(f"     ✔️ Downloaded {display_name} successfully to {model_path}")
         except Exception as e:
             print_warning(f"Failed to download {display_name}: {e}")
     else:
         cmd = f"gdown --fuzzy {gdrive_id} -O '{model_path}'"
         run_command_with_progress(cmd, model_name, model_path, 200)
+        elapsed = time.time() - start
+        print(f"     ⏱️ Time taken: {elapsed:.2f}s")
 
 
 def download_wb3d_models():
     """Download Wholebody 3D models"""
-    print_step("2.5", "Download Wholebody 3D Models", indent=True)
-    
+    print("  " + "─" * 65)
+    print("  ⬇️ STEP 2.5: Download Wholebody 3D Models")
+    print("  " + "─" * 65 + "\n")
+
     wb3d_dir = os.path.join(MODELS_DIR, "wb3d")
     model_path = os.path.join(wb3d_dir, "rtmw3d-l.onnx")
-    
+
     if check_file_exists(model_path, quiet=True):
-        print("  Skipping rtmw3d-l.onnx (already exists)")
+        print(f"  {COLOR_GREEN}✔️{COLOR_RESET} RTM Wholebody already exists: {model_path}")
         return
-    
+
+    print(f"  ⚠️ RTM Wholebody not found")
+    start = time.time()
+
     # Check Drive backup (primary source - stored in rtmw3d_onnx_exports/)
     if is_colab_environment() and os.path.exists("/content/drive/MyDrive"):
         drive_path = "/content/drive/MyDrive/rtmw3d_onnx_exports/rtmw3d-l.onnx"
         if os.path.exists(drive_path):
-            if not VERBOSE:
-                print("  Copying from Drive: rtmw3d-l.onnx")
-            else:
-                print("  Copying from Drive: rtmw3d-l.onnx")
-                print(f"  Running: cp '{drive_path}' '{model_path}'")
-            
+            print(f"     ⚡ Copying from Drive: rtmw3d-l.onnx")
+            if VERBOSE:
+                print(f"     Running: cp '{drive_path}' '{model_path}'")
+
             # Run copy silently in non-verbose mode
             if VERBOSE:
                 run_command(f"cp '{drive_path}' '{model_path}'")
             else:
                 subprocess.run(f"cp '{drive_path}' '{model_path}'", shell=True, check=True, capture_output=True)
-            
-            if not VERBOSE:
-                print("  ✓ Copied rtmw3d-l.onnx")
+
+            print(f"     ✔️ Copied rtmw3d-l.onnx")
+            elapsed = time.time() - start
+            print(f"     ⏱️ Time taken: {elapsed:.2f}s")
             return
         else:
             print_warning("rtmw3d-l.onnx not found in Drive")
@@ -331,8 +354,10 @@ def download_wb3d_models():
 
 def download_reid_models():
     """Download ReID models (both PyTorch and ONNX variants)"""
-    print_step("2.6", "Download ReID Models", indent=True)
-    
+    print("  " + "─" * 65)
+    print("  ⬇️ STEP 2.6: Download ReID Models")
+    print("  " + "─" * 65 + "\n")
+
     reid_dir = os.path.join(MODELS_DIR, "reid")
     
     # Model 1: OSNet x1.0 (PyTorch) - for high accuracy
@@ -343,29 +368,35 @@ def download_reid_models():
     if check_file_exists(model_path_pt, quiet=True):
         file_size_bytes = os.path.getsize(model_path_pt)
         file_size_mb = file_size_bytes / (1024 * 1024)
-        print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name_pt} already exists: {model_path_pt} ({file_size_mb:.1f} MB)")
+        print(f"  {COLOR_GREEN}✔️{COLOR_RESET} {display_name_pt} already exists: {model_path_pt} ({file_size_mb:.1f} MB)")
     else:
-        print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name_pt} not found")
-        
+        print(f"  ⚠️ {display_name_pt} not found")
+        start = time.time()
+
         # Check Drive backup
         if DRIVE_MODELS:
             drive_path = os.path.join(DRIVE_MODELS, "reid", model_name_pt)
             if os.path.exists(drive_path):
-                print(f"  Copying from Drive: {display_name_pt}")
+                print(f"     ⚡ Copying from Drive: {display_name_pt}")
                 run_command(f"cp '{drive_path}' '{model_path_pt}'")
+                print(f"     ✔️ Copied {display_name_pt}")
+                elapsed = time.time() - start
+                print(f"     ⏱️ Time taken: {elapsed:.2f}s")
             else:
                 # Download from Google Drive
                 gdrive_id = "1LaG1EJpHrxdAxKnSCJ_i0u-nbxSAeiFY"
                 if VERBOSE:
-                    print(f"  Downloading {display_name_pt} (~25 MB)...")
+                    print(f"     ⚡ Downloading {display_name_pt} (~25 MB)")
                     try:
                         run_command(f"gdown --fuzzy {gdrive_id} -O '{model_path_pt}'")
-                        print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name_pt}")
+                        print(f"     ✔️ Downloaded {display_name_pt} successfully to {model_path_pt}")
                     except Exception as e:
                         print_warning(f"Failed to download {display_name_pt}: {e}")
                 else:
                     cmd = f"gdown --fuzzy {gdrive_id} -O '{model_path_pt}'"
                     run_command_with_progress(cmd, model_name_pt, model_path_pt, 25)
+                    elapsed = time.time() - start
+                    print(f"     ⏱️ Time taken: {elapsed:.2f}s")
         else:
             # Download from Google Drive
             gdrive_id = "1LaG1EJpHrxdAxKnSCJ_i0u-nbxSAeiFY"
@@ -388,29 +419,35 @@ def download_reid_models():
     if check_file_exists(model_path_x025, quiet=True):
         file_size_bytes = os.path.getsize(model_path_x025)
         file_size_mb = file_size_bytes / (1024 * 1024)
-        print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name_x025} already exists: {model_path_x025} ({file_size_mb:.1f} MB)")
+        print(f"  {COLOR_GREEN}✔️{COLOR_RESET} {display_name_x025} already exists: {model_path_x025} ({file_size_mb:.1f} MB)")
     else:
-        print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name_x025} not found")
-        
+        print(f"  ⚠️ {display_name_x025} not found")
+        start = time.time()
+
         # Check Drive backup
         if DRIVE_MODELS:
             drive_path = os.path.join(DRIVE_MODELS, "reid", model_name_x025)
             if os.path.exists(drive_path):
-                print(f"  Copying from Drive: {display_name_x025}")
+                print(f"     ⚡ Copying from Drive: {display_name_x025}")
                 run_command(f"cp '{drive_path}' '{model_path_x025}'")
+                print(f"     ✔️ Copied {display_name_x025}")
+                elapsed = time.time() - start
+                print(f"     ⏱️ Time taken: {elapsed:.2f}s")
             else:
                 # Download from HuggingFace
                 hf_url = "https://huggingface.co/paulosantiago/osnet_x0_25_msmt17/resolve/main/osnet_x0_25_msmt17.pt"
                 if VERBOSE:
-                    print(f"  Downloading {display_name_x025} (~2 MB)...")
+                    print(f"     ⚡ Downloading {display_name_x025} (~2 MB)")
                     try:
                         run_command(f"wget -O '{model_path_x025}' {hf_url}")
-                        print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name_x025}")
+                        print(f"     ✔️ Downloaded {display_name_x025} successfully to {model_path_x025}")
                     except Exception as e:
                         print_warning(f"Failed to download {display_name_x025}: {e}")
                 else:
                     cmd = f"wget -q -O '{model_path_x025}' {hf_url}"
                     run_command_with_progress(cmd, model_name_x025, model_path_x025, 2)
+                    elapsed = time.time() - start
+                    print(f"     ⏱️ Time taken: {elapsed:.2f}s")
         else:
             # Download from HuggingFace
             hf_url = "https://huggingface.co/paulosantiago/osnet_x0_25_msmt17/resolve/main/osnet_x0_25_msmt17.pt"
@@ -433,29 +470,35 @@ def download_reid_models():
     if check_file_exists(model_path_onnx, quiet=True):
         file_size_bytes = os.path.getsize(model_path_onnx)
         file_size_mb = file_size_bytes / (1024 * 1024)
-        print(f"  {COLOR_GREEN}✓{COLOR_RESET} {display_name_onnx} already exists: {model_path_onnx} ({file_size_mb:.1f} MB)")
+        print(f"  {COLOR_GREEN}✔️{COLOR_RESET} {display_name_onnx} already exists: {model_path_onnx} ({file_size_mb:.1f} MB)")
     else:
-        print(f"  {COLOR_ORANGE}✗{COLOR_RESET} {display_name_onnx} not found")
-        
+        print(f"  ⚠️ {display_name_onnx} not found")
+        start = time.time()
+
         # Check Drive backup
         if DRIVE_MODELS:
             drive_path = os.path.join(DRIVE_MODELS, "reid", model_name_onnx)
             if os.path.exists(drive_path):
-                print(f"  Copying from Drive: {display_name_onnx}")
+                print(f"     ⚡ Copying from Drive: {display_name_onnx}")
                 run_command(f"cp '{drive_path}' '{model_path_onnx}'")
+                print(f"     ✔️ Copied {display_name_onnx}")
+                elapsed = time.time() - start
+                print(f"     ⏱️ Time taken: {elapsed:.2f}s")
             else:
                 # Download from HuggingFace
                 hf_url = "https://huggingface.co/anriha/osnet_x0_25_msmt17/resolve/main/osnet_x0_25_msmt17.onnx"
                 if VERBOSE:
-                    print(f"  Downloading {display_name_onnx} (~2 MB)...")
+                    print(f"     ⚡ Downloading {display_name_onnx} (~2 MB)")
                     try:
                         run_command(f"wget -O '{model_path_onnx}' {hf_url}")
-                        print(f"  {COLOR_GREEN}✓{COLOR_RESET} Downloaded {display_name_onnx}")
+                        print(f"     ✔️ Downloaded {display_name_onnx} successfully to {model_path_onnx}")
                     except Exception as e:
                         print_warning(f"Failed to download {display_name_onnx}: {e}")
                 else:
                     cmd = f"wget -q -O '{model_path_onnx}' {hf_url}"
                     run_command_with_progress(cmd, model_name_onnx, model_path_onnx, 2)
+                    elapsed = time.time() - start
+                    print(f"     ⏱️ Time taken: {elapsed:.2f}s")
         else:
             # Download from HuggingFace
             hf_url = "https://huggingface.co/anriha/osnet_x0_25_msmt17/resolve/main/osnet_x0_25_msmt17.onnx"
@@ -484,6 +527,9 @@ def main():
     
     VERBOSE = args.verbose
     
+    import time
+    start_time = time.time()
+
     print_header("STEP 2: Download Model Files", color=COLOR_YELLOW)
     
     if not VERBOSE:
@@ -505,10 +551,14 @@ def main():
         download_wb3d_models()
         download_reid_models()
         
-        print_success("Model download complete!", color=COLOR_YELLOW)
-        print("\nNext steps:")
-        print("  python step3_pull_demodata.py    # Setup demo data")
-        print("  python step4_verify_envt.py      # Verify installation")
+        total_time = time.time() - start_time
+        print("\n" + "=" * 70)
+        print(f"{COLOR_YELLOW}✅  SUCCESS: Model download complete!{COLOR_RESET}")
+        print(f"⏱️  TOTAL TIME TAKEN: {total_time:.2f}s")
+        print("=" * 70 + "\n")
+        print("📌 Next steps to try:")
+        print("    python step3_pull_demodata.py    # Setup demo data")
+        print("    python step4_verify_envt.py      # Verify installation")
         
     except KeyboardInterrupt:
         print("\n\n⊘ Download interrupted by user")
