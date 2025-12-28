@@ -192,6 +192,7 @@ def download_vitpose_models():
             print(f"     ✔️ Copied {display_name}")
             elapsed = time.time() - start
             print(f"     ⏱️ Time taken: {elapsed:.2f}s")
+            print()
             return
 
     # Download from GitHub releases
@@ -209,6 +210,7 @@ def download_vitpose_models():
         run_command_with_progress(cmd, model_name, model_path, 343)
         elapsed = time.time() - start
         print(f"     ⏱️ Time taken: {elapsed:.2f}s")
+        print()
         print()
 
 
@@ -406,6 +408,7 @@ def download_reid_models():
                     run_command_with_progress(cmd, model_name_pt, model_path_pt, 25)
                     elapsed = time.time() - start
                     print(f"     ⏱️ Time taken: {elapsed:.2f}s")
+                    print()
         else:
             # Download from Google Drive
             gdrive_id = "1LaG1EJpHrxdAxKnSCJ_i0u-nbxSAeiFY"
@@ -457,6 +460,7 @@ def download_reid_models():
                     run_command_with_progress(cmd, model_name_x025, model_path_x025, 2)
                     elapsed = time.time() - start
                     print(f"     ⏱️ Time taken: {elapsed:.2f}s")
+                    print()
         else:
             # Download from HuggingFace
             hf_url = "https://huggingface.co/paulosantiago/osnet_x0_25_msmt17/resolve/main/osnet_x0_25_msmt17.pt"
@@ -470,6 +474,7 @@ def download_reid_models():
             else:
                 cmd = f"wget -q -O '{model_path_x025}' {hf_url}"
                 run_command_with_progress(cmd, model_name_x025, model_path_x025, 2)
+                print()
     
     # Model 3: OSNet x0.25 (ONNX) - kept for reference (has batch size issues)
     model_name_onnx = "osnet_x0_25_msmt17.onnx"
@@ -508,6 +513,7 @@ def download_reid_models():
                     run_command_with_progress(cmd, model_name_onnx, model_path_onnx, 2)
                     elapsed = time.time() - start
                     print(f"     ⏱️ Time taken: {elapsed:.2f}s")
+                    print()
         else:
             # Download from HuggingFace
             hf_url = "https://huggingface.co/anriha/osnet_x0_25_msmt17/resolve/main/osnet_x0_25_msmt17.onnx"
