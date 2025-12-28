@@ -66,20 +66,17 @@ library_groups:
     packages:
       - package_name: "opencv-python"
         version: ""
-    packages:
-      - package_name: "opencv-python"
-        version: ""
       
       - package_name: "opencv-contrib-python"
         version: ""
       
       - package_name: "ultralytics"
         version: ""
+
+  - name: "Pose Estimation Libraries"
+    sequence: 4
     description: "ONNX Runtime for pose estimation models"
     gpu_aware: true
-    packages:
-      - package_name: "onnx"
-        version: ""
     packages:
       - package_name: "onnx"
         version: ""
@@ -87,9 +84,10 @@ library_groups:
       - package_name: "onnxruntime"
         version: ""
         gpu_variant: "onnxruntime-gpu"
+
+  - name: "Tracking Libraries"
+    sequence: 5
     description: "Multi-object tracking and ReID libraries"
-    packages:
-      - package_name: "boxmot"
     packages:
       - package_name: "boxmot"
         version: ""

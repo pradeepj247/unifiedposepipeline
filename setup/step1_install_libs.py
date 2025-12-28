@@ -185,20 +185,20 @@ def main():
     print("=" * 70 + "\n")
     
     print("   This script will install all required Python packages.")
-    print(f"   Repository root: {repo_root}")
-    print(f"   Models directory: {models_dir}")
+    print(f"   📁 Repository root: {repo_root}")
+    print(f"   📁 Models directory: {models_dir}")
     
     try:
         # Load configuration
         config = load_library_config()
-        print_info(f"Loaded configuration from libraries.yaml")
+        print("   ✅ Loaded configuration from libraries.yaml")
         
         # Check GPU availability
         gpu_available = is_gpu_available()
         if gpu_available:
-            print_info("GPU detected - will use GPU-optimized packages where available")
+            print("   ✅ GPU detected - will use GPU-optimized packages where available")
         else:
-            print_info("No GPU detected - will use CPU-only packages")
+            print("   ✅ No GPU detected - will use CPU-only packages")
         
         # Mount Drive (Colab only)
         mount_google_drive()
