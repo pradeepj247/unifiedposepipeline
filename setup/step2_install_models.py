@@ -69,6 +69,7 @@ def create_model_directories():
 
     # Single summary message (green check)
     print(f"  {COLOR_GREEN}✓{COLOR_RESET} Creating directory structure for models")
+    print()
 
 
 def run_command_with_progress(cmd, filename, model_path, expected_size_mb=None):
@@ -143,6 +144,7 @@ def download_yolo_models():
                 print(f"     ✔️ Copied {display_name}")
                 elapsed = time.time() - start
                 print(f"     ⏱️ Time taken: {elapsed:.2f}s")
+                print()
                 continue
 
         # Download from GitHub
@@ -158,6 +160,7 @@ def download_yolo_models():
             run_command_with_progress(cmd, model_name, model_path, size_mb)
             elapsed = time.time() - start
             print(f"     ⏱️ Time taken: {elapsed:.2f}s")
+            print()
 
 
 def download_vitpose_models():
@@ -206,6 +209,7 @@ def download_vitpose_models():
         run_command_with_progress(cmd, model_name, model_path, 343)
         elapsed = time.time() - start
         print(f"     ⏱️ Time taken: {elapsed:.2f}s")
+        print()
 
 
 def download_rtmpose_models():
@@ -243,6 +247,7 @@ def download_rtmpose_models():
                 print(f"     ✔️ Copied {display_name}")
                 elapsed = time.time() - start
                 print(f"     ⏱️ Time taken: {elapsed:.2f}s")
+                print()
                 continue
 
         # Download from GitHub
@@ -258,6 +263,7 @@ def download_rtmpose_models():
             run_command_with_progress(cmd, model_name, model_path, size_mb)
             elapsed = time.time() - start
             print(f"     ⏱️ Time taken: {elapsed:.2f}s")
+            print()
 
 
 def download_motionagformer_models():
@@ -289,6 +295,7 @@ def download_motionagformer_models():
             print(f"     ✔️ Copied {display_name}")
             elapsed = time.time() - start
             print(f"     ⏱️ Time taken: {elapsed:.2f}s")
+            print()
             return
 
     # Download from Google Drive using gdown with --fuzzy flag
@@ -383,6 +390,7 @@ def download_reid_models():
                 print(f"     ✔️ Copied {display_name_pt}")
                 elapsed = time.time() - start
                 print(f"     ⏱️ Time taken: {elapsed:.2f}s")
+                print()
             else:
                 # Download from Google Drive
                 gdrive_id = "1LaG1EJpHrxdAxKnSCJ_i0u-nbxSAeiFY"
