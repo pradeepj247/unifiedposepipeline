@@ -87,7 +87,7 @@ library_groups:
 
   - name: "Tracking Libraries"
     sequence: 5
-    description: "Multi-object tracking and ReID libraries"
+    description: "📌 Multi-object tracking and ReID libraries"
     packages:
       - package_name: "boxmot"
         version: ""
@@ -106,7 +106,7 @@ library_groups:
 
   - name: "MotionAGFormer Dependencies"
     sequence: 6
-    description: "Dependencies for 3D pose lifting with MotionAGFormer"
+    description: "📌 Dependencies for 3D pose lifting with MotionAGFormer"
     allow_failures: true
     packages:
       - package_name: "timm"
