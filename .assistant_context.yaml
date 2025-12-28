@@ -6,6 +6,16 @@ metadata:
   last_updated_by: pradeepj247
   last_updated_on: "2025-12-28"
 
+stats:
+  # overall_message_count: total messages exchanged across all sessions
+  overall_message_count: 0
+  # current_message_count: messages since last summary checkpoint
+  current_message_count: 0
+  # When current_message_count reaches 25, assistant will create/update
+  # `current_context.md` with a summary of the last 25 messages and reset
+  # current_message_count to 0 (assistant will request commit approval).
+  last_message_on: "2025-12-28"
+
 defaults:
   tracker: bytetrack
   reid_enabled: false
