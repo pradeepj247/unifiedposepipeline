@@ -11,6 +11,4 @@ directories:
   
   - path: "demo_data/outputs"
     description: "Output results from demos"
-  
-  - path: "configs"
-    description: "Configuration files"
+
