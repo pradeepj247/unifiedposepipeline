@@ -66,7 +66,7 @@ def step1_install_core_dependencies():
     
     cmd = f"pip install -q {' '.join(packages)}"
     try:
-        run_command(cmd, message=f"  🛠️ Installing {' '.join(packages)}")
+        run_command(cmd, message=f"  🛠️ Installing {', '.join(packages)}")
         print("      ✓ Core dependencies installed")
     except Exception as e:
         print_error(f"Failed to install core dependencies: {e}")
@@ -83,7 +83,7 @@ def step2_install_pytorch():
     cmd = "pip install -q torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118"
 
     try:
-        run_command(cmd, message="  🛠️ Installing torch torchvision torchaudio")
+        run_command(cmd, message="  🛠️ Installing torch, torchvision, torchaudio")
         print("     ✓ PyTorch installed")
 
         # Verify installation
@@ -111,10 +111,10 @@ def step3_install_opencv_yolo():
     ]
     
     cmd = f"pip install -q {' '.join(packages)}"
-    
+
     try:
-        run_command(cmd, message=f"  🛠️ Installing {' '.join(packages)}")
-        print("     ✓ OpenCV and YOLO installed")
+        run_command(cmd, message=f"  🛠️ Installing {', '.join(packages)}")
+        print("     ✓ OpenCV and Ultralytics packages installed")
     except Exception as e:
         print_error(f"Failed to install OpenCV/YOLO: {e}")
         sys.exit(1)
@@ -143,8 +143,8 @@ def step4_install_pose_estimation():
     cmd = f"pip install -q {' '.join(packages)}"
     
     try:
-        run_command(cmd, message=f"  🛠️ Installing {' '.join(packages)}")
-        print("     ✓ Pose estimation libraries installed")
+        run_command(cmd, message=f"  🛠️ Installing {', '.join(packages)}")
+        print(f"     ✓ Installed: {', '.join(packages)}")
     except Exception as e:
         print_error(f"Failed to install pose estimation libraries: {e}")
         sys.exit(1)
@@ -165,9 +165,9 @@ def step5_install_tracking():
     ]
     
     cmd = f"pip install -q {' '.join(packages)}"
-    
+
     try:
-        run_command(cmd, message=f"  🛠️ Installing {' '.join(packages)}")
+        run_command(cmd, message=f"  🛠️ Installing {', '.join(packages)}")
         print("      ✓ Tracking libraries installed")
     except Exception as e:
         print_error(f"Failed to install tracking libraries: {e}")
@@ -189,9 +189,9 @@ def step6_install_motionagformer_deps():
     ]
     
     cmd = f"pip install -q {' '.join(packages)}"
-    
+
     try:
-        run_command(cmd, message=f"  🛠️ Installing {' '.join(packages)}")
+        run_command(cmd, message=f"  🛠️ Installing {', '.join(packages)}")
         print("      ✓ MotionAGFormer dependencies installed")
     except Exception as e:
         print(f"⚠ Some MotionAGFormer dependencies failed: {e}")
