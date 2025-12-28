@@ -60,7 +60,6 @@ def create_model_directories(models, base_dir):
         os.makedirs(d, exist_ok=True)
     
     print(f"  {COLOR_GREEN}✓{COLOR_RESET} Creating directory structure for models")
-    print()
 
 
 def download_from_github(url, destination, size_mb, model_name):
@@ -133,14 +132,15 @@ def fetch_model(model, preferred_source, base_dir):
     size_mb = model['size_mb']
     
     # Check if already exists
+    # Check if already exists
     if check_file_exists(destination, quiet=True):
         file_size_bytes = os.path.getsize(destination)
         file_size_mb = file_size_bytes / (1024 * 1024)
         print(f"  {COLOR_GREEN}✔️{COLOR_RESET} {name} already exists: {destination} ({file_size_mb:.1f} MB)")
+        print("  " + "─" * 65 + "\n")
         return True
     
     print(f"  ⚠️ {name} not found")
-    start = time.time()
     
     success = False
     
@@ -163,15 +163,15 @@ def fetch_model(model, preferred_source, base_dir):
             if VERBOSE:
                 print(f"     Falling back to Drive")
             success = copy_from_drive(fallback_location, destination, name)
-    
     if success:
         elapsed = time.time() - start
         print(f"     ⏱️ Time taken: {elapsed:.2f}s")
-        print()
+        print("  " + "─" * 65 + "\n")
         return True
     else:
         print_error(f"Failed to fetch {name} from both sources")
-        print()
+        print("  " + "─" * 65 + "\n")
+        return False
         return False
 
 
@@ -198,10 +198,12 @@ def main():
     print(f"  📋 Loading configuration from: models.yaml")
     print(f"  🎯 Preferred source: {preferred_source.upper()}")
     print(f"  📂 Destination folder: {base_dir}")
-    print(f"  📦 Total models to fetch: {len(models)}\n")
+    print(f"  📦 Total models to fetch: {len(models)}")
+    print("  " + "─" * 65 + "\n")
     
     # Create directories
     create_model_directories(models, base_dir)
+    print("  " + "─" * 65 + "\n")
     
     # Fetch each model
     success_count = 0
@@ -210,7 +212,6 @@ def main():
     try:
         for i, model in enumerate(models, 1):
             print(f"  [{i}/{len(models)}] Processing: {model['name']}")
-            print("  " + "─" * 65)
             
             if fetch_model(model, preferred_source, base_dir):
                 success_count += 1
