@@ -51,7 +51,6 @@ def print_info(text):
 def run_command(cmd, message=None, allow_failure=False):
     """Execute a shell command with optional message"""
     if message:
-        print()
         print(message)
     
     result = subprocess.run(
@@ -124,7 +123,7 @@ def install_library_group(group, config, gpu_available):
     print_header(f"STEP 1.{sequence}: Install {name}")
     
     if description:
-        print(f"  {description}\n")
+        print(f"  {description}")
     
     # Build package list
     package_list = []
