@@ -231,9 +231,14 @@ def step7_create_directories():
 
 def main():
     """Main execution function"""
-    # Top header with rocket emoji (yellow)
-    print_header("🚀 STEP 1: Install Libraries and Dependencies", color=COLOR_YELLOW)
-    
+    import time
+    start_time = time.time()
+
+    # Top header with rocket emoji (yellow) - left aligned
+    print("\n" + "=" * 70)
+    print(f"{COLOR_YELLOW}🚀 STEP 1: Install Libraries and Dependencies{COLOR_RESET}")
+    print("=" * 70 + "\n")
+
     print("   This script will install all required Python packages.")
     print(f"   Repository root: {REPO_ROOT}")
     print(f"   Models directory: {MODELS_DIR}")
@@ -248,10 +253,13 @@ def main():
         step6_install_motionagformer_deps()
         step7_create_directories()
         
-        # Final success message (yellow) with check emoji
+        # Final success message (yellow) with check emoji and timing
+        total_time = time.time() - start_time
+        print("\n" + "=" * 70)
         print(f"{COLOR_YELLOW}✅ SUCCESS: All libraries and dependencies installed successfully!{COLOR_RESET}")
-        print(f"{COLOR_RESET}⏱️ TOTAL TIME TAKEN: <...>{COLOR_RESET}")
-        print("\n🛠️ Next steps to try:")
+        print(f"⏱️ TOTAL TIME TAKEN: {total_time:.2f}s")
+        print("=" * 70 + "\n")
+        print("🛠️ Next steps to try:")
         print("    ✓ python step2_install_models.py   # Download model files")
         print("    ✓ python step3_pull_demodata.py    # Setup demo data")
         print("    ✓ python step4_verify_envt.py      # Verify installation")
