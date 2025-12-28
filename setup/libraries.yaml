@@ -23,7 +23,7 @@ global_settings:
 library_groups:
   - name: "Core Dependencies"
     sequence: 1
-    description: "Essential Python packages for scientific computing and data handling"
+    description: "📌 Essential Python packages for scientific computing and data handling"
     packages:
       - package_name: "numpy"
         version: ""
@@ -48,7 +48,7 @@ library_groups:
 
   - name: "PyTorch with CUDA"
     sequence: 2
-    description: "PyTorch deep learning framework with CUDA support"
+    description: "📌 PyTorch deep learning framework with CUDA support"
     requires_index_url: true
     packages:
       - package_name: "torch"
@@ -62,7 +62,7 @@ library_groups:
 
   - name: "OpenCV and YOLO"
     sequence: 3
-    description: "Computer vision libraries and object detection"
+    description: "📌 Computer vision libraries and object detection"
     packages:
       - package_name: "opencv-python"
         version: ""
@@ -75,7 +75,7 @@ library_groups:
 
   - name: "Pose Estimation Libraries"
     sequence: 4
-    description: "ONNX Runtime for pose estimation models"
+    description: "📌 ONNX Runtime for pose estimation models"
     gpu_aware: true
     packages:
       - package_name: "onnx"
