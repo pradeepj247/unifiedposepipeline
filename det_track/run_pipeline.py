@@ -110,6 +110,23 @@ def run_stage(stage_name, stage_script, config_path, verbose=False):
     return True
 
 
+def check_stage_outputs_exist(config, stage_key):
+    """Check if stage output files already exist"""
+    stage_config = config.get(stage_key, {})
+    output_config = stage_config.get('output', {})
+    
+    if not output_config:
+        return False
+    
+    # Check all output files
+    for key, filepath in output_config.items():
+        if isinstance(filepath, str):
+            if not Path(filepath).exists():
+                return False
+    
+    return True
+
+
 def run_pipeline(config_path, stages_to_run=None, verbose=False):
     """Run the full pipeline"""
     
@@ -155,6 +172,11 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False):
     pipeline_start = time.time()
     
     for stage_name, stage_script, stage_key in stages:
+        # Check if stage outputs already exist
+        if check_stage_outputs_exist(config, stage_key):
+            print(f"\n⏭️  Skipping {stage_name} (outputs already exist)")
+            continue
+        
         # Get script path (relative to this orchestrator)
         script_dir = Path(__file__).parent
         script_path = script_dir / stage_script

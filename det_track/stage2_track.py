@@ -231,7 +231,7 @@ def run_tracking(config):
         
         # Update tracker (pass actual frame for context)
         try:
-            tracked = tracker.update(dets_for_tracker, frame)  # Pass actual frame
+            tracked = tracker.update(dets_for_tracker, None)  # ByteTrack motion-only, no frame needed
             
             # Debug first tracking result
             if debug_first_frame and len(dets_for_tracker) > 0:
@@ -266,8 +266,6 @@ def run_tracking(config):
         pbar.update(1)
     
     pbar.close()
-    if cap is not None:
-        cap.release()
     
     t_end = time.time()
     total_time = t_end - t_start
