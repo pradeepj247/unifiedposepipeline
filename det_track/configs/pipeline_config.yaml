@@ -184,7 +184,7 @@ stage5_rank:
     weights:
       duration: 0.4       # Longest presence in video
       coverage: 0.3       # Percentage of frames covered
-      center_bias: 0.2    # Proximity to frame center
+      center: 0.2         # Proximity to frame center
       smoothness: 0.1     # Motion stability (less jitter)
     
     # Manual selection (used if method = manual)

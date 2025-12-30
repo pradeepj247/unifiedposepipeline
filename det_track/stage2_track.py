@@ -119,6 +119,10 @@ def init_bytetrack_tracker(params, frame_rate, verbose=False):
     except ImportError:
         raise ImportError("boxmot not found. Install with: pip install boxmot")
     
+    # Suppress BoxMOT's verbose logging
+    import logging
+    logging.getLogger('boxmot').setLevel(logging.WARNING)
+    
     if verbose:
         print(f"  ✅ Initializing ByteTrack tracker")
         print(f"     track_thresh: {params.get('track_thresh', 0.25)}")
