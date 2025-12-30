@@ -185,6 +185,7 @@ def run_tracking(config):
     
     pbar = tqdm(total=num_frames, desc="Tracking")
     
+    debug_first_frame = True
     for frame_id in sorted(unique_frames):
         frame_data = detections_by_frame[frame_id]
         
@@ -197,6 +198,14 @@ def run_tracking(config):
             ])
         else:
             dets_for_tracker = np.empty((0, 6))
+        
+        # Debug first frame
+        if debug_first_frame and len(dets_for_tracker) > 0:
+            print(f"\n🔍 DEBUG - First frame with detections (frame {frame_id}):")
+            print(f"   Shape: {dets_for_tracker.shape}")
+            print(f"   First detection: {dets_for_tracker[0]}")
+            print(f"   Bbox format: [x1={dets_for_tracker[0,0]:.1f}, y1={dets_for_tracker[0,1]:.1f}, x2={dets_for_tracker[0,2]:.1f}, y2={dets_for_tracker[0,3]:.1f}, conf={dets_for_tracker[0,4]:.2f}, cls={dets_for_tracker[0,5]:.0f}]")
+            debug_first_frame = False
         
         # Update tracker (no frame image needed!)
         try:

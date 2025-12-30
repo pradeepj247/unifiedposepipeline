@@ -156,7 +156,7 @@ stage4b_group_canonical:
     method: heuristic  # Options: heuristic, clustering, hybrid
     
     # Heuristic rules
-    heuristic_rules:
+    heuristic_criteria:
       max_temporal_gap: 30
       max_spatial_distance: 200
       area_ratio_range: [0.7, 1.3]
