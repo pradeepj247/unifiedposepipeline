@@ -136,6 +136,7 @@ stage4a_reid_recovery:
   input:
     video_path: ${demo_data_dir}/videos/dance.mp4
     tracklets_file: ${outputs_dir}/${current_video}/tracklets_raw.npz
+    tracklet_stats_file: ${outputs_dir}/${current_video}/tracklet_stats.npz
     candidates_file: ${outputs_dir}/${current_video}/reid_candidates.json
   
   output:
