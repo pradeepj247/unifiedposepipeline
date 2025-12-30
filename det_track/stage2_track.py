@@ -112,7 +112,7 @@ def reconstruct_detections_per_frame(detections_data):
     return detections_by_frame, unique_frames
 
 
-def init_bytetrack_tracker(params, verbose=False):
+def init_bytetrack_tracker(params, frame_rate, verbose=False):
     """Initialize ByteTrack tracker"""
     try:
         from boxmot import ByteTrack
@@ -121,20 +121,16 @@ def init_bytetrack_tracker(params, verbose=False):
     
     if verbose:
         print(f"  ✅ Initializing ByteTrack tracker")
-        print(f"     det_thresh: {params.get('det_thresh', 0.3)}")
-        print(f"     track_thresh: {params.get('track_thresh', 0.45)}")
+        print(f"     track_thresh: {params.get('track_thresh', 0.25)}")
+        print(f"     track_buffer: {params.get('track_buffer', 30)}")
         print(f"     match_thresh: {params.get('match_thresh', 0.8)}")
-        print(f"     max_age: {params.get('max_age', 30)}")
+        print(f"     frame_rate: {frame_rate}")
     
     tracker = ByteTrack(
-        det_thresh=params.get('det_thresh', 0.3),
-        track_thresh=params.get('track_thresh', 0.45),
+        track_thresh=params.get('track_thresh', 0.25),
+        track_buffer=params.get('track_buffer', 30),
         match_thresh=params.get('match_thresh', 0.8),
-        max_age=params.get('max_age', 30),
-        min_hits=params.get('min_hits', 3),
-        iou_threshold=params.get('iou_threshold', 0.3),
-        device='cpu',  # ByteTrack runs on CPU (motion-only)
-        half=False
+        frame_rate=frame_rate
     )
     
     return tracker
@@ -154,11 +150,22 @@ def run_tracking(config):
     
     detections_file = input_config['detections_file']
     tracklets_file = output_config['tracklets_file']
+    video_path = input_config.get('video_path', None)
     
     # Print header
     print(f"\n{'='*70}")
     print(f"📍 STAGE 2: TRACKING (BYTETRACK OFFLINE)")
     print(f"{'='*70}\n")
+    
+    # Get video metadata for frame_rate
+    frame_rate = 30  # default
+    if video_path:
+        import cv2
+        cap = cv2.VideoCapture(video_path)
+        frame_rate = cap.get(cv2.CAP_PROP_FPS)
+        cap.release()
+        if verbose:
+            print(f"📹 Video frame rate: {frame_rate:.2f} fps")
     
     # Load detections
     print(f"📂 Loading detections: {detections_file}")
@@ -175,7 +182,7 @@ def run_tracking(config):
     
     # Initialize tracker
     print(f"\n🛠️  Initializing ByteTrack tracker...")
-    tracker = init_bytetrack_tracker(params, verbose)
+    tracker = init_bytetrack_tracker(params, frame_rate, verbose)
     
     # Track
     print(f"\n⚡ Running ByteTrack (offline mode)...")

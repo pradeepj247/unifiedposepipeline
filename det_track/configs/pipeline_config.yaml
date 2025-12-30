@@ -71,14 +71,12 @@ stage2_track:
     type: bytetrack  # Only bytetrack/ocsort supported for offline mode
   
   params:
-    det_thresh: 0.3        # Minimum detection confidence
-    track_thresh: 0.45     # Confidence to start new track
-    match_thresh: 0.8      # IoU threshold for matching
-    max_age: 30            # Frames to keep lost track alive
-    min_hits: 3            # Minimum detections before outputting track
-    iou_threshold: 0.3     # NMS IoU threshold
+    track_thresh: 0.25     # Confidence threshold for tracking
+    track_buffer: 30       # Buffer size for lost tracks (frames)
+    match_thresh: 0.8      # IOU threshold for matching
   
   input:
+    video_path: ${demo_data_dir}/videos/dance.mp4
     detections_file: ${outputs_dir}/${current_video}/detections_raw.npz
   
   output:
