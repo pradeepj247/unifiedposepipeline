@@ -1,0 +1,209 @@
+# Detection & Tracking Pipeline Configuration
+# Multi-stage pipeline for person detection, tracking, and identity resolution
+
+# ============================================================================
+# Global Path Variables (Single Source of Truth)
+# ============================================================================
+global:
+  # Repository root - change this for different environments
+  repo_root: /content/unifiedposepipeline  # Colab
+  # repo_root: D:/trials/unifiedpipeline/newrepo  # Windows (uncomment for local)
+  
+  # Derived paths (use ${variable} syntax)
+  models_dir: ${repo_root}/models
+  demo_data_dir: ${repo_root}/demo_data
+  outputs_dir: ${demo_data_dir}/outputs
+  
+  # Current video being processed (used for per-video output directories)
+  current_video: dance
+
+# ============================================================================
+# Pipeline Stage Control
+# ============================================================================
+pipeline:
+  stages:
+    stage1_detect: true       # YOLO detection
+    stage2_track: true        # ByteTrack offline tracking
+    stage3_analyze: true      # Tracklet statistics
+    stage4a_reid_recovery: true   # Selective ReID recovery (optional)
+    stage4b_group_canonical: true # Geometric grouping (optional)
+    stage5_rank: true         # Primary person selection
+  
+  # Data flow options
+  skip_if_exists: false  # Skip stages if output files already exist
+  cleanup_intermediates: false  # Delete intermediate NPZ files after completion
+
+# ============================================================================
+# Stage 1: Detection
+# ============================================================================
+stage1_detect:
+  detector:
+    type: yolo
+    model_path: ${models_dir}/yolo/yolov8s.pt
+    confidence: 0.3
+    device: cuda
+    detect_only_humans: true
+  
+  detection_limit:
+    method: hybrid  # Options: top_n, confidence, hybrid
+    max_count: 15   # Maximum detections per frame
+    min_confidence: 0.3  # Minimum confidence threshold
+  
+  processing:
+    processing_resolution: [1280, 720]  # Downscale for speed (null = original)
+    batch_size: 1
+  
+  input:
+    video_path: ${demo_data_dir}/videos/dance.mp4
+    max_frames: 0  # 0 = all frames
+  
+  output:
+    detections_file: ${outputs_dir}/${current_video}/detections_raw.npz
+  
+  advanced:
+    verbose: false
+
+# ============================================================================
+# Stage 2: Tracking (ByteTrack Offline)
+# ============================================================================
+stage2_track:
+  tracker:
+    type: bytetrack  # Only bytetrack/ocsort supported for offline mode
+  
+  params:
+    det_thresh: 0.3        # Minimum detection confidence
+    track_thresh: 0.45     # Confidence to start new track
+    match_thresh: 0.8      # IoU threshold for matching
+    max_age: 30            # Frames to keep lost track alive
+    min_hits: 3            # Minimum detections before outputting track
+    iou_threshold: 0.3     # NMS IoU threshold
+  
+  input:
+    detections_file: ${outputs_dir}/${current_video}/detections_raw.npz
+  
+  output:
+    tracklets_file: ${outputs_dir}/${current_video}/tracklets_raw.npz
+  
+  advanced:
+    verbose: false
+
+# ============================================================================
+# Stage 3: Tracklet Analysis
+# ============================================================================
+stage3_analyze:
+  analysis:
+    compute_statistics: true  # Temporal, spatial, motion stats
+    identify_candidates: true # Find suspicious tracklet pairs for ReID
+  
+  candidate_criteria:
+    max_temporal_gap: 50       # Frames between tracklet end/start
+    max_spatial_distance: 300  # Pixels between last/first bbox centers
+    area_ratio_range: [0.6, 1.4]  # Min/max area ratio for size consistency
+  
+  input:
+    tracklets_file: ${outputs_dir}/${current_video}/tracklets_raw.npz
+  
+  output:
+    tracklet_stats_file: ${outputs_dir}/${current_video}/tracklet_stats.npz
+    candidates_file: ${outputs_dir}/${current_video}/reid_candidates.json
+  
+  advanced:
+    verbose: false
+
+# ============================================================================
+# Stage 4a: Selective ReID Recovery (OPTIONAL - Toggle for benchmarking)
+# ============================================================================
+stage4a_reid_recovery:
+  enabled: true  # Set false to skip ReID recovery (faster, less accurate)
+  
+  reid:
+    model_path: ${models_dir}/reid/osnet_x0_25_msmt17.pt  # Fast model
+    device: cuda
+    batch_size: 8  # Process multiple crops at once
+  
+  matching:
+    similarity_threshold: 0.75  # Cosine similarity threshold for merging
+    adaptive_threshold: true    # Adjust threshold based on temporal gap
+    adaptive_thresholds:
+      gap_0_10: 0.65   # Very close in time (lenient)
+      gap_10_30: 0.75  # Normal gap (standard)
+      gap_30_50: 0.85  # Large gap (strict)
+  
+  extraction:
+    frames_per_tracklet: 1  # How many frames to sample (1 = last/first only)
+    crop_padding: 10        # Pixels to add around bbox
+  
+  input:
+    video_path: ${demo_data_dir}/videos/dance.mp4
+    tracklets_file: ${outputs_dir}/${current_video}/tracklets_raw.npz
+    candidates_file: ${outputs_dir}/${current_video}/reid_candidates.json
+  
+  output:
+    tracklets_file: ${outputs_dir}/${current_video}/tracklets_recovered.npz
+    merge_log: ${outputs_dir}/${current_video}/reid_merge_log.json
+  
+  advanced:
+    verbose: false
+
+# ============================================================================
+# Stage 4b: Canonical Person Grouping (OPTIONAL - Toggle for benchmarking)
+# ============================================================================
+stage4b_group_canonical:
+  enabled: true  # Set false to skip geometric grouping
+  
+  grouping:
+    method: heuristic  # Options: heuristic, clustering, hybrid
+    
+    # Heuristic rules
+    heuristic_rules:
+      max_temporal_gap: 30
+      max_spatial_distance: 200
+      area_ratio_range: [0.7, 1.3]
+      max_velocity_diff: 50  # pixels/frame
+  
+  input:
+    # Auto-resolved based on stage4a.enabled
+    tracklets_file: auto
+    tracklet_stats_file: ${outputs_dir}/${current_video}/tracklet_stats.npz
+  
+  output:
+    canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
+  
+  advanced:
+    verbose: false
+
+# ============================================================================
+# Stage 5: Ranking and Primary Person Selection
+# ============================================================================
+stage5_rank:
+  ranking:
+    method: auto  # Options: auto, manual
+    
+    # Auto-ranking weights
+    weights:
+      duration: 0.4       # Longest presence in video
+      coverage: 0.3       # Percentage of frames covered
+      center_bias: 0.2    # Proximity to frame center
+      smoothness: 0.1     # Motion stability (less jitter)
+    
+    # Manual selection (used if method = manual)
+    manual_selection:
+      canonical_id: null  # e.g., "A"
+  
+  input:
+    canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
+  
+  output:
+    primary_person_file: ${outputs_dir}/${current_video}/primary_person.npz
+    ranking_report: ${outputs_dir}/${current_video}/ranking_report.json
+  
+  advanced:
+    verbose: false
+
+# ============================================================================
+# Advanced Settings
+# ============================================================================
+advanced:
+  verbose: false  # Global verbose flag
+  save_visualizations: false  # Generate debug videos (slow)
+  visualization_output: ${outputs_dir}/${current_video}/visualizations/

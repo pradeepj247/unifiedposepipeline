@@ -1,0 +1,285 @@
+#!/usr/bin/env python3
+"""
+Stage 2: Tracking (ByteTrack Offline)
+
+Runs ByteTrack tracker on pre-stored detections from Stage 1.
+Motion-only tracking (no video frames needed).
+
+Usage:
+    python stage2_track.py --config configs/pipeline_config.yaml
+"""
+
+import argparse
+import yaml
+import numpy as np
+import time
+import re
+import sys
+from pathlib import Path
+from tqdm import tqdm
+
+
+def resolve_path_variables(config):
+    """Recursively resolve ${variable} in config"""
+    global_vars = config.get('global', {})
+    
+    def resolve_string(s):
+        return re.sub(
+            r'\$\{(\w+)\}',
+            lambda m: str(global_vars.get(m.group(1), m.group(0))),
+            s
+        )
+    
+    def resolve_recursive(obj):
+        if isinstance(obj, dict):
+            return {k: resolve_recursive(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [resolve_recursive(v) for v in obj]
+        elif isinstance(obj, str):
+            return resolve_string(obj)
+        return obj
+    
+    return resolve_recursive(config)
+
+
+def load_config(config_path):
+    """Load and resolve YAML configuration"""
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    return resolve_path_variables(config)
+
+
+def load_detections(detections_file):
+    """Load detections from NPZ file"""
+    data = np.load(detections_file)
+    return {
+        'frame_numbers': data['frame_numbers'],
+        'bboxes': data['bboxes'],
+        'confidences': data['confidences'],
+        'classes': data['classes'],
+        'num_detections_per_frame': data['num_detections_per_frame']
+    }
+
+
+def reconstruct_detections_per_frame(detections_data):
+    """Reconstruct per-frame detections from flat arrays"""
+    frame_numbers = detections_data['frame_numbers']
+    bboxes = detections_data['bboxes']
+    confidences = detections_data['confidences']
+    classes = detections_data['classes']
+    
+    # Get unique frame numbers
+    unique_frames = np.unique(frame_numbers)
+    
+    detections_by_frame = {}
+    for frame_id in unique_frames:
+        mask = frame_numbers == frame_id
+        detections_by_frame[frame_id] = {
+            'bboxes': bboxes[mask],
+            'confidences': confidences[mask],
+            'classes': classes[mask]
+        }
+    
+    return detections_by_frame, unique_frames
+
+
+def init_bytetrack_tracker(params, verbose=False):
+    """Initialize ByteTrack tracker"""
+    try:
+        from boxmot import ByteTrack
+    except ImportError:
+        raise ImportError("boxmot not found. Install with: pip install boxmot")
+    
+    if verbose:
+        print(f"  ✅ Initializing ByteTrack tracker")
+        print(f"     det_thresh: {params.get('det_thresh', 0.3)}")
+        print(f"     track_thresh: {params.get('track_thresh', 0.45)}")
+        print(f"     match_thresh: {params.get('match_thresh', 0.8)}")
+        print(f"     max_age: {params.get('max_age', 30)}")
+    
+    tracker = ByteTrack(
+        det_thresh=params.get('det_thresh', 0.3),
+        track_thresh=params.get('track_thresh', 0.45),
+        match_thresh=params.get('match_thresh', 0.8),
+        max_age=params.get('max_age', 30),
+        min_hits=params.get('min_hits', 3),
+        iou_threshold=params.get('iou_threshold', 0.3),
+        device='cpu',  # ByteTrack runs on CPU (motion-only)
+        half=False
+    )
+    
+    return tracker
+
+
+def run_tracking(config):
+    """Run Stage 2: Tracking"""
+    
+    stage_config = config['stage2_track']
+    verbose = stage_config.get('advanced', {}).get('verbose', False)
+    
+    # Extract configuration
+    tracker_config = stage_config['tracker']
+    params = stage_config['params']
+    input_config = stage_config['input']
+    output_config = stage_config['output']
+    
+    detections_file = input_config['detections_file']
+    tracklets_file = output_config['tracklets_file']
+    
+    # Print header
+    print(f"\n{'='*70}")
+    print(f"📍 STAGE 2: TRACKING (BYTETRACK OFFLINE)")
+    print(f"{'='*70}\n")
+    
+    # Load detections
+    print(f"📂 Loading detections: {detections_file}")
+    detections_data = load_detections(detections_file)
+    
+    total_detections = len(detections_data['frame_numbers'])
+    print(f"  ✅ Loaded {total_detections} detections")
+    
+    # Reconstruct per-frame detections
+    print(f"\n🔄 Reconstructing per-frame detections...")
+    detections_by_frame, unique_frames = reconstruct_detections_per_frame(detections_data)
+    num_frames = len(unique_frames)
+    print(f"  ✅ {num_frames} frames with detections")
+    
+    # Initialize tracker
+    print(f"\n🛠️  Initializing ByteTrack tracker...")
+    tracker = init_bytetrack_tracker(params, verbose)
+    
+    # Track
+    print(f"\n⚡ Running ByteTrack (offline mode)...")
+    t_start = time.time()
+    
+    tracklets_dict = {}  # {tracklet_id: {'frame_numbers': [], 'bboxes': [], 'confidences': []}}
+    
+    pbar = tqdm(total=num_frames, desc="Tracking")
+    
+    for frame_id in sorted(unique_frames):
+        frame_data = detections_by_frame[frame_id]
+        
+        # Prepare detections for tracker: (N, 6) = [x1, y1, x2, y2, conf, cls]
+        if len(frame_data['bboxes']) > 0:
+            dets_for_tracker = np.column_stack([
+                frame_data['bboxes'],
+                frame_data['confidences'],
+                frame_data['classes']
+            ])
+        else:
+            dets_for_tracker = np.empty((0, 6))
+        
+        # Update tracker (no frame image needed!)
+        try:
+            tracked = tracker.update(dets_for_tracker, None)  # frame=None for offline
+            
+            # Store tracklets
+            # tracked: (N, 8) = [x1, y1, x2, y2, track_id, conf, cls, det_ind]
+            if len(tracked) > 0:
+                for track in tracked:
+                    track_id = int(track[4])
+                    bbox = track[:4].astype(np.float32)
+                    conf = float(track[5])
+                    
+                    if track_id not in tracklets_dict:
+                        tracklets_dict[track_id] = {
+                            'frame_numbers': [],
+                            'bboxes': [],
+                            'confidences': []
+                        }
+                    
+                    tracklets_dict[track_id]['frame_numbers'].append(int(frame_id))
+                    tracklets_dict[track_id]['bboxes'].append(bbox)
+                    tracklets_dict[track_id]['confidences'].append(conf)
+        
+        except Exception as e:
+            # Tracker error - skip this frame
+            if verbose:
+                print(f"\n⚠️  Tracker error at frame {frame_id}: {e}")
+        
+        pbar.update(1)
+    
+    pbar.close()
+    
+    t_end = time.time()
+    total_time = t_end - t_start
+    tracking_fps = num_frames / total_time if total_time > 0 else 0
+    
+    # Convert tracklets to list format
+    tracklets = []
+    for track_id, data in tracklets_dict.items():
+        tracklets.append({
+            'tracklet_id': track_id,
+            'frame_numbers': np.array(data['frame_numbers'], dtype=np.int64),
+            'bboxes': np.array(data['bboxes'], dtype=np.float32),
+            'confidences': np.array(data['confidences'], dtype=np.float32)
+        })
+    
+    # Sort by tracklet ID
+    tracklets.sort(key=lambda x: x['tracklet_id'])
+    
+    # Summary
+    num_tracklets = len(tracklets)
+    total_tracked_detections = sum(len(t['frame_numbers']) for t in tracklets)
+    
+    print(f"\n✅ Tracking complete!")
+    print(f"  Frames processed: {num_frames}")
+    print(f"  Unique tracklets: {num_tracklets}")
+    print(f"  Total tracked detections: {total_tracked_detections}")
+    print(f"  Tracking FPS: {tracking_fps:.1f}")
+    print(f"  Time taken: {total_time:.2f}s")
+    
+    if verbose and num_tracklets > 0:
+        print(f"\n📊 Tracklet Statistics:")
+        for t in tracklets[:10]:  # Show first 10
+            duration = len(t['frame_numbers'])
+            start_frame = t['frame_numbers'][0]
+            end_frame = t['frame_numbers'][-1]
+            print(f"  Tracklet {t['tracklet_id']}: {duration} frames "
+                  f"(frames {start_frame}-{end_frame})")
+        if num_tracklets > 10:
+            print(f"  ... and {num_tracklets - 10} more")
+    
+    # Save NPZ
+    print(f"\n💾 Saving tracklets...")
+    output_path = Path(tracklets_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Save as structured array
+    np.savez_compressed(
+        output_path,
+        tracklets=np.array(tracklets, dtype=object)
+    )
+    
+    print(f"  ✅ Saved: {output_path}")
+    print(f"  Format: {num_tracklets} tracklets")
+    
+    return {
+        'tracklets_file': str(output_path),
+        'num_tracklets': num_tracklets,
+        'num_frames': num_frames
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Stage 2: Tracking')
+    parser.add_argument('--config', type=str, required=True,
+                       help='Path to pipeline configuration YAML')
+    args = parser.parse_args()
+    
+    # Load config
+    config = load_config(args.config)
+    
+    # Check if stage is enabled
+    if not config['pipeline']['stages']['stage2_track']:
+        print("⏭️  Stage 2 is disabled in config")
+        return
+    
+    # Run tracking
+    run_tracking(config)
+    
+    print(f"\n{'='*70}\n")
+
+
+if __name__ == '__main__':
+    main()
