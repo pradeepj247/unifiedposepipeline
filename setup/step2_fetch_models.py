@@ -142,6 +142,9 @@ def fetch_model(model, preferred_source, base_dir):
     
     print(f"  ⚠️ {name} not found")
     
+    # Start timing
+    start = time.time()
+    
     success = False
     
     # Try preferred source first
@@ -171,7 +174,6 @@ def fetch_model(model, preferred_source, base_dir):
     else:
         print_error(f"Failed to fetch {name} from both sources")
         print("  " + "─" * 65 + "\n")
-        return False
         return False
 
 
