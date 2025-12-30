@@ -214,9 +214,9 @@ def run_tracking(config):
         # Prepare detections for tracker: (N, 6) = [x1, y1, x2, y2, conf, cls]
         if len(frame_data['bboxes']) > 0:
             dets_for_tracker = np.column_stack([
-                frame_data['bboxes'],
-                frame_data['confidences'].reshape(-1, 1),
-                frame_data['classes'].reshape(-1, 1)
+                frame_data['bboxes'],       # (N, 4)
+                frame_data['confidences'],  # (N,)
+                frame_data['classes']       # (N,)
             ])
         else:
             dets_for_tracker = np.empty((0, 6))
