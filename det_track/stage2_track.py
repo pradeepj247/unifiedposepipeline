@@ -188,6 +188,13 @@ def run_tracking(config):
     print(f"\n⚡ Running ByteTrack (offline mode)...")
     t_start = time.time()
     
+    # Get video for image frames (ByteTrack might need actual frame dimensions)
+    import cv2
+    video_path = input_config.get('video_path', None)
+    cap = None
+    if video_path:
+        cap = cv2.VideoCapture(video_path)
+    
     tracklets_dict = {}  # {tracklet_id: {'frame_numbers': [], 'bboxes': [], 'confidences': []}}
     
     pbar = tqdm(total=num_frames, desc="Tracking")
@@ -195,6 +202,14 @@ def run_tracking(config):
     debug_first_frame = True
     for frame_id in sorted(unique_frames):
         frame_data = detections_by_frame[frame_id]
+        
+        # Read actual frame if video available (ByteTrack may need it for context)
+        frame = None
+        if cap is not None:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
+            ret, frame = cap.read()
+            if not ret:
+                frame = None
         
         # Prepare detections for tracker: (N, 6) = [x1, y1, x2, y2, conf, cls]
         if len(frame_data['bboxes']) > 0:
@@ -214,9 +229,15 @@ def run_tracking(config):
             print(f"   Bbox format: [x1={dets_for_tracker[0,0]:.1f}, y1={dets_for_tracker[0,1]:.1f}, x2={dets_for_tracker[0,2]:.1f}, y2={dets_for_tracker[0,3]:.1f}, conf={dets_for_tracker[0,4]:.2f}, cls={dets_for_tracker[0,5]:.0f}]")
             debug_first_frame = False
         
-        # Update tracker (no frame image needed!)
+        # Update tracker (pass actual frame for context)
         try:
-            tracked = tracker.update(dets_for_tracker, None)  # frame=None for offline
+            tracked = tracker.update(dets_for_tracker, frame)  # Pass actual frame
+            
+            # Debug first tracking result
+            if debug_first_frame and len(dets_for_tracker) > 0:
+                print(f"   Tracker returned: shape={tracked.shape if len(tracked) > 0 else 'empty'}, count={len(tracked)}")
+                if len(tracked) > 0:
+                    print(f"   First track: {tracked[0]}")
             
             # Store tracklets
             # tracked: (N, 8) = [x1, y1, x2, y2, track_id, conf, cls, det_ind]
@@ -245,6 +266,8 @@ def run_tracking(config):
         pbar.update(1)
     
     pbar.close()
+    if cap is not None:
+        cap.release()
     
     t_end = time.time()
     total_time = t_end - t_start
