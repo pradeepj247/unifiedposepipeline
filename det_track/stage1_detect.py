@@ -48,7 +48,15 @@ def load_config(config_path):
     """Load and resolve YAML configuration"""
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
-    return resolve_path_variables(config)
+    
+    # Check if global section exists
+    if 'global' not in config:
+        raise ValueError("Config file missing 'global' section")
+    
+    # Resolve path variables
+    resolved_config = resolve_path_variables(config)
+    
+    return resolved_config
 
 
 def load_yolo_detector(model_path, device='cuda', verbose=False):

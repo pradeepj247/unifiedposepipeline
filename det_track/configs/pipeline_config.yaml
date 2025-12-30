@@ -139,8 +139,8 @@ stage4a_reid_recovery:
     candidates_file: ${outputs_dir}/${current_video}/reid_candidates.json
   
   output:
-    tracklets_file: ${outputs_dir}/${current_video}/tracklets_recovered.npz
-    merge_log: ${outputs_dir}/${current_video}/reid_merge_log.json
+    recovered_tracklets_file: ${outputs_dir}/${current_video}/tracklets_recovered.npz
+    merge_log_file: ${outputs_dir}/${current_video}/reid_merge_log.json
   
   advanced:
     verbose: false
@@ -163,11 +163,13 @@ stage4b_group_canonical:
   
   input:
     # Auto-resolved based on stage4a.enabled
-    tracklets_file: auto
+    recovered_tracklets_file: ${outputs_dir}/${current_video}/tracklets_recovered.npz
+    tracklets_raw_file: ${outputs_dir}/${current_video}/tracklets_raw.npz
     tracklet_stats_file: ${outputs_dir}/${current_video}/tracklet_stats.npz
   
   output:
     canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
+    grouping_log_file: ${outputs_dir}/${current_video}/grouping_log.json
   
   advanced:
     verbose: false
@@ -195,7 +197,7 @@ stage5_rank:
   
   output:
     primary_person_file: ${outputs_dir}/${current_video}/primary_person.npz
-    ranking_report: ${outputs_dir}/${current_video}/ranking_report.json
+    ranking_report_file: ${outputs_dir}/${current_video}/ranking_report.json
   
   advanced:
     verbose: false
