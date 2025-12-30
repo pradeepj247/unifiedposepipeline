@@ -93,23 +93,17 @@ def run_stage(stage_name, stage_script, config_path, verbose=False):
     
     t_start = time.time()
     
-    # Run stage script
+    # Run stage script with real-time output streaming
     result = subprocess.run(
-        [sys.executable, stage_script, '--config', config_path],
-        capture_output=True,
+        [sys.executable, '-u', stage_script, '--config', config_path],
+        capture_output=False,  # Stream output directly to console
         text=True
     )
     
     t_end = time.time()
     
-    # Print output
-    if result.stdout:
-        print(result.stdout)
-    
     if result.returncode != 0:
         print(f"❌ {stage_name} failed!")
-        if result.stderr:
-            print(f"Error: {result.stderr}")
         return False
     
     print(f"✅ {stage_name} completed in {t_end - t_start:.2f}s")
