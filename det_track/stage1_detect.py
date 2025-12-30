@@ -53,8 +53,15 @@ def load_config(config_path):
     if 'global' not in config:
         raise ValueError("Config file missing 'global' section")
     
+    # Debug: Print what's in global before resolution
+    print(f"🔍 Debug - repo_root before resolution: {config['global'].get('repo_root', 'NOT FOUND')}")
+    
     # Resolve path variables
     resolved_config = resolve_path_variables(config)
+    
+    # Debug: Print model_path after resolution
+    model_path = resolved_config['stage1_detect']['detector']['model_path']
+    print(f"🔍 Debug - model_path after resolution: {model_path}")
     
     return resolved_config
 
