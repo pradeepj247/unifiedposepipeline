@@ -25,6 +25,33 @@ def resolve_path_variables(config):
     """Recursively resolve ${variable} in config"""
     global_vars = config.get('global', {})
     
+    # First pass: resolve variables within global section itself
+    def resolve_string_once(s, vars_dict):
+        if not isinstance(s, str):
+            return s
+        return re.sub(
+            r'\$\{(\w+)\}',
+            lambda m: str(vars_dict.get(m.group(1), m.group(0))),
+            s
+        )
+    
+    # Resolve global variables iteratively
+    max_iterations = 10
+    for _ in range(max_iterations):
+        resolved_globals = {}
+        changed = False
+        for key, value in global_vars.items():
+            if isinstance(value, str):
+                resolved = resolve_string_once(value, global_vars)
+                resolved_globals[key] = resolved
+                if resolved != value:
+                    changed = True
+            else:
+                resolved_globals[key] = value
+        global_vars = resolved_globals
+        if not changed:
+            break
+    
     def resolve_string(s):
         return re.sub(
             r'\$\{(\w+)\}',
@@ -41,7 +68,9 @@ def resolve_path_variables(config):
             return resolve_string(obj)
         return obj
     
-    return resolve_recursive(config)
+    result = resolve_recursive(config)
+    result['global'] = global_vars
+    return result
 
 
 def load_config(config_path):
