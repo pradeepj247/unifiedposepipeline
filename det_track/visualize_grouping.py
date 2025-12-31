@@ -97,14 +97,16 @@ def load_canonical_persons(persons_file, grouping_log_file):
 
 
 def print_table1_raw_tracklets(tracklets):
-    """Print Table 1: All raw tracklets"""
+    """Print Table 1: All raw tracklets (numbered sequentially)"""
     print("\n" + "="*80)
     print("📊 TABLE 1: RAW TRACKLETS (Before Grouping)")
     print("="*80)
+    print(f"Total: {len(tracklets)} tracklets\n")
     
     table_data = []
-    for t in tracklets:
+    for idx, t in enumerate(tracklets, 1):
         table_data.append([
+            idx,
             t['id'],
             t['appearances'],
             t['start_frame'],
@@ -112,78 +114,146 @@ def print_table1_raw_tracklets(tracklets):
             t['duration']
         ])
     
-    headers = ['Tracklet ID', '# Appearances', 'Start Frame', 'End Frame', 'Duration (frames)']
-    print(tabulate(table_data, headers=headers, tablefmt='grid'))
-    print(f"\nTotal tracklets: {len(tracklets)}")
+    headers = ['#', 'Tracklet ID', 'Appearances', 'Start', 'End', 'Duration']
+    print(tabulate(table_data, headers=headers, tablefmt='simple'))
 
 
 def print_table2_reid_candidates(candidates, tracklets_dict):
     """Print Table 2: ReID merge candidates"""
     print("\n" + "="*80)
-    print("📊 TABLE 2: ReID MERGE CANDIDATES")
+    print("📊 TABLE 2: MERGE CANDIDATES (Temporally Disconnected)")
     print("="*80)
+    print(f"Total: {len(candidates)} candidate pairs\n")
     
     if len(candidates) == 0:
-        print("No ReID candidates found (Stage 4a disabled or no candidates identified)")
+        print("No merge candidates identified.")
         return
     
     table_data = []
-    for c in candidates:
+    for idx, c in enumerate(candidates, 1):
         t1 = tracklets_dict.get(c['tracklet_1'], {})
         t2 = tracklets_dict.get(c['tracklet_2'], {})
         
         table_data.append([
-            f"{c['tracklet_1']} → {c['tracklet_2']}",
-            f"{t1.get('appearances', '?')} → {t2.get('appearances', '?')}",
-            f"{t1.get('end_frame', '?')} → {t2.get('start_frame', '?')}",
+            idx,
+            c['tracklet_1'],
+            c['tracklet_2'],
             c['temporal_gap'],
-            f"{c['spatial_distance']:.1f}",
-            f"{c['area_ratio']:.2f}"
+            f"{c['spatial_distance']:.0f}",
+            f"{c['area_ratio']:.2f}",
+            f"{t1.get('end_frame', '?')} → {t2.get('start_frame', '?')}"
         ])
     
-    headers = ['Tracklet Pair', '# Apps', 'Transition', 'Gap (frames)', 'Distance (px)', 'Area Ratio']
-    print(tabulate(table_data, headers=headers, tablefmt='grid'))
-    print(f"\nTotal candidates: {len(candidates)}")
+    headers = ['#', 'Track 1', 'Track 2', 'Gap', 'Distance', 'Area Ratio', 'Transition']
+    print(tabulate(table_data, headers=headers, tablefmt='simple'))
 
 
-def print_table3_canonical_persons(persons):
-    """Print Table 3: Final canonical persons"""
+def print_table3_merge_results(canonical_persons, candidates):
+    """Print Table 3: Merge results (accepted vs rejected)"""
     print("\n" + "="*80)
-    print("📊 TABLE 3: CANONICAL PERSONS (After Grouping/Merging)")
+    print("📊 TABLE 3: MERGE RESULTS")
     print("="*80)
     
+    # Find which candidates were merged
+    merged_persons = [p for p in canonical_persons if p['num_tracklets'] > 1]
+    
+    # Build set of all merged tracklet IDs
+    all_merged_ids = set()
+    for p in merged_persons:
+        all_merged_ids.update(p['tracklet_ids'])
+    
+    # Check each candidate
+    accepted = []
+    rejected = []
+    
+    for c in candidates:
+        t1, t2 = c['tracklet_1'], c['tracklet_2']
+        # Check if both tracklets ended up in the same person
+        merged_together = False
+        for p in merged_persons:
+            if t1 in p['tracklet_ids'] and t2 in p['tracklet_ids']:
+                merged_together = True
+                accepted.append((c, p['person_id']))
+                break
+        
+        if not merged_together:
+            rejected.append(c)
+    
+    print(f"✅ Accepted: {len(accepted)} merges")
+    print(f"❌ Rejected: {len(rejected)} candidates\n")
+    
+    if accepted:
+        print("ACCEPTED MERGES:")
+        table_data = []
+        for c, person_id in accepted:
+            table_data.append([
+                f"{c['tracklet_1']} + {c['tracklet_2']}",
+                person_id,
+                c['temporal_gap'],
+                f"{c['spatial_distance']:.0f}",
+                f"{c['area_ratio']:.2f}"
+            ])
+        headers = ['Merged Pair', 'Person ID', 'Gap', 'Distance', 'Ratio']
+        print(tabulate(table_data, headers=headers, tablefmt='simple'))
+    
+    if rejected:
+        print("\n\nREJECTED CANDIDATES:")
+        table_data = []
+        for c in rejected:
+            # Determine likely rejection reason
+            reason = []
+            if c['temporal_gap'] > 50:
+                reason.append('gap>50')
+            if c['spatial_distance'] > 300:
+                reason.append('dist>300')
+            if c['area_ratio'] < 0.6 or c['area_ratio'] > 1.4:
+                reason.append('area')
+            reason_str = ', '.join(reason) if reason else 'unknown'
+            
+            table_data.append([
+                f"{c['tracklet_1']} + {c['tracklet_2']}",
+                c['temporal_gap'],
+                f"{c['spatial_distance']:.0f}",
+                f"{c['area_ratio']:.2f}",
+                reason_str
+            ])
+        headers = ['Candidate Pair', 'Gap', 'Distance', 'Ratio', 'Likely Reason']
+        print(tabulate(table_data, headers=headers, tablefmt='simple'))
+
+
+def print_table4_top_persons(canonical_persons, top_n=5):
+    """Print Table 4: Top N persons by duration"""
+    print("\n" + "="*80)
+    print(f"📊 TABLE 4: TOP {top_n} PERSONS (Ranked by Duration)")
+    print("="*80)
+    print(f"Total canonical persons: {len(canonical_persons)}\n")
+    
+    # Sort by duration descending
+    sorted_persons = sorted(canonical_persons, key=lambda x: x['duration'], reverse=True)
+    top_persons = sorted_persons[:top_n]
+    
     table_data = []
-    for p in persons:
+    for rank, p in enumerate(top_persons, 1):
         tracklet_ids_str = ', '.join([str(tid) for tid in sorted(p['tracklet_ids'])])
-        if len(tracklet_ids_str) > 40:
-            tracklet_ids_str = tracklet_ids_str[:37] + '...'
         
         table_data.append([
+            rank,
             p['person_id'],
-            f"({tracklet_ids_str})",
+            tracklet_ids_str,
             p['num_tracklets'],
             p['appearances'],
             p['start_frame'],
             p['end_frame'],
-            p['duration'],
-            p['method']
+            p['duration']
         ])
     
-    headers = ['Person ID', 'Tracklet IDs', '# Tracklets', '# Apps', 'Start', 'End', 'Duration', 'Method']
-    print(tabulate(table_data, headers=headers, tablefmt='grid'))
-    print(f"\nTotal canonical persons: {len(persons)}")
+    headers = ['Rank', 'Person ID', 'Tracklet IDs', '# Tracks', 'Appear', 'Start', 'End', 'Duration']
+    print(tabulate(table_data, headers=headers, tablefmt='simple'))
     
-    # Print detailed breakdown of multi-tracklet persons
-    multi_tracklet_persons = [p for p in persons if p['num_tracklets'] > 1]
-    if multi_tracklet_persons:
-        print("\n" + "-"*80)
-        print("🔗 MULTI-TRACKLET PERSONS (Grouped/Merged):")
-        print("-"*80)
-        for p in multi_tracklet_persons:
-            tracklet_ids_str = ', '.join([str(tid) for tid in sorted(p['tracklet_ids'])])
-            print(f"  Person {p['person_id']}: Tracklets [{tracklet_ids_str}] | "
-                  f"{p['num_tracklets']} tracklets | {p['appearances']} appearances | "
-                  f"Frames {p['start_frame']}-{p['end_frame']} | Method: {p['method']}")
+    # Highlight primary person
+    if top_persons:
+        primary = top_persons[0]
+        print(f"\n🎯 Primary Person: {primary['person_id']} (Duration: {primary['duration']} frames)")
 
 
 def main():
@@ -225,26 +295,8 @@ def main():
     # Print tables
     print_table1_raw_tracklets(tracklets)
     print_table2_reid_candidates(reid_candidates, tracklets_dict)
-    print_table3_canonical_persons(canonical_persons)
-    
-    # Print ranking info if available
-    if ranking_report_file.exists():
-        with open(ranking_report_file, 'r') as f:
-            ranking = json.load(f)
-        
-        print("\n" + "="*80)
-        print("🎯 PRIMARY PERSON SELECTION")
-        print("="*80)
-        primary_id = ranking['primary_person_id']
-        primary = next((p for p in canonical_persons if p['person_id'] == primary_id), None)
-        
-        if primary:
-            print(f"  Primary Person: {primary_id}")
-            print(f"  Tracklet IDs: {sorted(primary['tracklet_ids'])}")
-            print(f"  Total appearances: {primary['appearances']}")
-            print(f"  Duration: {primary['duration']} frames (frame {primary['start_frame']}-{primary['end_frame']})")
-            print(f"  Ranking score: {ranking['primary_score']:.4f}")
-            print(f"  Selection method: {ranking['ranking_method']}")
+    print_table3_merge_results(canonical_persons, reid_candidates)
+    print_table4_top_persons(canonical_persons, top_n=5)
     
     print("\n" + "="*80)
     print("✅ Visualization complete!")
