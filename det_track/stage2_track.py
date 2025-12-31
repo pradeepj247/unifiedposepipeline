@@ -139,9 +139,10 @@ def init_bytetrack_tracker(params, frame_rate, verbose=False):
         print(f"     frame_rate: {frame_rate}")
     
     tracker = ByteTrack(
-        track_thresh=params.get('track_thresh', 0.25),
+        track_thresh=params.get('track_thresh', 0.15),
         track_buffer=params.get('track_buffer', 30),
         match_thresh=params.get('match_thresh', 0.8),
+        min_hits=params.get('min_hits', 1),
         frame_rate=frame_rate
     )
     
@@ -206,6 +207,7 @@ def run_tracking(config):
     
     debug_first_frame = True
     debug_first_tracking = True
+    frame_count = 0
     for frame_id in sorted(unique_frames):
         frame_data = detections_by_frame[frame_id]
         
@@ -264,8 +266,9 @@ def run_tracking(config):
             if verbose:
                 print(f"\n⚠️  Tracker error at frame {frame_id}: {e}")
         
-        if frame_id % 100 == 0 or frame_id == num_frames - 1:
-            pbar.update(min(100, num_frames - frame_id))
+        frame_count += 1
+        if frame_count % 100 == 0 or frame_count == num_frames:
+            pbar.update(100 if frame_count + 100 <= num_frames else num_frames - frame_count + 100)
     
     pbar.close()
     

@@ -72,9 +72,10 @@ stage2_track:
     type: bytetrack  # Only bytetrack/ocsort supported for offline mode
   
   params:
-    track_thresh: 0.25     # Confidence threshold for tracking
+    track_thresh: 0.15     # Confidence threshold for tracking (lowered for better recall)
     track_buffer: 30       # Buffer size for lost tracks (frames)
     match_thresh: 0.8      # IOU threshold for matching
+    min_hits: 1            # Minimum consecutive detections to create track (1=immediate)
   
   input:
     video_path: ${video_dir}${video_file}

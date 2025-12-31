@@ -320,7 +320,8 @@ def run_detection(config):
             all_classes.append(classes[i])
         
         frame_idx += 1
-        pbar.update(1)
+        if frame_idx % 100 == 0 or frame_idx == num_frames:
+            pbar.update(min(100, num_frames - frame_idx + 100))
     
     pbar.close()
     cap.release()
