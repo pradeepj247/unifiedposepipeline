@@ -88,6 +88,13 @@ def load_config(config_path):
     if 'global' not in config:
         raise ValueError("Config file missing 'global' section")
     
+    # Auto-extract current_video from video_path
+    video_path = config.get('stage1_detect', {}).get('input', {}).get('video_path', '')
+    if video_path:
+        import os
+        video_name = os.path.splitext(os.path.basename(video_path))[0]
+        config['global']['current_video'] = video_name
+    
     # Debug: Print what's in global before resolution
     print(f"🔍 Debug - repo_root before resolution: {config['global'].get('repo_root', 'NOT FOUND')}")
     
