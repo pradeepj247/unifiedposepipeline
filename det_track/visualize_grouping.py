@@ -69,6 +69,9 @@ def load_canonical_persons(persons_file, grouping_log_file):
     with open(grouping_log_file, 'r') as f:
         grouping_log = json.load(f)
     
+    # Build dict for fast lookup
+    log_dict = {log['canonical_id']: log for log in grouping_log}
+    
     results = []
     for p in persons:
         person_id = p['person_id']
@@ -76,8 +79,8 @@ def load_canonical_persons(persons_file, grouping_log_file):
         frames = p['frame_numbers']
         
         # Get grouping info from log
-        group_info = grouping_log['persons'].get(str(person_id), {})
-        method = group_info.get('method', 'unknown')
+        log_entry = log_dict.get(person_id, {})
+        num_merged = log_entry.get('num_merged', len(tracklet_ids))
         
         results.append({
             'person_id': person_id,
@@ -87,7 +90,7 @@ def load_canonical_persons(persons_file, grouping_log_file):
             'start_frame': int(frames[0]),
             'end_frame': int(frames[-1]),
             'duration': int(frames[-1] - frames[0] + 1),
-            'method': method
+            'method': 'heuristic' if num_merged > 1 else 'single'
         })
     
     return sorted(results, key=lambda x: x['person_id'])
