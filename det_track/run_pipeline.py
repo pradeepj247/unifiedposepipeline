@@ -178,11 +178,13 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False):
     
     # Run stages
     pipeline_start = time.time()
+    stage_times = []  # Track timing for each stage
     
     for stage_name, stage_script, stage_key in stages:
         # Check if stage outputs already exist
         if check_stage_outputs_exist(config, stage_key):
             print(f"\n⏭️  Skipping {stage_name} (outputs already exist)")
+            stage_times.append((stage_name, 0.0, True))  # Mark as skipped
             continue
         
         # Get script path (relative to this orchestrator)
@@ -193,21 +195,65 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False):
             print(f"❌ Stage script not found: {script_path}")
             return False
         
-        # Run stage
+        # Run stage with timing
+        stage_start = time.time()
         success = run_stage(stage_name, str(script_path), config_path, verbose)
+        stage_end = time.time()
+        stage_duration = stage_end - stage_start
+        
+        stage_times.append((stage_name, stage_duration, False))  # Not skipped
         
         if not success:
             print(f"\n❌ Pipeline failed at {stage_name}")
             return False
     
     pipeline_end = time.time()
+    total_time = pipeline_end - pipeline_start
     
     # Summary
     print(f"\n{'='*70}")
     print(f"✅ PIPELINE COMPLETE!")
     print(f"{'='*70}\n")
-    print(f"Total time: {pipeline_end - pipeline_start:.2f}s")
-    print(f"Stages run: {len(stages)}")
+    
+    # Timing breakdown table
+    print(f"⏱️  TIMING SUMMARY:")
+    print(f"-" * 70)
+    
+    executed_times = [(name, duration) for name, duration, skipped in stage_times if not skipped]
+    
+    if executed_times:
+        try:
+            from tabulate import tabulate
+            
+            table_data = []
+            for stage_name, duration in executed_times:
+                percentage = (duration / total_time * 100) if total_time > 0 else 0
+                table_data.append([
+                    stage_name,
+                    f"{duration:.2f}s",
+                    f"{percentage:.1f}%"
+                ])
+            
+            # Add total row
+            table_data.append([
+                "TOTAL",
+                f"{total_time:.2f}s",
+                "100.0%"
+            ])
+            
+            headers = ['Stage', 'Time', '% of Total']
+            print(tabulate(table_data, headers=headers, tablefmt='simple'))
+        except ImportError:
+            # Fallback if tabulate not available
+            for stage_name, duration in executed_times:
+                percentage = (duration / total_time * 100) if total_time > 0 else 0
+                print(f"  {stage_name}: {duration:.2f}s ({percentage:.1f}%)")
+            print(f"  TOTAL: {total_time:.2f}s (100.0%)")
+    else:
+        print(f"Total time: {total_time:.2f}s (all stages skipped)")
+    
+    print(f"\nStages executed: {len(executed_times)}")
+    print(f"Stages skipped: {len([s for _, _, skipped in stage_times if skipped])}")
     
     # Show output files
     print(f"\n📦 Output Files:")
