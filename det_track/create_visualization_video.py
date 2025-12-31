@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-Create Visualization Video - Top 5 Canonical Persons
+Create Visualization Video - Canonical Persons with >=5s Appearance
 
-Draws bounding boxes for the top 5 persons (by duration) on the video.
+Draws bounding boxes for all persons who appear for at least 5 seconds.
 Each person gets a unique color and is labeled with their person ID.
+Output video is at 90% fps and downscaled to 720p for faster processing.
 
 Usage:
     python create_visualization_video.py --output-dir /path/to/outputs/video_name
+    python create_visualization_video.py --output-dir /path/to/outputs/video_name --min-seconds 3.0
 """
 
 import argparse
@@ -17,33 +19,57 @@ from pathlib import Path
 from tqdm import tqdm
 
 
-# Color palette for top 5 persons (BGR format for OpenCV)
+# Color palette for persons (BGR format for OpenCV)
+# Extended palette to support more than 5 persons
 COLORS = [
-    (0, 255, 0),      # Green - Person 1
-    (255, 0, 0),      # Blue - Person 2
-    (0, 0, 255),      # Red - Person 3
-    (255, 255, 0),    # Cyan - Person 4
-    (255, 0, 255),    # Magenta - Person 5
+    (0, 255, 0),      # Green
+    (255, 0, 0),      # Blue
+    (0, 0, 255),      # Red
+    (255, 255, 0),    # Cyan
+    (255, 0, 255),    # Magenta
+    (0, 255, 255),    # Yellow
+    (128, 0, 128),    # Purple
+    (0, 128, 128),    # Olive
+    (128, 128, 0),    # Teal
+    (255, 128, 0),    # Orange
+    (0, 128, 255),    # Light Blue
+    (128, 255, 0),    # Lime
+    (255, 0, 128),    # Pink
+    (128, 0, 255),    # Violet
+    (0, 255, 128),    # Spring Green
 ]
 
 
-def load_top_persons(canonical_persons_file, top_n=5):
-    """Load top N persons by duration"""
+def load_top_persons(canonical_persons_file, min_duration_seconds=5.0, video_fps=30.0):
+    """Load persons who appear for at least min_duration_seconds
+    
+    Args:
+        canonical_persons_file: Path to canonical_persons.npz
+        min_duration_seconds: Minimum appearance duration in seconds (default: 5.0)
+        video_fps: Original video frame rate (used to compute frame threshold)
+    """
     data = np.load(canonical_persons_file, allow_pickle=True)
     persons = data['persons']
     
-    # Sort by duration (end - start)
+    # Calculate minimum frame threshold
+    min_frames = int(min_duration_seconds * video_fps)
+    print(f"\n📏 Filtering persons: min {min_duration_seconds}s = {min_frames} frames @ {video_fps:.2f} fps")
+    
+    # Filter persons by total frame count (not temporal duration)
     persons_with_duration = []
     for p in persons:
         frames = p['frame_numbers']
-        duration = frames[-1] - frames[0] + 1
-        persons_with_duration.append((p, duration))
+        frame_count = len(frames)  # Number of frames person appears in
+        if frame_count >= min_frames:
+            persons_with_duration.append((p, frame_count))
     
-    # Sort descending by duration
+    # Sort descending by frame count
     persons_with_duration.sort(key=lambda x: x[1], reverse=True)
     
-    # Get top N
-    top_persons = persons_with_duration[:top_n]
+    print(f"   Found {len(persons_with_duration)} persons with >={min_frames} frames")
+    
+    # Use all filtered persons (no top_n limit)
+    top_persons = persons_with_duration
     
     # Create person_id -> data mapping
     persons_dict = {}
@@ -132,18 +158,32 @@ def create_visualization_video(video_path, persons_dict, output_path):
         raise ValueError(f"Could not open video: {video_path}")
     
     # Get video properties
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    orig_fps = cap.get(cv2.CAP_PROP_FPS)
+    orig_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    orig_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     
-    print(f"\n📹 Video: {width}x{height} @ {fps:.2f} fps")
+    # Output at 90% of original fps for smoother playback
+    output_fps = orig_fps * 0.9
+    
+    # Downscale to 720p max width (or 640p if already small)
+    max_width = 720 if orig_width > 800 else 640
+    if orig_width > max_width:
+        scale_factor = max_width / orig_width
+        output_width = max_width
+        output_height = int(orig_height * scale_factor)
+    else:
+        output_width = orig_width
+        output_height = orig_height
+    
+    print(f"\n📹 Video Input: {orig_width}x{orig_height} @ {orig_fps:.2f} fps")
+    print(f"   Video Output: {output_width}x{output_height} @ {output_fps:.2f} fps")
     print(f"   Total frames: {total_frames}")
-    print(f"   Drawing top {len(persons_dict)} persons\n")
+    print(f"   Drawing {len(persons_dict)} persons\n")
     
     # Create video writer
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(str(output_path), fourcc, fps, (width, height))
+    out = cv2.VideoWriter(str(output_path), fourcc, output_fps, (output_width, output_height))
     
     # Process frames
     frame_idx = 0
@@ -154,11 +194,24 @@ def create_visualization_video(video_path, persons_dict, output_path):
         if not ret:
             break
         
+        # Resize frame if needed
+        if output_width != orig_width or output_height != orig_height:
+            frame = cv2.resize(frame, (output_width, output_height))
+            scale_factor = output_width / orig_width
+        else:
+            scale_factor = 1.0
+        
         # Get persons visible at this frame
         visible_persons = get_person_at_frame(persons_dict, frame_idx)
         
-        # Draw each person
+        # Draw each person (scale bboxes if needed)
         for person_info in visible_persons:
+            if scale_factor != 1.0:
+                # Scale bbox coordinates
+                bbox = person_info['bbox']
+                scaled_bbox = bbox * scale_factor
+                person_info = person_info.copy()
+                person_info['bbox'] = scaled_bbox
             frame = draw_bbox(frame, person_info)
         
         # Add frame counter
@@ -179,11 +232,11 @@ def create_visualization_video(video_path, persons_dict, output_path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Create visualization video with top persons')
+    parser = argparse.ArgumentParser(description='Create visualization video with persons appearing >=5 seconds')
     parser.add_argument('--output-dir', type=str, required=True,
                         help='Output directory containing pipeline outputs')
-    parser.add_argument('--top-n', type=int, default=5,
-                        help='Number of top persons to visualize (default: 5)')
+    parser.add_argument('--min-seconds', type=float, default=5.0,
+                        help='Minimum appearance duration in seconds (default: 5.0)')
     args = parser.parse_args()
     
     output_dir = Path(args.output_dir)
@@ -198,9 +251,14 @@ def main():
         print(f"   Please specify video path manually")
         return
     
+    # Get video fps for frame threshold calculation
+    cap = cv2.VideoCapture(str(video_path))
+    video_fps = cap.get(cv2.CAP_PROP_FPS)
+    cap.release()
+    
     # File paths
     canonical_persons_file = output_dir / 'canonical_persons.npz'
-    output_video_path = output_dir / f'{video_name}_top{args.top_n}_visualization.mp4'
+    output_video_path = output_dir / f'{video_name}_5sec_visualization.mp4'
     
     # Check files exist
     if not canonical_persons_file.exists():
@@ -210,8 +268,10 @@ def main():
     print(f"📂 Loading data from: {output_dir}")
     print(f"📹 Video: {video_path}")
     
-    # Load top persons
-    persons_dict = load_top_persons(canonical_persons_file, top_n=args.top_n)
+    # Load persons with min duration filter
+    persons_dict = load_top_persons(canonical_persons_file, 
+                                     min_duration_seconds=args.min_seconds,
+                                     video_fps=video_fps)
     
     print(f"\n📊 Top {len(persons_dict)} Persons:")
     for person_id, data in sorted(persons_dict.items(), key=lambda x: x[1]['rank']):
