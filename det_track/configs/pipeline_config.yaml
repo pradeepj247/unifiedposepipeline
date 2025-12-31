@@ -114,7 +114,7 @@ stage3_analyze:
 # Stage 4a: Selective ReID Recovery (OPTIONAL - Toggle for benchmarking)
 # ============================================================================
 stage4a_reid_recovery:
-  enabled: true  # Set false to skip ReID recovery (faster, less accurate)
+  enabled: false  # Disabled: boxmot.appearance module not available in current BoxMOT version
   
   reid:
     model_path: ${models_dir}/reid/osnet_x0_25_msmt17.pt  # Fast model
