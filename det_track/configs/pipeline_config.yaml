@@ -26,7 +26,7 @@ pipeline:
     stage1_detect: true       # YOLO detection
     stage2_track: true        # ByteTrack offline tracking
     stage3_analyze: true      # Tracklet statistics
-    stage4a_reid_recovery: true   # Selective ReID recovery (optional)
+    stage4a_reid_recovery: false   # DISABLED: boxmot.appearance not available
     stage4b_group_canonical: true # Geometric grouping (optional)
     stage5_rank: true         # Primary person selection
   
