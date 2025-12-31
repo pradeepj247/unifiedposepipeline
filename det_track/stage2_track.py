@@ -192,13 +192,6 @@ def run_tracking(config):
     print(f"\n⚡ Running ByteTrack (offline mode)...")
     t_start = time.time()
     
-    # Get video for image frames (ByteTrack might need actual frame dimensions)
-    import cv2
-    video_path = input_config.get('video_path', None)
-    cap = None
-    if video_path:
-        cap = cv2.VideoCapture(video_path)
-    
     tracklets_dict = {}  # {tracklet_id: {'frame_numbers': [], 'bboxes': [], 'confidences': []}}
     
     pbar = tqdm(total=num_frames, desc="Tracking")
@@ -206,14 +199,6 @@ def run_tracking(config):
     debug_first_frame = True
     for frame_id in sorted(unique_frames):
         frame_data = detections_by_frame[frame_id]
-        
-        # Read actual frame if video available (ByteTrack may need it for context)
-        frame = None
-        if cap is not None:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
-            ret, frame = cap.read()
-            if not ret:
-                frame = None
         
         # Prepare detections for tracker: (N, 6) = [x1, y1, x2, y2, conf, cls]
         if len(frame_data['bboxes']) > 0:
