@@ -3,7 +3,7 @@
 
 # Global settings
 preferred_fetch_location: github  # Options: github, drive
-destination_folder: /content/models/  # Base directory for all models
+destination_folder: /content/unifiedposepipeline/models/  # Base directory for all models
 
 # Model definitions
 models:
