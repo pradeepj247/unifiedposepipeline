@@ -77,7 +77,7 @@ stage2_track:
     match_thresh: 0.8      # IOU threshold for matching
   
   input:
-    video_path: ${demo_data_dir}/videos/dance.mp4
+    video_path: ${video_dir}${video_file}
     detections_file: ${outputs_dir}/${current_video}/detections_raw.npz
   
   output:
@@ -133,7 +133,7 @@ stage4a_reid_recovery:
     crop_padding: 10        # Pixels to add around bbox
   
   input:
-    video_path: ${demo_data_dir}/videos/dance.mp4
+    video_path: ${video_dir}${video_file}
     tracklets_file: ${outputs_dir}/${current_video}/tracklets_raw.npz
     tracklet_stats_file: ${outputs_dir}/${current_video}/tracklet_stats.npz
     candidates_file: ${outputs_dir}/${current_video}/reid_candidates.json
