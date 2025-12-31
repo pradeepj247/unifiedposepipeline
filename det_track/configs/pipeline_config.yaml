@@ -13,6 +13,10 @@ global:
   models_dir: ${repo_root}/models
   demo_data_dir: ${repo_root}/demo_data
   outputs_dir: ${demo_data_dir}/outputs
+  
+  # Video input settings - change video_file to process different videos
+  video_dir: ${demo_data_dir}/videos/
+  video_file: kohli_nets.mp4
 
 # ============================================================================
 # Pipeline Stage Control
@@ -51,7 +55,7 @@ stage1_detect:
     batch_size: 1
   
   input:
-    video_path: ${demo_data_dir}/videos/dance.mp4
+    video_path: ${video_dir}${video_file}
     max_frames: 0  # 0 = all frames
   
   output:

@@ -74,11 +74,11 @@ def load_config(config_path):
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
     
-    # Auto-extract current_video from video_path
-    video_path = config.get('stage1_detect', {}).get('input', {}).get('video_path', '')
-    if video_path:
+    # Auto-extract current_video from video_file
+    video_file = config.get('global', {}).get('video_file', '')
+    if video_file:
         import os
-        video_name = os.path.splitext(os.path.basename(video_path))[0]
+        video_name = os.path.splitext(video_file)[0]
         config['global']['current_video'] = video_name
     
     return resolve_path_variables(config)
