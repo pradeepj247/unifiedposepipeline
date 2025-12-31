@@ -202,9 +202,10 @@ def run_tracking(config):
     
     tracklets_dict = {}  # {tracklet_id: {'frame_numbers': [], 'bboxes': [], 'confidences': []}}
     
-    pbar = tqdm(total=num_frames, desc="Tracking")
+    pbar = tqdm(total=num_frames, desc="Tracking", mininterval=1.0)
     
     debug_first_frame = True
+    debug_first_tracking = True
     for frame_id in sorted(unique_frames):
         frame_data = detections_by_frame[frame_id]
         
@@ -231,10 +232,13 @@ def run_tracking(config):
             tracked = tracker.update(dets_for_tracker, None)  # ByteTrack motion-only, no frame needed
             
             # Debug first tracking result
-            if debug_first_frame and len(dets_for_tracker) > 0:
+            if debug_first_tracking and len(dets_for_tracker) > 0:
                 print(f"   Tracker returned: shape={tracked.shape if len(tracked) > 0 else 'empty'}, count={len(tracked)}")
                 if len(tracked) > 0:
                     print(f"   First track: {tracked[0]}")
+                else:
+                    print(f"   ⚠️ WARNING: Tracker returned 0 tracks despite {len(dets_for_tracker)} detections!")
+                debug_first_tracking = False
             
             # Store tracklets
             # tracked: (N, 8) = [x1, y1, x2, y2, track_id, conf, cls, det_ind]
@@ -260,7 +264,8 @@ def run_tracking(config):
             if verbose:
                 print(f"\n⚠️  Tracker error at frame {frame_id}: {e}")
         
-        pbar.update(1)
+        if frame_id % 100 == 0 or frame_id == num_frames - 1:
+            pbar.update(min(100, num_frames - frame_id))
     
     pbar.close()
     

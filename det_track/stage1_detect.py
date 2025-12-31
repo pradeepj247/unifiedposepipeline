@@ -276,7 +276,7 @@ def run_detection(config):
     print(f"\n⚡ Running detection...")
     t_start = time.time()
     
-    pbar = tqdm(total=num_frames, desc="Detecting")
+    pbar = tqdm(total=num_frames, desc="Detecting", mininterval=1.0)
     
     frame_idx = 0
     while frame_idx < num_frames:
