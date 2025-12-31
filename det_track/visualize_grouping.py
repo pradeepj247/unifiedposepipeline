@@ -51,9 +51,11 @@ def load_reid_candidates(candidates_file):
         results.append({
             'tracklet_1': c['tracklet_1'],
             'tracklet_2': c['tracklet_2'],
-            'temporal_gap': c['temporal_gap'],
-            'spatial_distance': c['spatial_distance'],
-            'area_ratio': c['area_ratio']
+            'temporal_gap': c['gap'],
+            'spatial_distance': c['distance'],
+            'area_ratio': c['area_ratio'],
+            'transition_1': c.get('transition_frame_1', '?'),
+            'transition_2': c.get('transition_frame_2', '?')
         })
     
     return results
