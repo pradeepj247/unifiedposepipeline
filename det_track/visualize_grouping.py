@@ -72,7 +72,7 @@ def load_canonical_persons(persons_file, grouping_log_file):
     results = []
     for p in persons:
         person_id = p['person_id']
-        tracklet_ids = p['tracklet_ids']
+        tracklet_ids = p['original_tracklet_ids']
         frames = p['frame_numbers']
         
         # Get grouping info from log
