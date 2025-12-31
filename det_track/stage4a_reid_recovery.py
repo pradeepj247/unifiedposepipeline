@@ -298,7 +298,7 @@ def run_reid_recovery(config):
     # Load ReID model
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"  🛠️  Device: {device}")
-    reid_model = load_reid_model(reid_config['model_name'], device)
+    reid_model = load_reid_model(reid_config['model_path'], device)
     
     # Extract frames
     print(f"\n📹 Extracting frames at transitions...")
