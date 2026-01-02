@@ -256,7 +256,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False):
         print(f"Total time: {total_time:.2f}s (all stages skipped)")
     
     print(f"\nStages executed: {len(executed_times)}")
-    print(f"Stages skipped: {len([s for _, _, skipped in stage_times if skipped])}")
+    print(f"Stages skipped: {len([stage for stage, _, skipped in stage_times if skipped])}")
     
     # Show output files
     print(f"\n📦 Output Files:")
