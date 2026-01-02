@@ -1,21 +1,91 @@
 #!/usr/bin/env python3
 """
-Visualize Tracklet Grouping Results
+Stage 5b: Visualize Tracklet Grouping Results
 
-Shows 3 tables:
+Shows 4 tables:
 1. All raw tracklets (before grouping)
 2. ReID merge candidates
 3. Final canonical persons (after grouping/merging)
+4. Top 5 persons ranked by duration
 
 Usage:
-    python visualize_grouping.py --output-dir /path/to/outputs/video_name
+    python stage5b_visualize_grouping.py --config configs/pipeline_config.yaml
 """
 
 import argparse
 import json
 import numpy as np
+import yaml
+import re
 from pathlib import Path
 from tabulate import tabulate
+
+
+def resolve_path_variables(config):
+    """Recursively resolve ${variable} in config"""
+    global_vars = config.get('global', {})
+    
+    # First pass: resolve variables within global section itself
+    def resolve_string_once(s, vars_dict):
+        if not isinstance(s, str):
+            return s
+        return re.sub(
+            r'\$\{(\w+)\}',
+            lambda m: str(vars_dict.get(m.group(1), m.group(0))),
+            s
+        )
+    
+    # Resolve global variables iteratively
+    max_iterations = 10
+    for _ in range(max_iterations):
+        resolved_globals = {}
+        changed = False
+        for key, value in global_vars.items():
+            if isinstance(value, str):
+                resolved = resolve_string_once(value, global_vars)
+                resolved_globals[key] = resolved
+                if resolved != value:
+                    changed = True
+            else:
+                resolved_globals[key] = value
+        global_vars = resolved_globals
+        if not changed:
+            break
+    
+    def resolve_string(s):
+        return re.sub(
+            r'\$\{(\w+)\}',
+            lambda m: str(global_vars.get(m.group(1), m.group(0))),
+            s
+        )
+    
+    def resolve_recursive(obj):
+        if isinstance(obj, dict):
+            return {k: resolve_recursive(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [resolve_recursive(v) for v in obj]
+        elif isinstance(obj, str):
+            return resolve_string(obj)
+        return obj
+    
+    result = resolve_recursive(config)
+    result['global'] = global_vars
+    return result
+
+
+def load_config(config_path):
+    """Load and resolve YAML configuration"""
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    # Auto-extract current_video from video_file
+    video_file = config.get('global', {}).get('video_file', '')
+    if video_file:
+        import os
+        video_name = os.path.splitext(video_file)[0]
+        config['global']['current_video'] = video_name
+    
+    return resolve_path_variables(config)
 
 
 def load_tracklets(tracklets_file):
@@ -257,32 +327,37 @@ def print_table4_top_persons(canonical_persons, top_n=5):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Visualize tracklet grouping results')
-    parser.add_argument('--output-dir', type=str, required=True,
-                        help='Output directory containing NPZ and JSON files')
+    parser = argparse.ArgumentParser(description='Stage 5b: Visualize tracklet grouping results')
+    parser.add_argument('--config', type=str, required=True,
+                        help='Path to pipeline configuration YAML')
     args = parser.parse_args()
     
-    output_dir = Path(args.output_dir)
+    # Load config
+    config = load_config(args.config)
     
-    # File paths
-    tracklets_file = output_dir / 'tracklets_raw.npz'
-    reid_candidates_file = output_dir / 'reid_candidates.json'
-    canonical_persons_file = output_dir / 'canonical_persons.npz'
-    grouping_log_file = output_dir / 'grouping_log.json'
-    ranking_report_file = output_dir / 'ranking_report.json'
+    print(f"\n{'='*70}")
+    print(f"📊 STAGE 5b: VISUALIZE GROUPING RESULTS")
+    print(f"{'='*70}\n")
+    
+    # File paths from config
+    tracklets_file = Path(config['stage2_track']['output']['tracklets_file'])
+    reid_candidates_file = Path(config['stage3_analyze']['output']['candidates_file'])
+    canonical_persons_file = Path(config['stage4b_group_canonical']['output']['canonical_persons_file'])
+    grouping_log_file = Path(config['stage4b_group_canonical']['output']['grouping_log_file'])
+    ranking_report_file = Path(config['stage5_rank']['output']['ranking_report_file'])
     
     # Check files exist
     if not tracklets_file.exists():
-        print(f"❌ Error: {tracklets_file} not found")
+        print(f"❌ Error: {tracklets_file.name} not found")
         return
     if not canonical_persons_file.exists():
-        print(f"❌ Error: {canonical_persons_file} not found")
+        print(f"❌ Error: {canonical_persons_file.name} not found")
         return
     if not grouping_log_file.exists():
-        print(f"❌ Error: {grouping_log_file} not found")
+        print(f"❌ Error: {grouping_log_file.name} not found")
         return
     
-    print(f"\n📂 Loading data from: {output_dir}")
+    print(f"📂 Loading grouping data...")
     
     # Load data
     tracklets = load_tracklets(tracklets_file)
@@ -298,9 +373,9 @@ def main():
     print_table3_merge_results(canonical_persons, reid_candidates)
     print_table4_top_persons(canonical_persons, top_n=5)
     
-    print("\n" + "="*80)
-    print("✅ Visualization complete!")
-    print("="*80 + "\n")
+    print(f"\n{'='*70}")
+    print(f"✅ VISUALIZATION COMPLETE!")
+    print(f"{'='*70}\n")
 
 
 if __name__ == '__main__':

@@ -148,7 +148,10 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False):
         ('Stage 3: Analysis', 'stage3_analyze_tracklets.py', 'stage3_analyze'),
         ('Stage 4a: ReID Recovery', 'stage4a_reid_recovery.py', 'stage4a_reid_recovery'),
         ('Stage 4b: Canonical Grouping', 'stage4b_group_canonical.py', 'stage4b_group_canonical'),
-        ('Stage 5: Ranking', 'stage5_rank_persons.py', 'stage5_rank')
+        ('Stage 5: Ranking', 'stage5_rank_persons.py', 'stage5_rank'),
+        ('Stage 5b: Visualize Grouping', 'stage5b_visualize_grouping.py', 'stage5b_visualize_grouping'),
+        ('Stage 6: Visualization', 'stage6_create_output_video.py', 'stage6_create_output_video'),
+        ('Stage 6b: Selection Grids', 'stage6b_create_selection_grid.py', 'stage6b_create_selection_grid')
     ]
     
     # Print header
@@ -276,6 +279,13 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False):
         'stage5_rank': [
             config['stage5_rank']['output']['primary_person_file'],
             config['stage5_rank']['output']['ranking_report_file']
+        ],
+        'stage6_create_output_video': [
+            config.get('stage6_create_output_video', {}).get('output', {}).get('video_file', 'N/A')
+        ],
+        'stage6b_create_selection_grid': [
+            config.get('stage6b_create_selection_grid', {}).get('output', {}).get('fullframe_grid', 'N/A'),
+            config.get('stage6b_create_selection_grid', {}).get('output', {}).get('cropped_grid', 'N/A')
         ]
     }
     

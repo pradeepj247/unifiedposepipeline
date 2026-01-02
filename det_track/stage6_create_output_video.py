@@ -1,22 +1,90 @@
 #!/usr/bin/env python3
 """
-Create Visualization Video - Canonical Persons with >=5s Appearance
+Stage 6: Create Visualization Video - Top 10 Canonical Persons
 
-Draws bounding boxes for all persons who appear for at least 5 seconds.
+Draws bounding boxes for top 10 persons who appear for at least 5 seconds.
 Each person gets a unique color and is labeled with their person ID.
 Output video is at 90% fps and downscaled to 720p for faster processing.
 
 Usage:
-    python create_visualization_video.py --output-dir /path/to/outputs/video_name
-    python create_visualization_video.py --output-dir /path/to/outputs/video_name --min-seconds 3.0
+    python stage6_create_output_video.py --config configs/pipeline_config.yaml
 """
 
 import argparse
 import numpy as np
 import cv2
 import json
+import yaml
+import re
 from pathlib import Path
 from tqdm import tqdm
+
+
+def resolve_path_variables(config):
+    """Recursively resolve ${variable} in config"""
+    global_vars = config.get('global', {})
+    
+    # First pass: resolve variables within global section itself
+    def resolve_string_once(s, vars_dict):
+        if not isinstance(s, str):
+            return s
+        return re.sub(
+            r'\$\{(\w+)\}',
+            lambda m: str(vars_dict.get(m.group(1), m.group(0))),
+            s
+        )
+    
+    # Resolve global variables iteratively
+    max_iterations = 10
+    for _ in range(max_iterations):
+        resolved_globals = {}
+        changed = False
+        for key, value in global_vars.items():
+            if isinstance(value, str):
+                resolved = resolve_string_once(value, global_vars)
+                resolved_globals[key] = resolved
+                if resolved != value:
+                    changed = True
+            else:
+                resolved_globals[key] = value
+        global_vars = resolved_globals
+        if not changed:
+            break
+    
+    def resolve_string(s):
+        return re.sub(
+            r'\$\{(\w+)\}',
+            lambda m: str(global_vars.get(m.group(1), m.group(0))),
+            s
+        )
+    
+    def resolve_recursive(obj):
+        if isinstance(obj, dict):
+            return {k: resolve_recursive(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [resolve_recursive(v) for v in obj]
+        elif isinstance(obj, str):
+            return resolve_string(obj)
+        return obj
+    
+    result = resolve_recursive(config)
+    result['global'] = global_vars
+    return result
+
+
+def load_config(config_path):
+    """Load and resolve YAML configuration"""
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    # Auto-extract current_video from video_file
+    video_file = config.get('global', {}).get('video_file', '')
+    if video_file:
+        import os
+        video_name = os.path.splitext(video_file)[0]
+        config['global']['current_video'] = video_name
+    
+    return resolve_path_variables(config)
 
 
 # Color palette for persons (BGR format for OpenCV)
@@ -68,8 +136,14 @@ def load_top_persons(canonical_persons_file, min_duration_seconds=5.0, video_fps
     
     print(f"   Found {len(persons_with_duration)} persons with >={min_frames} frames")
     
-    # Use all filtered persons (no top_n limit)
-    top_persons = persons_with_duration
+    # Limit to top 10 persons (or fewer if less than 10 meet criteria)
+    top_n = min(10, len(persons_with_duration))
+    top_persons = persons_with_duration[:top_n]
+    
+    if len(persons_with_duration) > 10:
+        print(f"   Showing top {top_n} persons (out of {len(persons_with_duration)})")
+    else:
+        print(f"   Showing all {top_n} persons")
     
     # Create person_id -> data mapping
     persons_dict = {}
@@ -232,23 +306,30 @@ def create_visualization_video(video_path, persons_dict, output_path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Create visualization video with persons appearing >=5 seconds')
-    parser.add_argument('--output-dir', type=str, required=True,
-                        help='Output directory containing pipeline outputs')
-    parser.add_argument('--min-seconds', type=float, default=5.0,
-                        help='Minimum appearance duration in seconds (default: 5.0)')
+    parser = argparse.ArgumentParser(description='Create visualization video with top 10 persons (>=5 seconds)')
+    parser.add_argument('--config', type=str, required=True,
+                        help='Path to pipeline configuration YAML')
     args = parser.parse_args()
     
-    output_dir = Path(args.output_dir)
+    # Load config
+    config = load_config(args.config)
+    stage_config = config['stage6_create_output_video']
     
-    # Find video file (from config)
-    # For now, assume it's in ../../demo_data/videos/{video_name}.mp4
-    video_name = output_dir.name
-    video_path = output_dir.parent.parent / 'videos' / f'{video_name}.mp4'
+    # Get paths from config
+    video_path = Path(stage_config['input']['video_file'])
+    canonical_persons_file = Path(stage_config['input']['canonical_persons_file'])
+    output_video_path = Path(stage_config['output']['video_file'])
     
+    # Get visualization settings
+    min_seconds = stage_config['visualization']['min_duration_seconds']
+    
+    # Check files exist
     if not video_path.exists():
         print(f"❌ Video not found: {video_path}")
-        print(f"   Please specify video path manually")
+        return
+    
+    if not canonical_persons_file.exists():
+        print(f"❌ Canonical persons file not found: {canonical_persons_file}")
         return
     
     # Get video fps for frame threshold calculation
@@ -256,21 +337,16 @@ def main():
     video_fps = cap.get(cv2.CAP_PROP_FPS)
     cap.release()
     
-    # File paths
-    canonical_persons_file = output_dir / 'canonical_persons.npz'
-    output_video_path = output_dir / f'{video_name}_5sec_visualization.mp4'
-    
-    # Check files exist
-    if not canonical_persons_file.exists():
-        print(f"❌ Canonical persons file not found: {canonical_persons_file}")
-        return
-    
-    print(f"📂 Loading data from: {output_dir}")
-    print(f"📹 Video: {video_path}")
+    print(f"\n{'='*70}")
+    print(f"📹 STAGE 6: CREATE VISUALIZATION VIDEO")
+    print(f"{'='*70}\n")
+    print(f"📂 Video: {video_path.name}")
+    print(f"📊 Canonical Persons: {canonical_persons_file.name}")
+    print(f"🎬 Output: {output_video_path.name}")
     
     # Load persons with min duration filter
     persons_dict = load_top_persons(canonical_persons_file, 
-                                     min_duration_seconds=args.min_seconds,
+                                     min_duration_seconds=min_seconds,
                                      video_fps=video_fps)
     
     print(f"\n📊 Top {len(persons_dict)} Persons:")
@@ -285,6 +361,7 @@ def main():
     
     print(f"\n{'='*70}")
     print(f"✅ Visualization complete!")
+    print(f"   Output: {output_video_path}")
     print(f"{'='*70}\n")
 
 

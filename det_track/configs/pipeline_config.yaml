@@ -29,6 +29,9 @@ pipeline:
     stage4a_reid_recovery: false   # DISABLED: boxmot.appearance not available
     stage4b_group_canonical: true # Geometric grouping (optional)
     stage5_rank: true         # Primary person selection
+    stage5b_visualize_grouping: false  # Optional: Show grouping results tables
+    stage6_create_output_video: true  # Visualization of top 10 persons
+    stage6b_create_selection_grid: false  # Alternative: Create selection grid images
   
   # Data flow options
   skip_if_exists: false  # Skip stages if output files already exist
@@ -199,6 +202,54 @@ stage5_rank:
   output:
     primary_person_file: ${outputs_dir}/${current_video}/primary_person.npz
     ranking_report_file: ${outputs_dir}/${current_video}/ranking_report.json
+  
+  advanced:
+    verbose: false
+
+# ============================================================================
+# Stage 6: Create Output Video - Visualization of Top 10 Persons
+# ============================================================================
+stage6_create_output_video:
+  enabled: true
+  
+  visualization:
+    min_duration_seconds: 5    # Minimum appearance time to be included
+    max_persons_shown: 10      # Show top 10 persons (or all if <10 qualify)
+    output_resolution: 720     # Output video height (720p)
+    output_fps: 22.5           # Output video framerate
+  
+  input:
+    video_file: ${video_dir}${video_file}
+    canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
+  
+  output:
+    video_file: ${outputs_dir}/${current_video}/top_persons_visualization.mp4
+  
+  advanced:
+    verbose: false
+
+# ============================================================================
+# Stage 6b: Create Selection Grid Images (Alternative to Stage 6 Video)
+# ============================================================================
+stage6b_create_selection_grid:
+  enabled: false  # Set true to generate selection grids instead of/in addition to video
+  
+  filters:
+    min_duration_seconds: 5    # Minimum appearance time to be included
+    max_persons_shown: 10      # Show top 10 persons (or all if <10 qualify)
+  
+  full_frame_grid:
+    target_frame_count: 10     # Target number of frames to show (adaptive if fewer persons)
+    cell_size: [384, 216]      # Cell dimensions (width x height)
+  
+  cropped_grid:
+    bbox_padding_percent: 10   # Padding around person bbox (uniform)
+    max_cell_size: [384, 600]  # Maximum cell dimensions
+  
+  output:
+    fullframe_grid: ${outputs_dir}/${current_video}/top10_persons_fullframe_grid.png
+    cropped_grid: ${outputs_dir}/${current_video}/top10_persons_cropped_grid.png
+    selection_info: ${outputs_dir}/${current_video}/selection_grid_info.json
   
   advanced:
     verbose: false
