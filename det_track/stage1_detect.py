@@ -112,11 +112,26 @@ def load_yolo_detector(model_path, device='cuda', verbose=False):
     """Load YOLO detector - supports both PyTorch (.pt) and TensorRT (.engine) models"""
     try:
         from ultralytics import YOLO
+        import torch
     except ImportError:
-        raise ImportError("ultralytics not found. Install with: pip install ultralytics")
+        raise ImportError("ultralytics or torch not found. Install with: pip install ultralytics torch")
     
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"YOLO model not found: {model_path}")
+    
+    # CRITICAL: Initialize CUDA via PyTorch BEFORE loading TensorRT engine
+    # TensorRT cannot bootstrap CUDA by itself in Python
+    if model_path.endswith('.engine'):
+        if verbose:
+            print(f"  🔧 Initializing CUDA via PyTorch (required for TensorRT)...")
+        
+        # Force CUDA initialization
+        assert torch.cuda.is_available(), "CUDA not available"
+        torch.cuda.set_device(0)
+        _ = torch.zeros(1, device="cuda")  # Dummy tensor to ensure CUDA is ready
+        
+        if verbose:
+            print(f"  ✅ CUDA initialized: {torch.cuda.get_device_name(0)}")
     
     if verbose:
         model_type = "TensorRT engine" if model_path.endswith('.engine') else "PyTorch model"
