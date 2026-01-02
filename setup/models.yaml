@@ -15,6 +15,14 @@ models:
     size_mb: 22.6
     fallback_location: /content/drive/MyDrive/pipelinemodels/yolo/yolov8s.pt
 
+  - name: YOLOv8s TensorRT
+    filename: yolov8s.engine
+    type: .engine
+    source_url: https://github.com/pradeepj247/unifiedposepipeline/releases/download/v1.0.0/yolov8s.engine
+    subfolder: yolo/
+    size_mb: 23.0
+    fallback_location: /content/drive/MyDrive/pipelinemodels/yolo/yolov8s.engine
+
   - name: VITPose
     filename: vitpose-b.pth
     type: .pth
