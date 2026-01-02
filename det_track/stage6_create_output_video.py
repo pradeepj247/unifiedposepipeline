@@ -16,8 +16,13 @@ import cv2
 import json
 import yaml
 import re
+import os
 from pathlib import Path
 from tqdm import tqdm
+
+# Suppress OpenCV/FFmpeg h264 warnings
+os.environ['OPENCV_FFMPEG_LOGLEVEL'] = '-8'
+cv2.setLogLevel(0)
 
 
 def resolve_path_variables(config):
