@@ -151,6 +151,20 @@ def load_yolo_detector(model_path, device='cuda', verbose=False):
         }
     else:
         # TensorRT engine - device passed to predict() method
+        # Warm up the engine with a dummy prediction to ensure TensorRT initializes properly
+        if verbose:
+            print(f"  🔥 Warming up TensorRT engine...")
+        
+        import numpy as np
+        dummy_frame = np.zeros((640, 640, 3), dtype=np.uint8)
+        try:
+            _ = model.predict(source=dummy_frame, conf=0.5, device=0, verbose=False)
+            if verbose:
+                print(f"  ✅ TensorRT engine ready")
+        except Exception as e:
+            if verbose:
+                print(f"  ⚠️  TensorRT warmup warning: {e}")
+        
         return {
             'type': 'tensorrt',
             'model': model,
