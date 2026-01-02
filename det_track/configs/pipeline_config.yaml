@@ -40,7 +40,7 @@ pipeline:
 stage1_detect:
   detector:
     type: yolo
-    model_path: ${models_dir}/yolo/yolov8s.engine
+    model_path: ${models_dir}/yolo/yolov8s.pt  # Use .engine for TensorRT (requires tensorrt package)
     confidence: 0.3
     device: cuda
     detect_only_humans: true

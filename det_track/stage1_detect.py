@@ -150,7 +150,17 @@ def load_yolo_detector(model_path, device='cuda', verbose=False):
         }
     else:
         # TensorRT engine - device passed to predict() method
-        # Warm up the engine with a dummy prediction to ensure TensorRT initializes properly
+        # Check if TensorRT is available
+        try:
+            import tensorrt as trt
+            trt_available = True
+        except ImportError:
+            trt_available = False
+            print(f"  ⚠️  TensorRT not installed. Ultralytics will attempt auto-install.")
+            print(f"  ⚠️  After installation, you MUST restart the runtime.")
+            print(f"  💡 Alternatively, use PyTorch model (.pt) which works without TensorRT.")
+        
+        # Warm up the engine with a dummy prediction
         if verbose:
             print(f"  🔥 Warming up TensorRT engine...")
         
@@ -160,9 +170,19 @@ def load_yolo_detector(model_path, device='cuda', verbose=False):
             _ = model.predict(source=dummy_frame, conf=0.5, device=0, verbose=False)
             if verbose:
                 print(f"  ✅ TensorRT engine ready")
+        except ModuleNotFoundError as e:
+            if 'tensorrt' in str(e).lower():
+                print(f"\n❌ TensorRT module not found!")
+                print(f"   Solution 1: Install TensorRT and restart runtime")
+                print(f"      !pip install tensorrt")
+                print(f"      Then: Runtime → Restart runtime")
+                print(f"   Solution 2: Use PyTorch model instead")
+                print(f"      Edit config: model_path: yolov8s.pt")
+                raise RuntimeError("TensorRT not available. See solutions above.")
+            else:
+                raise
         except Exception as e:
-            if verbose:
-                print(f"  ⚠️  TensorRT warmup warning: {e}")
+            print(f"  ⚠️  TensorRT warmup warning: {e}")
         
         return {
             'type': 'tensorrt',
