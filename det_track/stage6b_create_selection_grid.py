@@ -130,16 +130,14 @@ def extract_crop(frame, bbox, padding_percent=10):
     return frame[y1:y2, x1:x2].copy()
 
 
-def create_slideshow_frame(crops, person_info, crop_height=600):
+def create_slideshow_frame(crops, person_info, crop_height=600, fixed_width=400):
     """Create one slideshow frame with 3 crops + label bar"""
     
-    # Resize crops to uniform height, maintain aspect ratio
+    # Resize crops to uniform height AND width to ensure consistent dimensions
     resized_crops = []
     for crop in crops:
-        h, w = crop.shape[:2]
-        new_h = crop_height
-        new_w = int(w * (crop_height / h))
-        resized = cv2.resize(crop, (new_w, new_h))
+        # Resize to fixed dimensions
+        resized = cv2.resize(crop, (fixed_width, crop_height))
         resized_crops.append(resized)
     
     # Stack horizontally
@@ -232,12 +230,12 @@ def main():
     config = load_config(args.config)
     stage_config = config.get('stage6b_create_selection_grid', {})
     
-    # Get paths
-    video_path = Path(config['global']['video_dir'] + config['global']['video_file'])
-    canonical_persons_file = Path(config['stage4b_group_canonical']['output']['canonical_persons_file'])
+    # Get paths (use absolute paths to avoid creating nested directories)
+    video_path = Path(config['global']['video_dir'] + config['global']['video_file']).resolve().absolute()
+    canonical_persons_file = Path(config['stage4b_group_canonical']['output']['canonical_persons_file']).resolve().absolute()
     
     # Output paths
-    output_dir = Path(config['global']['outputs_dir']) / config['global']['current_video']
+    output_dir = Path(config['global']['outputs_dir']).resolve().absolute() / config['global']['current_video']
     output_dir.mkdir(parents=True, exist_ok=True)
     
     mp4_output = output_dir / 'person_selection_slideshow.mp4'
@@ -281,6 +279,8 @@ def main():
     
     # Create slideshow frames
     print(f"\n🎨 Creating slideshow frames (1 FPS)...")
+    frame_extraction_time = 0
+    frame_creation_time = 0
     slideshow_frames = []
     metadata = []
     
@@ -292,7 +292,8 @@ def main():
         # Get 3 frame numbers
         three_frames = get_three_frames(person)
         
-        # Load and crop
+        # Load and crop (timing extraction)
+        extract_start = time.time()
         crops = []
         for frame_num, bbox_idx in three_frames:
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
@@ -305,9 +306,11 @@ def main():
             bbox = person['bboxes'][bbox_idx]
             crop = extract_crop(frame, bbox, padding_percent=10)
             crops.append(crop)
+        frame_extraction_time += time.time() - extract_start
         
         if len(crops) == 3:
-            # Create slideshow frame
+            # Create slideshow frame (timing creation)
+            create_start = time.time()
             person_info = {
                 'person_id': int(person_id),
                 'frame_count': frame_count,
@@ -317,6 +320,8 @@ def main():
             }
             
             slideshow_frame = create_slideshow_frame(crops, person_info)
+            frame_creation_time += time.time() - create_start
+            
             slideshow_frames.append(slideshow_frame)
             
             metadata.append({
@@ -327,7 +332,8 @@ def main():
                 'frames_shown': [int(f) for f, _ in three_frames]
             })
             
-            print(f"   ✅ Person {person_id} ({rank}/{len(persons)}) - {frame_count} frames")
+            extract_ms = (time.time() - extract_start) * 1000
+            print(f"   ✅ Person {person_id} ({rank}/{len(persons)}) - {frame_count} frames [{extract_ms:.0f}ms extract]")
     
     cap.release()
     
@@ -336,20 +342,27 @@ def main():
         return
     
     # Write MP4
+    print(f"\n⏱️  Frame extraction: {frame_extraction_time:.2f}s")
+    print(f"⏱️  Frame creation: {frame_creation_time:.2f}s")
+    
+    write_start = time.time()
     print(f"\n💾 Writing MP4 (1 FPS, {len(slideshow_frames)} frames = {len(slideshow_frames)}s)...")
     success_mp4 = write_video(slideshow_frames, mp4_output, fps=1)
+    write_mp4_time = time.time() - write_start
     
     if success_mp4:
         mp4_size = mp4_output.stat().st_size / (1024 * 1024)
-        print(f"   ✅ Saved: {mp4_output.name} ({mp4_size:.2f} MB)")
+        print(f"   ✅ Saved: {mp4_output.name} ({mp4_size:.2f} MB) [{write_mp4_time:.2f}s]")
     
     # Write GIF
+    gif_start = time.time()
     print(f"\n💾 Writing GIF...")
     success_gif = write_gif(slideshow_frames, gif_output)
+    write_gif_time = time.time() - gif_start
     
     if success_gif:
         gif_size = gif_output.stat().st_size / (1024 * 1024)
-        print(f"   ✅ Saved: {gif_output.name} ({gif_size:.2f} MB)")
+        print(f"   ✅ Saved: {gif_output.name} ({gif_size:.2f} MB) [{write_gif_time:.2f}s]")
     
     # Save metadata
     with open(info_output, 'w') as f:
@@ -369,7 +382,11 @@ def main():
     print(f"\n{'='*70}")
     print(f"✅ SLIDESHOW COMPLETE!")
     print(f"{'='*70}\n")
-    print(f"⏱️  Time: {elapsed:.2f}s")
+    print(f"⏱️  Total Time: {elapsed:.2f}s")
+    print(f"   • Frame extraction: {frame_extraction_time:.2f}s ({frame_extraction_time/elapsed*100:.1f}%)")
+    print(f"   • Frame creation: {frame_creation_time:.2f}s ({frame_creation_time/elapsed*100:.1f}%)")
+    print(f"   • MP4 write: {write_mp4_time:.2f}s ({write_mp4_time/elapsed*100:.1f}%)")
+    print(f"   • GIF write: {write_gif_time:.2f}s ({write_gif_time/elapsed*100:.1f}%)")
     print(f"📦 Outputs:")
     print(f"   • MP4: {mp4_output.name} ({len(slideshow_frames)} seconds @ 1 FPS)")
     print(f"   • GIF: {gif_output.name}")
