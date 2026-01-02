@@ -62,7 +62,7 @@ stage1_detect:
     detections_file: ${outputs_dir}/${current_video}/detections_raw.npz
   
   advanced:
-    verbose: false
+    verbose: true
 
 # ============================================================================
 # Stage 2: Tracking (ByteTrack Offline)

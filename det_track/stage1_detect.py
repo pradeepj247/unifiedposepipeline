@@ -119,19 +119,18 @@ def load_yolo_detector(model_path, device='cuda', verbose=False):
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"YOLO model not found: {model_path}")
     
-    # CRITICAL: Initialize CUDA via PyTorch BEFORE loading TensorRT engine
+    # CRITICAL: Initialize CUDA via PyTorch BEFORE any TensorRT operations
     # TensorRT cannot bootstrap CUDA by itself in Python
+    # This MUST happen before YOLO() constructor for .engine files
     if model_path.endswith('.engine'):
-        if verbose:
-            print(f"  🔧 Initializing CUDA via PyTorch (required for TensorRT)...")
+        print(f"  🔧 Initializing CUDA via PyTorch (required for TensorRT)...")
         
-        # Force CUDA initialization
+        # Force CUDA initialization FIRST
         assert torch.cuda.is_available(), "CUDA not available"
         torch.cuda.set_device(0)
-        _ = torch.zeros(1, device="cuda")  # Dummy tensor to ensure CUDA is ready
+        _ = torch.zeros(1, device="cuda")  # Dummy tensor to ensure CUDA is fully initialized
         
-        if verbose:
-            print(f"  ✅ CUDA initialized: {torch.cuda.get_device_name(0)}")
+        print(f"  ✅ CUDA initialized: {torch.cuda.get_device_name(0)}")
     
     if verbose:
         model_type = "TensorRT engine" if model_path.endswith('.engine') else "PyTorch model"
