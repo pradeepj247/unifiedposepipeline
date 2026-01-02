@@ -27,28 +27,43 @@ cv2.setLogLevel(0)
 
 
 def resolve_path_variables(config):
-    """Recursively resolve ${variable} in config"""
-    global_vars = config.get('global', {})
+    """Recursively resolve ${variable} in config with multi-pass resolution"""
+    max_passes = 5
     
-    def resolve_string(s):
-        if not isinstance(s, str):
-            return s
-        return re.sub(
-            r'\$\{(\w+)\}',
-            lambda m: str(global_vars.get(m.group(1), m.group(0))),
-            s
-        )
+    for _ in range(max_passes):
+        global_vars = config.get('global', {})
+        changed = False
+        
+        def resolve_string(s):
+            nonlocal changed
+            if not isinstance(s, str):
+                return s
+            
+            def replace_var(match):
+                nonlocal changed
+                var_name = match.group(1)
+                replacement = str(global_vars.get(var_name, match.group(0)))
+                if replacement != match.group(0):
+                    changed = True
+                return replacement
+            
+            return re.sub(r'\$\{(\w+)\}', replace_var, s)
+        
+        def resolve_recursive(obj):
+            if isinstance(obj, dict):
+                return {k: resolve_recursive(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [resolve_recursive(v) for v in obj]
+            elif isinstance(obj, str):
+                return resolve_string(obj)
+            return obj
+        
+        config = resolve_recursive(config)
+        
+        if not changed:
+            break
     
-    def resolve_recursive(obj):
-        if isinstance(obj, dict):
-            return {k: resolve_recursive(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [resolve_recursive(v) for v in obj]
-        elif isinstance(obj, str):
-            return resolve_string(obj)
-        return obj
-    
-    return resolve_recursive(config)
+    return config
 
 
 def load_config(config_path):
