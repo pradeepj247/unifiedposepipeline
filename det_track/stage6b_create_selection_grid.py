@@ -193,14 +193,16 @@ def extract_crop(frame, bbox, padding_percent=20):
     return frame[y1:y2, x1:x2].copy()
 
 
-def extract_crops_from_frames(video_path, frame_plan, persons_dict):
+def extract_crops_from_frames(video_path, frame_plan, persons_dict, all_persons, debug_dir=None):
     """
-    Extract crops from selected frames
+    Extract crops from selected frames and optionally save debug images
     
     Args:
         video_path: Path to video
         frame_plan: List of (frame_num, [person_ids])
         persons_dict: Dict of {person_id: person_data}
+        all_persons: List of all person dicts (for debug visualization)
+        debug_dir: If provided, save debug frames with all bboxes drawn
     
     Returns:
         crops: Dict of {person_id: crop_image}
@@ -220,6 +222,39 @@ def extract_crops_from_frames(video_path, frame_plan, persons_dict):
             print(f"   ⚠️  Could not read frame {frame_num}")
             continue
         
+        # Save debug frame with ALL bboxes
+        if debug_dir is not None:
+            debug_frame = frame.copy()
+            
+            # Draw all persons' bboxes that exist in this frame
+            for person in all_persons:
+                person_id = person['person_id']
+                
+                # Check if person exists in this frame
+                if frame_num in person['frame_numbers']:
+                    frame_idx = np.where(person['frame_numbers'] == frame_num)[0][0]
+                    bbox = person['bboxes'][frame_idx]
+                    conf = person['confidences'][frame_idx]
+                    
+                    # Color: green for selected persons, gray for others
+                    color = (0, 255, 0) if person_id in person_ids else (128, 128, 128)
+                    thickness = 3 if person_id in person_ids else 2
+                    
+                    # Draw bbox
+                    x1, y1, x2, y2 = map(int, bbox)
+                    cv2.rectangle(debug_frame, (x1, y1), (x2, y2), color, thickness)
+                    
+                    # Add label
+                    label = f"P{person_id} ({conf:.2f})"
+                    label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+                    cv2.rectangle(debug_frame, (x1, y1-25), (x1+label_size[0]+10, y1), color, -1)
+                    cv2.putText(debug_frame, label, (x1+5, y1-8),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
+            
+            # Save debug frame
+            debug_path = debug_dir / f'debug_frame_{frame_num:04d}.png'
+            cv2.imwrite(str(debug_path), debug_frame)
+        
         # Extract crops for all persons in this frame
         for person_id in person_ids:
             person = persons_dict[person_id]
@@ -228,7 +263,7 @@ def extract_crops_from_frames(video_path, frame_plan, persons_dict):
             frame_idx = np.where(person['frame_numbers'] == frame_num)[0][0]
             bbox = person['bboxes'][frame_idx]
             
-            crop = extract_crop(frame, bbox, padding_percent=10)
+            crop = extract_crop(frame, bbox, padding_percent=20)
             crops[person_id] = crop
     
     cap.release()
@@ -325,6 +360,9 @@ def main():
     output_dir = Path(config['global']['outputs_dir']).resolve().absolute() / config['global']['current_video']
     output_dir.mkdir(parents=True, exist_ok=True)
     
+    debug_dir = output_dir / 'debug'
+    debug_dir.mkdir(exist_ok=True)
+    
     grid_output = output_dir / 'person_selection_grid.png'
     
     # Settings
@@ -379,12 +417,14 @@ def main():
     
     # Extract crops (minimal video access)
     print(f"\n🎨 Extracting crops from video...")
+    print(f"   🐛 Debug: Saving annotated frames to debug/")
     extraction_start = time.time()
     persons_dict = {p['person_id']: p for p in persons}
-    crops = extract_crops_from_frames(video_path, frame_plan, persons_dict)
+    crops = extract_crops_from_frames(video_path, frame_plan, persons_dict, persons, debug_dir)
     extraction_time = time.time() - extraction_start
     
     print(f"   ✅ Extracted {len(crops)} crops in {extraction_time:.2f}s")
+    print(f"   ✅ Saved {len(frame_plan)} debug frames with all bboxes")
     
     # Create grid image
     print(f"\n🖼️  Creating grid image (2×5 layout, 1920×1080)...")
@@ -414,7 +454,9 @@ def main():
     print(f"   • Grid creation: {grid_time:.2f}s ({grid_time/elapsed*100:.1f}%)")
     print(f"\n📦 Output:")
     print(f"   • {grid_output.name} ({len(persons)} persons in {len(frame_plan)} frames)")
-    print(f"\n💡 Review the grid and select your preferred person!")
+    print(f"   • debug/ folder with {len(frame_plan)} annotated frames")
+    print(f"\n💡 Check debug frames to verify bbox accuracy!")
+    print(f"   Green boxes = selected persons, Gray boxes = other persons")
     print(f"{'='*70}\n")
 
 
