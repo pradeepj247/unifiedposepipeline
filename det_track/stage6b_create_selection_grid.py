@@ -169,14 +169,19 @@ def select_frames_smartly(persons, min_confidence=0.6, frame_offset=5):
     return frame_plan
 
 
-def extract_crop(frame, bbox, padding_percent=10):
-    """Extract crop with padding"""
+def extract_crop(frame, bbox, padding_percent=20):
+    """Extract crop with padding, ensuring full person is captured"""
     h, w = frame.shape[:2]
     x1, y1, x2, y2 = bbox
+    
+    # Ensure bbox is valid
+    x1, x2 = max(0, x1), min(w, x2)
+    y1, y2 = max(0, y1), min(h, y2)
     
     bbox_w = x2 - x1
     bbox_h = y2 - y1
     
+    # Add padding
     pad_x = bbox_w * (padding_percent / 100)
     pad_y = bbox_h * (padding_percent / 100)
     
@@ -203,7 +208,10 @@ def extract_crops_from_frames(video_path, frame_plan, persons_dict):
     crops = {}
     cap = cv2.VideoCapture(str(video_path))
     
-    for frame_num, person_ids in frame_plan:
+    # Sort frame_plan by frame number for sequential access (CRITICAL for speed)
+    frame_plan_sorted = sorted(frame_plan, key=lambda x: x[0])
+    
+    for frame_num, person_ids in frame_plan_sorted:
         # Seek to frame
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
         ret, frame = cap.read()
@@ -227,78 +235,74 @@ def extract_crops_from_frames(video_path, frame_plan, persons_dict):
     return crops
 
 
-def create_grid_image(crops, persons, fixed_height=600):
+def create_grid_image(crops, persons, grid_size=(2, 5), output_size=(1920, 1080)):
     """
-    Create single grid image with all person crops
+    Create fixed-size grid image (2×5 layout)
     
     Args:
         crops: Dict of {person_id: crop_image}
         persons: List of person dicts (sorted by duration)
-        fixed_height: Target height for all crops
+        grid_size: (rows, cols) tuple
+        output_size: (width, height) of final image
     
     Returns:
-        grid_image: Single image with all crops side-by-side
+        grid_image: Fixed 1920×1080 image with 2×5 grid
     """
-    # Resize crops to fixed height, calculate widths
-    resized_crops = []
-    person_ids = []
+    rows, cols = grid_size
+    output_w, output_h = output_size
     
-    for person in persons:
-        person_id = person['person_id']
-        if person_id not in crops:
-            continue
-        
-        crop = crops[person_id]
-        h, w = crop.shape[:2]
-        
-        # Maintain aspect ratio
-        new_h = fixed_height
-        new_w = int(w * (fixed_height / h))
-        
-        resized = cv2.resize(crop, (new_w, new_h))
-        resized_crops.append(resized)
-        person_ids.append(person_id)
+    # Calculate cell size
+    cell_w = output_w // cols
+    cell_h = output_h // rows
     
-    if not resized_crops:
-        return None
+    # Create blank canvas
+    canvas = np.zeros((output_h, output_w, 3), dtype=np.uint8)
     
-    # Find max width for padding
-    max_width = max(c.shape[1] for c in resized_crops)
-    
-    # Pad all crops to same width
-    padded_crops = []
-    for crop in resized_crops:
-        h, w = crop.shape[:2]
-        if w < max_width:
-            # Pad on right
-            pad_width = max_width - w
-            padded = cv2.copyMakeBorder(crop, 0, 0, 0, pad_width, 
-                                       cv2.BORDER_CONSTANT, value=(0, 0, 0))
-        else:
-            padded = crop
-        padded_crops.append(padded)
-    
-    # Stack horizontally
-    grid = np.hstack(padded_crops)
-    
-    # Add label bar below
-    label_height = 60
-    label_bar = np.ones((label_height, grid.shape[1], 3), dtype=np.uint8) * 255
-    
-    # Add person IDs
-    x_offset = 0
     font = cv2.FONT_HERSHEY_SIMPLEX
-    for person_id in person_ids:
-        text = f"Person {person_id}"
-        text_x = x_offset + max_width // 2 - 50
-        cv2.putText(label_bar, text, (text_x, 40),
-                   font, 0.8, (0, 0, 0), 2, cv2.LINE_AA)
-        x_offset += max_width
     
-    # Stack label below grid
-    final_image = np.vstack([grid, label_bar])
+    # Fill grid with person crops
+    for idx, person in enumerate(persons[:rows * cols]):
+        person_id = person['person_id']
+        
+        # Calculate cell position
+        row = idx // cols
+        col = idx % cols
+        x_start = col * cell_w
+        y_start = row * cell_h
+        
+        # Create cell
+        cell = np.zeros((cell_h, cell_w, 3), dtype=np.uint8)
+        
+        if person_id in crops:
+            crop = crops[person_id]
+            
+            # Resize crop to fit cell while maintaining aspect ratio
+            h, w = crop.shape[:2]
+            scale = min((cell_w - 20) / w, (cell_h - 40) / h)  # Leave margin for label
+            new_w = int(w * scale)
+            new_h = int(h * scale)
+            
+            resized = cv2.resize(crop, (new_w, new_h))
+            
+            # Center crop in cell
+            y_offset = (cell_h - new_h - 40) // 2  # Extra space for label
+            x_offset = (cell_w - new_w) // 2
+            
+            cell[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = resized
+        
+        # Add label at bottom of cell
+        label = f"Person {person_id}"
+        text_size = cv2.getTextSize(label, font, 0.7, 2)[0]
+        text_x = (cell_w - text_size[0]) // 2
+        text_y = cell_h - 10
+        
+        cv2.putText(cell, label, (text_x, text_y),
+                   font, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+        
+        # Place cell on canvas
+        canvas[y_start:y_start+cell_h, x_start:x_start+cell_w] = cell
     
-    return final_image
+    return canvas
 
 
 def main():
@@ -383,9 +387,9 @@ def main():
     print(f"   ✅ Extracted {len(crops)} crops in {extraction_time:.2f}s")
     
     # Create grid image
-    print(f"\n🖼️  Creating grid image...")
+    print(f"\n🖼️  Creating grid image (2×5 layout, 1920×1080)...")
     grid_start = time.time()
-    grid_image = create_grid_image(crops, persons, fixed_height=600)
+    grid_image = create_grid_image(crops, persons, grid_size=(2, 5), output_size=(1920, 1080))
     grid_time = time.time() - grid_start
     
     if grid_image is None:
@@ -396,7 +400,7 @@ def main():
     cv2.imwrite(str(grid_output), grid_image)
     file_size = grid_output.stat().st_size / (1024 * 1024)
     
-    print(f"   ✅ Grid created: {grid_image.shape[1]}×{grid_image.shape[0]} pixels")
+    print(f"   ✅ Grid created: 1920×1080 pixels (2 rows × 5 cols)")
     print(f"   ✅ Saved: {grid_output.name} ({file_size:.2f} MB)")
     
     elapsed = time.time() - start_time
