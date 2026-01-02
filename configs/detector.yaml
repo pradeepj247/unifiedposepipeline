@@ -6,7 +6,7 @@
 # ============================================================================
 detector:
   type: yolo  # Options: yolo, rtmdet
-  model_path: models/yolo/yolov8s.pt  # Path to detector model
+  model_path: models/yolo/yolov8s.engine  # Path to detector model
   confidence: 0.3  # Confidence threshold for detections
   device: cuda  # Device to use: cuda or cpu
   detect_only_humans: true  # If true, only detect person class (COCO class 0)

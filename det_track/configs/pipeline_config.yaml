@@ -40,7 +40,7 @@ pipeline:
 stage1_detect:
   detector:
     type: yolo
-    model_path: ${models_dir}/yolo/yolov8s.pt
+    model_path: ${models_dir}/yolo/yolov8s.engine
     confidence: 0.3
     device: cuda
     detect_only_humans: true

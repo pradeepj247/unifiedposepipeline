@@ -109,33 +109,113 @@ def load_config(config_path):
 
 
 def load_yolo_detector(model_path, device='cuda', verbose=False):
-    """Load YOLO detector"""
-    try:
-        from ultralytics import YOLO
-    except ImportError:
-        raise ImportError("ultralytics not found. Install with: pip install ultralytics")
+    """Load YOLO detector - supports both PyTorch (.pt) and TensorRT (.engine) models"""
     
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"YOLO model not found: {model_path}")
+    if model_path.endswith('.engine'):
+        # Try loading TensorRT engine with ultralytics first (it supports .engine files)
+        try:
+            from ultralytics import YOLO
+            if verbose:
+                print(f"  ✅ Loading TensorRT engine via ultralytics: {model_path}")
+            
+            model = YOLO(model_path)
+            model.to(device)
+            
+            return {
+                'type': 'tensorrt_ultralytics',
+                'model': model
+            }
+        except Exception as e:
+            if verbose:
+                print(f"  ⚠️  Ultralytics failed to load TensorRT engine: {e}")
+                print("  🔄 Falling back to manual TensorRT loading...")
+            
+            # Fallback to manual TensorRT loading
+            try:
+                import tensorrt as trt
+            except ImportError:
+                raise ImportError("tensorrt not found. Install with: pip install tensorrt")
+            
+            if not os.path.exists(model_path):
+                raise FileNotFoundError(f"TensorRT engine not found: {model_path}")
+            
+            if verbose:
+                print(f"  ✅ Loading TensorRT engine manually: {model_path}")
+            
+            # Load TensorRT engine
+            logger = trt.Logger(trt.Logger.WARNING)
+            with open(model_path, 'rb') as f:
+                engine_data = f.read()
+            
+            runtime = trt.Runtime(logger)
+            engine = runtime.deserialize_cuda_engine(engine_data)
+            context = engine.create_execution_context()
+            
+            # Get input/output binding info
+            input_binding = None
+            output_bindings = []
+            for i in range(engine.num_bindings):
+                name = engine.get_binding_name(i)
+                if engine.binding_is_input(i):
+                    input_binding = name
+                else:
+                    output_bindings.append(name)
+            
+            return {
+                'type': 'tensorrt_manual',
+                'engine': engine,
+                'context': context,
+                'input_binding': input_binding,
+                'output_bindings': output_bindings
+            }
     
-    if verbose:
-        print(f"  ✅ Loading YOLO model: {model_path}")
-    
-    model = YOLO(model_path)
-    model.to(device)
-    
-    return model
+    else:
+        # Load PyTorch model (existing code)
+        try:
+            from ultralytics import YOLO
+        except ImportError:
+            raise ImportError("ultralytics not found. Install with: pip install ultralytics")
+        
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"YOLO model not found: {model_path}")
+        
+        if verbose:
+            print(f"  ✅ Loading YOLO model: {model_path}")
+        
+        model = YOLO(model_path)
+        model.to(device)
+        
+        return {
+            'type': 'pytorch',
+            'model': model
+        }
 
 
 def detect_frame(model, frame, confidence=0.3, detect_only_humans=True):
     """
     Run YOLO detection on a single frame
     
+    Args:
+        model: Model dict returned by load_yolo_detector or YOLO model object (for backward compatibility)
+    
     Returns:
         detections: (N, 5) array of [x1, y1, x2, y2, confidence]
         classes: (N,) array of class IDs
     """
-    results = model(frame, conf=confidence, verbose=False)
+    # Handle both new dict format and old direct model format
+    if isinstance(model, dict):
+        model_type = model.get('type', 'pytorch')
+        if model_type in ['pytorch', 'tensorrt_ultralytics']:
+            yolo_model = model['model']
+        elif model_type == 'tensorrt_manual':
+            raise NotImplementedError("Manual TensorRT inference not yet implemented")
+        else:
+            raise ValueError(f"Unknown model type: {model_type}")
+    else:
+        # Backward compatibility: assume it's a YOLO model object
+        yolo_model = model
+    
+    results = yolo_model(frame, conf=confidence, verbose=False)
     
     detections = []
     classes = []
