@@ -327,7 +327,6 @@ def run_detection(config):
     # Extract configuration
     detector_config = stage_config['detector']
     detection_limit = stage_config['detection_limit']
-    processing_config = stage_config['processing']
     input_config = stage_config['input']
     output_config = stage_config['output']
     
