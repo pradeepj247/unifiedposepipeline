@@ -107,6 +107,66 @@ def get_best_crop_for_person(person, crops_cache):
     return None
 
 
+def bbox_iou(bbox1, bbox2):
+    """Calculate IoU between two bboxes [x1, y1, x2, y2]"""
+    x1_min, y1_min, x1_max, y1_max = bbox1
+    x2_min, y2_min, x2_max, y2_max = bbox2
+    
+    # Intersection
+    inter_min_x = max(x1_min, x2_min)
+    inter_min_y = max(y1_min, y2_min)
+    inter_max_x = min(x1_max, x2_max)
+    inter_max_y = min(y1_max, y2_max)
+    
+    if inter_max_x < inter_min_x or inter_max_y < inter_min_y:
+        return 0.0
+    
+    inter_area = (inter_max_x - inter_min_x) * (inter_max_y - inter_min_y)
+    
+    # Union
+    area1 = (x1_max - x1_min) * (y1_max - y1_min)
+    area2 = (x2_max - x2_min) * (y2_max - y2_min)
+    union_area = area1 + area2 - inter_area
+    
+    return inter_area / union_area if union_area > 0 else 0.0
+
+
+def find_crop_for_person_in_frame(person_bbox, frame_to_detections, crops_cache, frame_idx):
+    """
+    Find the crop that matches a person's bbox in a specific frame.
+    Uses IoU to find the best matching detection.
+    """
+    if frame_idx not in frame_to_detections or frame_idx not in crops_cache:
+        return None
+    
+    detections_in_frame = frame_to_detections[frame_idx]
+    crops_in_frame = crops_cache[frame_idx]
+    
+    # Find detection with highest IoU to person_bbox
+    best_det_idx = None
+    best_iou = 0.0
+    
+    for det_idx, det_bbox in detections_in_frame:
+        iou = bbox_iou(person_bbox, det_bbox)
+        if iou > best_iou:
+            best_iou = iou
+            best_det_idx = det_idx
+    
+    # Return crop if found and IoU is reasonable (>0.5)
+    if best_det_idx is not None and best_iou > 0.5:
+        if best_det_idx in crops_in_frame:
+            crop = crops_in_frame[best_det_idx]
+            if crop is not None and isinstance(crop, np.ndarray):
+                return crop
+    
+    # Fallback: return first available crop (better than nothing)
+    for crop_img in crops_in_frame.values():
+        if crop_img is not None and isinstance(crop_img, np.ndarray):
+            return crop_img
+    
+    return None
+
+
 def create_selection_report(canonical_file, crops_cache_file, fps, video_duration_frames, output_html):
     """Create HTML selection report with 3 temporal crops per person"""
     
@@ -128,6 +188,21 @@ def create_selection_report(canonical_file, crops_cache_file, fps, video_duratio
     print(f"📂 Loading crops cache...")
     with open(crops_cache_file, 'rb') as f:
         crops_cache = pickle.load(f)
+    
+    # Load detections to map bboxes to detection indices
+    print(f"📂 Loading detections (for bbox-to-crop mapping)...")
+    detections_file = Path(crops_cache_file).parent / 'detections_raw.npz'
+    detections_data = np.load(str(detections_file), allow_pickle=True)
+    detection_frame_numbers = detections_data['frame_numbers']
+    detection_bboxes = detections_data['bboxes']
+    # Build frame->detection mapping: {frame_idx: [(det_idx, bbox), ...]}
+    frame_to_detections = {}
+    for det_idx in range(len(detection_frame_numbers)):
+        frame_idx = int(detection_frame_numbers[det_idx])
+        bbox = detection_bboxes[det_idx]
+        if frame_idx not in frame_to_detections:
+            frame_to_detections[frame_idx] = []
+        frame_to_detections[frame_idx].append((det_idx, bbox))
     
     # Create HTML report
     print(f"📄 Creating HTML report...")
@@ -238,28 +313,21 @@ def create_selection_report(canonical_file, crops_cache_file, fps, video_duratio
             # Clamp to valid range
             idx = min(idx, num_frames - 1)
             frame_num = int(frames[idx])
+            person_bbox = person['bboxes'][idx]  # Get person's bbox at this frame
             
-            # Get crop from cache
-            if frame_num in crops_cache:
-                crops_in_frame = crops_cache[frame_num]
-                crop = None
+            # Find crop matching this person's bbox in this frame
+            crop = find_crop_for_person_in_frame(person_bbox, frame_to_detections, crops_cache, frame_num)
+            
+            if crop is not None:
+                # Convert BGR to RGB
+                crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
                 
-                # Get first available crop from this frame
-                for crop_img in crops_in_frame.values():
-                    if crop_img is not None and isinstance(crop_img, np.ndarray):
-                        crop = crop_img
-                        break
-                
-                if crop is not None:
-                    # Convert BGR to RGB
-                    crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-                    
-                    # Encode to PNG in memory
-                    success, png_array = cv2.imencode('.png', cv2.cvtColor(crop_rgb, cv2.COLOR_RGB2BGR))
-                    if success:
-                        png_base64 = base64.b64encode(png_array.tobytes()).decode('utf-8')
-                        percent_label = ['25%', '50%', '75%'][i]
-                        thumbnail_html += f'<img src="data:image/png;base64,{png_base64}" class="thumbnail" title="{percent_label}" alt="{percent_label}">'
+                # Encode to PNG in memory
+                success, png_array = cv2.imencode('.png', cv2.cvtColor(crop_rgb, cv2.COLOR_RGB2BGR))
+                if success:
+                    png_base64 = base64.b64encode(png_array.tobytes()).decode('utf-8')
+                    percent_label = ['25%', '50%', '75%'][i]
+                    thumbnail_html += f'<img src="data:image/png;base64,{png_base64}" class="thumbnail" title="{percent_label}" alt="{percent_label}">'
         
         # Add row
         html_content += f"""        <tr>
@@ -304,8 +372,8 @@ def main():
     output_dir = Path(canonical_file).parent
     output_html = output_dir / 'person_selection_report.html'
     
-    # Get video duration from config
-    video_duration_frames = config.get('global', {}).get('video_duration_frames', 25200)
+    # Get video duration from config (or 0 to auto-calculate from data)
+    video_duration_frames = config.get('global', {}).get('video_duration_frames', 0)
     
     print(f"\n{'='*70}")
     print(f"📄 STAGE 6b: CREATE PERSON SELECTION REPORT (3 TEMPORAL CROPS)")
