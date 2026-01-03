@@ -405,13 +405,13 @@ def run_detection(config):
     # Setup output video writer for visualization
     output_video_path = Path(detections_file).parent / 'stage1_detections_debug.mp4'
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out_video = cv2.VideoWriter(str(output_video_path), fourcc, fps, (width, height))
+    out_video = cv2.VideoWriter(str(output_video_path), fourcc, fps, (proc_width, proc_height))
     
     if not out_video.isOpened():
         print(f"  ⚠️  Warning: Could not open video writer. Continuing without visualization.")
         out_video = None
     else:
-        print(f"  📹 Output video: {output_video_path.name}")
+        print(f"  📹 Output video: {output_video_path.name} ({proc_width}x{proc_height})")
     
     # Storage
     all_frame_numbers = []
@@ -457,10 +457,10 @@ def run_detection(config):
             min_confidence=detection_limit['min_confidence']
         )
         
-        # Draw detections on original frame
-        frame_vis = draw_detections_on_frame(frame, detections, frame_idx)
+        # Draw detections on processing frame (for output video)
+        frame_vis = draw_detections_on_frame(frame_proc, detections, frame_idx)
         
-        # Write visualization frame to output video
+        # Write visualization frame to output video (at processing resolution)
         if out_video is not None:
             out_video.write(frame_vis)
         
