@@ -27,19 +27,19 @@ global:
 # Use ONLY the settings below to control pipeline execution.
 # ============================================================================
 pipeline:
-  # Stage execution control - the ONLY place to enable/disable stages
+  # Stage execution control - SIMPLE NUMERIC IDs 1-11 - the ONLY place to enable/disable stages
   stages:
-    stage1_detect: true                    # YOLO detection
-    stage2_track: true                     # ByteTrack offline tracking
-    stage3_analyze: true                   # Tracklet statistics & candidate analysis
-    stage4a_reid_recovery: true            # Load crops cache (lightweight)
-    stage4b_group_canonical: true          # Group tracklets into canonical persons
-    stage4b5_enrich_crops: true            # Enrich crops with person IDs and metadata (HDF5)
-    stage5_rank: true                      # Rank persons by appearance time
-    stage5b_visualize_grouping: true       # Optional: Show grouping tables (debug)
-    stage6_create_output_video: true       # Create video visualization of top 10 persons
-    stage6b_create_selection_grid: true    # Create HTML selection report (alternative to video)
-    stage9_generate_gifs: true             # Generate animated GIFs for top 10 persons (experimental)
+    stage1: true                           # Stage 1: YOLO detection
+    stage2: true                           # Stage 2: ByteTrack offline tracking
+    stage3: true                           # Stage 3: Tracklet statistics & candidate analysis
+    stage4: true                           # Stage 4: Load crops cache (lightweight)
+    stage5: true                           # Stage 5: Group tracklets into canonical persons
+    stage6: true                           # Stage 6: Enrich crops with person IDs and metadata (HDF5)
+    stage7: true                           # Stage 7: Rank persons by appearance time
+    stage8: false                          # Stage 8: Optional: Show grouping tables (debug)
+    stage9: true                           # Stage 9: Create video visualization of top 10 persons
+    stage10: true                          # Stage 10: Create HTML selection report
+    stage11: true                          # Stage 11: Generate animated GIFs for top 10 persons
   
   # Global settings inherited by all stages (can be overridden per-stage if needed)
   advanced:
@@ -47,9 +47,9 @@ pipeline:
 
 
 # ============================================================================
-# Stage 1: Detection
+# Stage 1: YOLO Detection
 # ============================================================================
-stage1_detect:
+stage1:
   detector:
     model_path: ${models_dir}/yolo/yolov8s.pt  # Use .engine for TensorRT (requires tensorrt package)
     confidence: 0.3
@@ -69,10 +69,10 @@ stage1_detect:
     crops_cache_file: ${outputs_dir}/${current_video}/crops_cache.pkl
 
 # ============================================================================
-# Stage 2: Tracking (ByteTrack Offline)
+# Stage 2: ByteTrack Offline Tracking
 # ============================================================================
 # NOTE: Only ByteTrack is currently supported (hardcoded in stage2_track.py)
-stage2_track:
+stage2:
   params:
     track_thresh: 0.15     # Confidence threshold for tracking (lowered for better recall)
     track_buffer: 30       # Buffer size for lost tracks (frames)
@@ -88,7 +88,7 @@ stage2_track:
 # ============================================================================
 # Stage 3: Tracklet Analysis
 # ============================================================================
-stage3_analyze:
+stage3:
   analysis:
     compute_statistics: true  # Temporal, spatial, motion stats
     identify_candidates: true # Find suspicious tracklet pairs for ReID
@@ -106,12 +106,12 @@ stage3_analyze:
     candidates_file: ${outputs_dir}/${current_video}/reid_candidates.json
 
 # ============================================================================
-# Stage 4a: Load Crops Cache (Lightweight - No ReID Recovery)
+# Stage 4: Load Crops Cache (Lightweight - No ReID Recovery)
 # ============================================================================
 # NOTE: This is the lightweight version that loads pre-cached crops from Stage 1
 # It does NOT perform ReID-based tracklet recovery
 # For full ReID-based recovery, use the old stage4a_reid_recovery_onnx.py
-stage4a_reid_recovery:
+stage4:
   input:
     crops_cache_file: ${outputs_dir}/${current_video}/crops_cache.pkl
   
@@ -119,10 +119,10 @@ stage4a_reid_recovery:
     # No outputs - crops cache is loaded and passed to Stage 7
 
 # ============================================================================
-# Stage 4b: Canonical Person Grouping
+# Stage 5: Canonical Person Grouping
 # ============================================================================
-# To disable this stage, set pipeline.stages.stage4b_group_canonical to false
-stage4b_group_canonical:
+# To disable this stage, set pipeline.stages.stage5 to false
+stage5:
   grouping:
     method: heuristic  # Options: heuristic, clustering, hybrid
     
@@ -143,12 +143,12 @@ stage4b_group_canonical:
     grouping_log_file: ${outputs_dir}/${current_video}/grouping_log.json
 
 # ============================================================================
-# Stage 4b.5: Enrich Crops with Person IDs and Metadata (HDF5)
+# Stage 6: Enrich Crops with Person IDs and Metadata (HDF5)
 # ============================================================================
-# NEW STAGE: Creates crops_enriched.h5 with fast indexed lookups
+# Creates crops_enriched.h5 with fast indexed lookups
 # Input: canonical_persons.npz + crops_cache.pkl
 # Output: crops_enriched.h5 with structure: person_ID -> frame_ID -> {image_bgr, bbox, width, height}
-stage4b5_enrich_crops:
+stage6:
   
   enrichment:
     format: hdf5              # Output format (HDF5 for fast indexed lookups)
@@ -164,9 +164,9 @@ stage4b5_enrich_crops:
     crops_enriched_file: ${outputs_dir}/${current_video}/crops_enriched.h5
 
 # ============================================================================
-# Stage 5: Ranking and Primary Person Selection
+# Stage 7: Rank Persons by Appearance Time
 # ============================================================================
-stage5_rank:
+stage7:
   ranking:
     method: auto  # Options: auto (manual selection not yet implemented)
     
@@ -185,10 +185,10 @@ stage5_rank:
     ranking_report_file: ${outputs_dir}/${current_video}/ranking_report.json
 
 # ============================================================================
-# Stage 6: Create Output Video - Visualization of Top 10 Persons
+# Stage 8: Visualize Grouping (Debug Only)
 # ============================================================================
-# To disable this stage, set pipeline.stages.stage6_create_output_video to false
-stage6_create_output_video:
+# To disable this stage, set pipeline.stages.stage8 to false
+stage8:
   
   visualization:
     min_duration_seconds: 5    # Minimum appearance time to be included
@@ -201,10 +201,10 @@ stage6_create_output_video:
     video_file: ${outputs_dir}/${current_video}/top_persons_visualization.mp4
 
 # ============================================================================
-# Stage 6b: Create Selection HTML Report (Alternative to Stage 6 Video)
+# Stage 10: HTML Selection Report
 # ============================================================================
-# To disable this stage, set pipeline.stages.stage6b_create_selection_grid to false
-stage6b_create_selection_grid:
+# To disable this stage, set pipeline.stages.stage10 to false
+stage10:
   
   filters:
     min_duration_seconds: 5    # Minimum appearance time to be included
@@ -214,3 +214,18 @@ stage6b_create_selection_grid:
     fullframe_grid: ${outputs_dir}/${current_video}/top10_persons_fullframe_grid.png
     cropped_grid: ${outputs_dir}/${current_video}/top10_persons_cropped_grid.png
     selection_info: ${outputs_dir}/${current_video}/selection_grid_info.json
+
+# ============================================================================
+# Stage 11: Generate Person GIFs
+# ============================================================================
+# To disable this stage, set pipeline.stages.stage11 to false
+stage11:
+  
+  gif_generation:
+    format: mp4              # Output format (mp4 or gif)
+    fps: 20                  # Frames per second
+    max_frames: 75           # Maximum frames per GIF
+    max_persons: 10          # Generate GIFs for top 10 persons
+  
+  output:
+    gifs_dir: ${outputs_dir}/${current_video}/gifs

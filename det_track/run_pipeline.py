@@ -156,19 +156,19 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     config = load_config(config_path)
     
     # Pipeline stages - SIMPLE NUMERIC IDs FOR CLEAR REFERENCING
-    # Usage: --stages 1,2,3  or  --stages 1,5,10
+    # Usage: --stages 1,2,3  or  --stages 10,11
     all_stages = [
-        ('Stage 1: YOLO Detection', 'stage1_detect.py', 'stage1_detect'),
-        ('Stage 2: ByteTrack Tracking', 'stage2_track.py', 'stage2_track'),
-        ('Stage 3: Tracklet Analysis', 'stage3_analyze_tracklets.py', 'stage3_analyze'),
-        ('Stage 4: Load Crops Cache', 'stage4a_load_crops_cache.py', 'stage4a_reid_recovery'),
-        ('Stage 5: Canonical Person Grouping', 'stage4b_group_canonical.py', 'stage4b_group_canonical'),
-        ('Stage 6: Enrich Crops with HDF5', 'stage4b5_enrich_crops.py', 'stage4b5_enrich_crops'),
-        ('Stage 7: Rank Persons', 'stage5_rank_persons.py', 'stage5_rank'),
-        ('Stage 8: Visualize Grouping (Debug)', 'stage5b_visualize_grouping.py', 'stage5b_visualize_grouping'),
-        ('Stage 9: Output Video Visualization', 'stage6_create_output_video.py', 'stage6_create_output_video'),
-        ('Stage 10: HTML Selection Report', 'stage6b_create_selection_html.py', 'stage6b_create_selection_grid'),
-        ('Stage 11: Generate Person GIFs', 'stage9_generate_person_gifs.py', 'stage9_generate_gifs')
+        ('Stage 1: YOLO Detection', 'stage1_detect.py', 'stage1'),
+        ('Stage 2: ByteTrack Tracking', 'stage2_track.py', 'stage2'),
+        ('Stage 3: Tracklet Analysis', 'stage3_analyze_tracklets.py', 'stage3'),
+        ('Stage 4: Load Crops Cache', 'stage4a_load_crops_cache.py', 'stage4'),
+        ('Stage 5: Canonical Person Grouping', 'stage4b_group_canonical.py', 'stage5'),
+        ('Stage 6: Enrich Crops with HDF5', 'stage4b5_enrich_crops.py', 'stage6'),
+        ('Stage 7: Rank Persons', 'stage5_rank_persons.py', 'stage7'),
+        ('Stage 8: Visualize Grouping (Debug)', 'stage5b_visualize_grouping.py', 'stage8'),
+        ('Stage 9: Output Video Visualization', 'stage6_create_output_video.py', 'stage9'),
+        ('Stage 10: HTML Selection Report', 'stage6b_create_selection_html.py', 'stage10'),
+        ('Stage 11: Generate Person GIFs', 'stage9_generate_person_gifs.py', 'stage11')
     ]
     
     # Print header
