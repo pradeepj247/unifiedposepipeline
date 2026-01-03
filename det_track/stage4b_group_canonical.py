@@ -273,14 +273,10 @@ def run_canonical_grouping(config):
     grouping_config = stage_config['grouping']
     
     # Determine input source
-    stage4a_enabled = config['pipeline']['stages']['stage4a_reid_recovery']
-    
-    if stage4a_enabled:
-        input_file = input_config['recovered_tracklets_file']
-        print(f"📂 Using ReID-recovered tracklets")
-    else:
-        input_file = input_config['tracklets_raw_file']
-        print(f"📂 Using raw tracklets (Stage 4a disabled)")
+    # NOTE: New lightweight stage4a (crops cache loader) doesn't produce tracklets_recovered.npz
+    # Always use tracklets_raw.npz (from Stage 2) as input
+    input_file = input_config['tracklets_raw_file']
+    print(f"📂 Using raw tracklets from Stage 2")
     
     canonical_file = output_config['canonical_persons_file']
     grouping_log_file = output_config['grouping_log_file']

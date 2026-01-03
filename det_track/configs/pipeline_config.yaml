@@ -115,8 +115,11 @@ stage3_analyze:
     verbose: false
 
 # ============================================================================
-# Stage 4a: Load Crops Cache (Lightweight - No ReID)
+# Stage 4a: Load Crops Cache (Lightweight - No ReID Recovery)
 # ============================================================================
+# NOTE: This is the lightweight version that loads pre-cached crops from Stage 1
+# It does NOT perform ReID-based tracklet recovery
+# For full ReID-based recovery, use the old stage4a_reid_recovery_onnx.py
 stage4a_reid_recovery:
   input:
     crops_cache_file: ${outputs_dir}/${current_video}/crops_cache.pkl
