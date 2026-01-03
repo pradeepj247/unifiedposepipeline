@@ -49,8 +49,41 @@ def resolve_path_variables(config):
         if not changed:
             break
     
-    config['global'] = global_vars
-    return config
+    # Auto-extract current_video from video_file
+    video_file = global_vars.get('video_file', '')
+    if video_file:
+        import os
+        video_name = os.path.splitext(video_file)[0]
+        global_vars['current_video'] = video_name
+    
+    # Second pass: resolve entire config using resolved global vars
+    def resolve_string(s, vars_dict):
+        if not isinstance(s, str):
+            return s
+        result = s
+        for _ in range(max_iterations):
+            new_result = re.sub(
+                r'\$\{(\w+)\}',
+                lambda m: str(vars_dict.get(m.group(1), m.group(0))),
+                result
+            )
+            if new_result == result:
+                break
+            result = new_result
+        return result
+    
+    def resolve_recursive(obj):
+        if isinstance(obj, dict):
+            return {k: resolve_recursive(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [resolve_recursive(v) for v in obj]
+        elif isinstance(obj, str):
+            return resolve_string(obj, global_vars)
+        return obj
+    
+    result = resolve_recursive(config)
+    result['global'] = global_vars
+    return result
 
 
 def load_npz_data(npz_path):
