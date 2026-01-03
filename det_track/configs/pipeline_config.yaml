@@ -27,6 +27,7 @@ global:
 # Use ONLY the settings below to control pipeline execution.
 # ============================================================================
 pipeline:
+  # Stage execution control - the ONLY place to enable/disable stages
   stages:
     stage1_detect: true                    # YOLO detection
     stage2_track: true                     # ByteTrack offline tracking
@@ -37,6 +38,10 @@ pipeline:
     stage5b_visualize_grouping: false      # Optional: Show grouping tables (debug)
     stage6_create_output_video: true       # Create video visualization of top 10 persons
     stage6b_create_selection_grid: false   # Create HTML selection report (alternative to video)
+  
+  # Global settings inherited by all stages (can be overridden per-stage if needed)
+  advanced:
+    verbose: false                         # Debug output for all stages (set true to see detailed logs)
 
 
 # ============================================================================
@@ -60,15 +65,11 @@ stage1_detect:
     batch_size: 1
   
   input:
-    video_path: ${video_dir}${video_file}
     max_frames: 0  # 0 = all frames
   
   output:
     detections_file: ${outputs_dir}/${current_video}/detections_raw.npz
     crops_cache_file: ${outputs_dir}/${current_video}/crops_cache.pkl
-  
-  advanced:
-    verbose: true
 
 # ============================================================================
 # Stage 2: Tracking (ByteTrack Offline)
@@ -84,14 +85,10 @@ stage2_track:
     min_hits: 1            # Minimum consecutive detections to create track (1=immediate)
   
   input:
-    video_path: ${video_dir}${video_file}
     detections_file: ${outputs_dir}/${current_video}/detections_raw.npz
   
   output:
     tracklets_file: ${outputs_dir}/${current_video}/tracklets_raw.npz
-  
-  advanced:
-    verbose: false
 
 # ============================================================================
 # Stage 3: Tracklet Analysis
@@ -112,9 +109,6 @@ stage3_analyze:
   output:
     tracklet_stats_file: ${outputs_dir}/${current_video}/tracklet_stats.npz
     candidates_file: ${outputs_dir}/${current_video}/reid_candidates.json
-  
-  advanced:
-    verbose: false
 
 # ============================================================================
 # Stage 4a: Load Crops Cache (Lightweight - No ReID Recovery)
@@ -130,11 +124,10 @@ stage4a_reid_recovery:
     # No outputs - crops cache is loaded and passed to Stage 7
 
 # ============================================================================
-# Stage 4b: Canonical Person Grouping (OPTIONAL - Toggle for benchmarking)
+# Stage 4b: Canonical Person Grouping
 # ============================================================================
+# To disable this stage, set pipeline.stages.stage4b_group_canonical to false
 stage4b_group_canonical:
-  enabled: true  # Set false to skip geometric grouping
-  
   grouping:
     method: heuristic  # Options: heuristic, clustering, hybrid
     
@@ -154,9 +147,6 @@ stage4b_group_canonical:
   output:
     canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
     grouping_log_file: ${outputs_dir}/${current_video}/grouping_log.json
-  
-  advanced:
-    verbose: false
 
 # ============================================================================
 # Stage 5: Ranking and Primary Person Selection
@@ -182,15 +172,11 @@ stage5_rank:
   output:
     primary_person_file: ${outputs_dir}/${current_video}/primary_person.npz
     ranking_report_file: ${outputs_dir}/${current_video}/ranking_report.json
-  
-  advanced:
-    verbose: false
 
 # ============================================================================
 # Stage 6: Create Output Video - Visualization of Top 10 Persons
 # ============================================================================
-# NOTE: To enable/disable this stage, use pipeline.stages.stage6_create_output_video
-# (not an 'enabled' field - that would be IGNORED)
+# To disable this stage, set pipeline.stages.stage6_create_output_video to false
 stage6_create_output_video:
   
   visualization:
@@ -200,20 +186,15 @@ stage6_create_output_video:
     output_fps: 22.5           # Output video framerate
   
   input:
-    video_file: ${video_dir}${video_file}
     canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
   
   output:
     video_file: ${outputs_dir}/${current_video}/top_persons_visualization.mp4
-  
-  advanced:
-    verbose: false
 
 # ============================================================================
 # Stage 6b: Create Selection HTML Report (Alternative to Stage 6 Video)
 # ============================================================================
-# NOTE: To enable/disable this stage, use pipeline.stages.stage6b_create_selection_grid
-# (not an 'enabled' field - that would be IGNORED)
+# To disable this stage, set pipeline.stages.stage6b_create_selection_grid to false
 stage6b_create_selection_grid:
   
   filters:
@@ -232,15 +213,3 @@ stage6b_create_selection_grid:
     fullframe_grid: ${outputs_dir}/${current_video}/top10_persons_fullframe_grid.png
     cropped_grid: ${outputs_dir}/${current_video}/top10_persons_cropped_grid.png
     selection_info: ${outputs_dir}/${current_video}/selection_grid_info.json
-  
-  advanced:
-    verbose: false
-
-# ============================================================================
-# Advanced Settings
-# ============================================================================
-# NOTE: Individual stage configs have their own 'advanced: verbose:' settings
-# (see under each stage section). Modify those to enable verbose output for
-# specific stages. Global settings would apply to all stages.
-
-# (Currently no global advanced settings are used by the pipeline)
