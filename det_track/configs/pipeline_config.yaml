@@ -37,10 +37,7 @@ pipeline:
     stage5b_visualize_grouping: false      # Optional: Show grouping tables (debug)
     stage6_create_output_video: true       # Create video visualization of top 10 persons
     stage6b_create_selection_grid: false   # Create HTML selection report (alternative to video)
-  
-  # Data flow options
-  skip_if_exists: false  # Skip stages if output files already exist
-  cleanup_intermediates: false  # Delete intermediate NPZ files after completion
+
 
 # ============================================================================
 # Stage 1: Detection
@@ -242,7 +239,8 @@ stage6b_create_selection_grid:
 # ============================================================================
 # Advanced Settings
 # ============================================================================
-advanced:
-  verbose: false  # Global verbose flag
-  save_visualizations: false  # Generate debug videos (slow)
-  visualization_output: ${outputs_dir}/${current_video}/visualizations/
+# NOTE: Individual stage configs have their own 'advanced: verbose:' settings
+# (see under each stage section). Modify those to enable verbose output for
+# specific stages. Global settings would apply to all stages.
+
+# (Currently no global advanced settings are used by the pipeline)
