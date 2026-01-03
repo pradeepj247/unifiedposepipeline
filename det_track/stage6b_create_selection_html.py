@@ -388,8 +388,8 @@ def main():
     args = parser.parse_args()
     config = load_config(args.config)
     
-    canonical_file = config['stage4b_group_canonical']['output']['canonical_persons_file']
-    crops_cache_file = config['stage4a_reid_recovery']['input']['crops_cache_file']
+    canonical_file = config['stage5']['output']['canonical_persons_file']
+    crops_cache_file = config['stage4']['input']['crops_cache_file']
     
     output_dir = Path(canonical_file).parent
     output_html = output_dir / 'person_selection_report.html'
@@ -398,7 +398,7 @@ def main():
     video_duration_frames = config.get('global', {}).get('video_duration_frames', 0)
     
     print(f"\n{'='*70}")
-    print(f"📄 STAGE 6b: CREATE PERSON SELECTION REPORT (3 TEMPORAL CROPS)")
+    print(f"📄 STAGE 10: CREATE HTML SELECTION REPORT")
     print(f"{'='*70}\n")
     
     t_start = time.time()

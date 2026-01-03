@@ -134,7 +134,26 @@ def run_stage(stage_name, stage_script, config_path, verbose=False):
 
 def check_stage_outputs_exist(config, stage_key):
     """Check if stage output files already exist"""
-    stage_config = config.get(stage_key, {})
+    # Map stage keys to config section names
+    stage_to_section = {
+        'stage1': 'stage1',
+        'stage2': 'stage2',
+        'stage3': 'stage3',
+        'stage4': 'stage4',
+        'stage5': 'stage5',
+        'stage6': 'stage6',
+        'stage7': 'stage7',
+        'stage8': 'stage8',
+        'stage9': 'stage9',
+        'stage10': 'stage10',
+        'stage11': 'stage11'
+    }
+    
+    section = stage_to_section.get(stage_key)
+    if not section or section not in config:
+        return False
+    
+    stage_config = config[section]
     output_config = stage_config.get('output', {})
     
     if not output_config:
