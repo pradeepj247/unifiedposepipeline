@@ -152,13 +152,29 @@ def main():
     if Path(ranking_report_file).exists():
         with open(ranking_report_file, 'r') as f:
             ranking = json.load(f)
-        for rank_idx, entry in enumerate(ranking[:15], 1):
-            p_id = entry['person_id']
-            frames = entry['frame_count']
-            dur = frames / video_fps
-            included_status = "✓" if p_id in [p[0] for p in included] else "✗"
-            print(f"  {included_status} Rank {rank_idx}: Person {p_id}, "
-                  f"{frames} frames ({dur:.2f}s), tracklets {entry['tracklet_ids']}")
+        
+        # Check which key has frame info
+        if ranking and len(ranking) > 0:
+            first_entry = ranking[0]
+            frame_key = None
+            if 'frame_count' in first_entry:
+                frame_key = 'frame_count'
+            elif 'appearances' in first_entry:
+                frame_key = 'appearances'
+            elif 'frames' in first_entry:
+                frame_key = 'frames'
+            
+            if frame_key:
+                for rank_idx, entry in enumerate(ranking[:15], 1):
+                    p_id = entry['person_id']
+                    frames = entry[frame_key]
+                    dur = frames / video_fps
+                    included_status = "✓" if p_id in [p[0] for p in included] else "✗"
+                    tids = entry.get('tracklet_ids', '?')
+                    print(f"  {included_status} Rank {rank_idx}: Person {p_id}, "
+                          f"{frames} frames ({dur:.2f}s), tracklets {tids}")
+            else:
+                print(f"  Entry keys: {first_entry.keys()}")
 
 
 if __name__ == '__main__':
