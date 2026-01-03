@@ -242,18 +242,39 @@ def main():
     tracklets_data = load_npz_data(tracklets_path)
     persons_data = load_npz_data(persons_path)
     
+    # Also try to load grouping log to understand merging
+    grouping_log_path = Path(config['stage4b_group_canonical']['output']['grouping_log_file'])
+    grouping_info = {}
+    if grouping_log_path.exists():
+        import json
+        with open(grouping_log_path, 'r') as f:
+            grouping_log = json.load(f)
+        print(f"\nGrouping Log: {len(grouping_log)} persons")
+        for entry in grouping_log[:5]:
+            grouping_info[entry['canonical_id']] = entry
+            print(f"  Person {entry['canonical_id']}: "
+                  f"merged from {entry['num_merged']} tracklets, "
+                  f"tracklet_ids={entry['original_tracklet_ids']}")
+    
     # Debug: Print data structure
     print(f"\nTracklets NPZ keys: {tracklets_data.files}")
     tracklets_list = tracklets_data['tracklets'].tolist()
     print(f"  Number of tracklets: {len(tracklets_list)}")
     if len(tracklets_list) > 0:
         print(f"  First tracklet keys: {tracklets_list[0].dtype.names if hasattr(tracklets_list[0], 'dtype') else tracklets_list[0].keys()}")
+        print(f"  Sample tracklet 0: ID={tracklets_list[0]['tracklet_id']}, "
+              f"frames={len(tracklets_list[0]['frame_numbers'])}, "
+              f"frame_range=[{tracklets_list[0]['frame_numbers'][0]}, {tracklets_list[0]['frame_numbers'][-1]}]")
     
     print(f"\nPersons NPZ keys: {persons_data.files}")
     persons_list = persons_data['persons'].tolist()
     print(f"  Number of persons: {len(persons_list)}")
     if len(persons_list) > 0:
         print(f"  First person keys: {persons_list[0].dtype.names if hasattr(persons_list[0], 'dtype') else persons_list[0].keys()}")
+        print(f"  Sample person 0: ID={persons_list[0]['person_id']}, "
+              f"tracklets_merged={persons_list[0].get('num_tracklets_merged', '?')}, "
+              f"frames={len(persons_list[0]['frame_numbers'])}, "
+              f"frame_range=[{persons_list[0]['frame_numbers'][0]}, {persons_list[0]['frame_numbers'][-1]}]")
     
     # Open video
     print(f"Opening video: {video_path}")
