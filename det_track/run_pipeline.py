@@ -334,11 +334,11 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             config.get('stage9', {}).get('output', {}).get('video_file', 'N/A')
         ],
         'stage10': [
-            # Only check cropped_grid (fullframe_grid is optional/not implemented)
-            config.get('stage10', {}).get('output', {}).get('cropped_grid', 'N/A')
+            # HTML report - check the person_selection_report.html file
+            str(Path(config['stage5']['output']['canonical_persons_file']).parent / 'person_selection_report.html')
         ],
         'stage11': [
-            # Check gifs subfolder
+            # Check gifs subfolder in video-specific outputs
             str(Path(config['stage5']['output']['canonical_persons_file']).parent / 'gifs')
         ]
     }

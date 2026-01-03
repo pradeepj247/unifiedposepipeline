@@ -317,7 +317,6 @@ def create_gifs_for_top_persons(canonical_file, crops_enriched_file, output_gifs
     print(f"\n{'='*70}")
     print(f"📊 GIF Generation Summary:")
     print(f"  ✅ Successful: {success_count}/10")
-    print(f"  ❌ Failed: {failed_count}/10")
     print(f"  📁 Output: {gifs_dir}")
     print(f"{'='*70}\n")
     
