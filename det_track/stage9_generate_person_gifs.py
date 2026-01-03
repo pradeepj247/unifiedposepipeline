@@ -217,14 +217,17 @@ def create_gif_for_person(person, h5_person_group, gifs_dir, fps=20, num_frames=
         
         # Load crop image from HDF5
         try:
-            crop = frame_group['image_bgr'][()]
+            crop_bgr = frame_group['image_bgr'][()]
             
-            if crop is None or crop.size == 0:
+            if crop_bgr is None or crop_bgr.size == 0:
                 frames_skipped += 1
                 continue
             
+            # Convert BGR to RGB for proper color display in GIF
+            crop_rgb = crop_bgr[..., ::-1]  # Reverse last axis: BGR -> RGB
+            
             # Pad crop to frame size
-            padded_frame = pad_crop_to_frame(crop, frame_width, frame_height)
+            padded_frame = pad_crop_to_frame(crop_rgb, frame_width, frame_height)
             gif_frames.append(padded_frame)
             frames_collected += 1
             

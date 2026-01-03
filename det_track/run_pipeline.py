@@ -315,31 +315,31 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     print(f"\n📦 Output Files:")
     
     stage_outputs = {
-        'stage1_detect': config['stage1_detect']['output']['detections_file'],
-        'stage2_track': config['stage2_track']['output']['tracklets_file'],
-        'stage3_analyze': [
-            config['stage3_analyze']['output']['tracklet_stats_file'],
-            config['stage3_analyze']['output']['candidates_file']
+        'stage1': config['stage1']['output']['detections_file'],
+        'stage2': config['stage2']['output']['tracklets_file'],
+        'stage3': [
+            config['stage3']['output']['tracklet_stats_file'],
+            config['stage3']['output']['candidates_file']
         ],
-        'stage4a_reid_recovery': [],  # Lightweight stage - no outputs, just loads crops cache
-        'stage4b_group_canonical': [
-            config['stage4b_group_canonical']['output']['canonical_persons_file'],
-            config['stage4b_group_canonical']['output']['grouping_log_file']
+        'stage4': [],  # Lightweight stage - no outputs, just loads crops cache
+        'stage5': [
+            config['stage5']['output']['canonical_persons_file'],
+            config['stage5']['output']['grouping_log_file']
         ],
-        'stage5_rank': [
-            config['stage5_rank']['output']['primary_person_file'],
-            config['stage5_rank']['output']['ranking_report_file']
+        'stage7': [
+            config['stage7']['output']['primary_person_file'],
+            config['stage7']['output']['ranking_report_file']
         ],
-        'stage6_create_output_video': [
-            config.get('stage6_create_output_video', {}).get('output', {}).get('video_file', 'N/A')
+        'stage9': [
+            config.get('stage9', {}).get('output', {}).get('video_file', 'N/A')
         ],
-        'stage6b_create_selection_grid': [
+        'stage10': [
             # Only check cropped_grid (fullframe_grid is optional/not implemented)
-            config.get('stage6b_create_selection_grid', {}).get('output', {}).get('cropped_grid', 'N/A')
+            config.get('stage10', {}).get('output', {}).get('cropped_grid', 'N/A')
         ],
-        'stage9_generate_gifs': [
+        'stage11': [
             # Check gifs subfolder
-            str(Path(config['stage4b_group_canonical']['output']['canonical_persons_file']).parent / 'gifs')
+            str(Path(config['stage5']['output']['canonical_persons_file']).parent / 'gifs')
         ]
     }
     
