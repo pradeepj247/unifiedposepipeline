@@ -66,7 +66,8 @@ tracklets = data['tracklets']
 print(f"\n✅ Loaded {len(tracklets)} tracklets")
 
 stats_data = np.load(stats_file, allow_pickle=True)
-stats = stats_data['stats']
+print(f"📂 Stats file keys: {list(stats_data.files)}")
+stats = stats_data['tracklet_stats']
 print(f"✅ Loaded {len(stats)} stats")
 
 # Find P14 and P29
