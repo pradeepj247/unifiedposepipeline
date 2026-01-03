@@ -93,108 +93,66 @@ def load_config(config_path):
     return resolve_path_variables(config)
 
 
-def compute_frame_size_for_person_hdf5(person, h5_person_group, padding=15):
+def compute_frame_size_for_person_hdf5(person, h5_person_group, target_width=256, target_height=384):
     """
-    Compute the frame size needed for this person using HDF5 data.
+    Use fixed frame size for all persons (optimized for faster GIF generation).
     
-    Scans first 75 frames and finds the largest bbox.
-    Adds padding around it to create the final frame size.
+    All crops will be resized to fit within target_width x target_height
+    while maintaining aspect ratio.
     
-    Returns: (width, height) for this person's GIF frames
+    Returns: (width, height) for this person's GIF frames (always fixed size)
     """
-    frames = person['frame_numbers']
-    
-    # Look at first 75 frames (or all if less than 75)
-    num_frames_to_check = min(75, len(frames))
-    
-    max_width = 0
-    max_height = 0
-    
-    frame_idx_counter = 0
-    for frame_idx in frames:
-        if frame_idx_counter >= num_frames_to_check:
-            break
-        
-        frame_idx = int(frame_idx)
-        frame_key = f'frame_{frame_idx:06d}'
-        
-        # Check if frame exists in HDF5
-        if frame_key not in h5_person_group:
-            continue
-        
-        frame_group = h5_person_group[frame_key]
-        
-        # Get bbox from metadata
-        if 'bbox' in frame_group.attrs:
-            bbox = frame_group.attrs['bbox']
-            width = int(bbox[2] - bbox[0])
-            height = int(bbox[3] - bbox[1])
-            
-            max_width = max(max_width, width)
-            max_height = max(max_height, height)
-        
-        frame_idx_counter += 1
-    
-    # Add padding on all sides
-    final_width = max_width + (2 * padding)
-    final_height = max_height + (2 * padding)
-    
-    return int(final_width), int(final_height)
+    # Return fixed size for all persons - much faster than computing per-person
+    return target_width, target_height
 
 
-def pad_crop_to_frame(crop, frame_width, frame_height, padding_color=(0, 0, 0)):
+def resize_crop_to_frame(crop, frame_width, frame_height, padding_color=(0, 0, 0)):
     """
-    Pad a crop to fit within frame_width x frame_height.
-    Center the crop within the frame.
+    Resize a crop to fit within frame_width x frame_height while maintaining aspect ratio.
+    Centers the resized crop within the frame with padding.
     
-    padding_color: RGB or BGR tuple (default black)
+    padding_color: BGR tuple (default black)
     """
     if crop is None:
         return np.zeros((frame_height, frame_width, 3), dtype=np.uint8)
     
     crop_height, crop_width = crop.shape[:2]
     
-    # If crop is already the right size, return it
-    if crop_width == frame_width and crop_height == frame_height:
-        return crop
+    # Calculate scaling to fit crop within target frame while maintaining aspect ratio
+    scale = min(frame_width / crop_width, frame_height / crop_height)
+    new_width = int(crop_width * scale)
+    new_height = int(crop_height * scale)
+    
+    # Resize crop (faster than padding)
+    resized = cv2.resize(crop, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
     
     # Create frame with padding color
     frame = np.full((frame_height, frame_width, 3), padding_color, dtype=np.uint8)
     
-    # Calculate position to center crop
-    start_x = max(0, (frame_width - crop_width) // 2)
-    start_y = max(0, (frame_height - crop_height) // 2)
+    # Center the resized crop in the frame
+    start_x = (frame_width - new_width) // 2
+    start_y = (frame_height - new_height) // 2
     
-    # Handle case where crop is larger than frame (shouldn't happen, but just in case)
-    crop_start_x = max(0, (crop_width - frame_width) // 2)
-    crop_start_y = max(0, (crop_height - frame_height) // 2)
-    crop_end_x = crop_start_x + min(crop_width, frame_width)
-    crop_end_y = crop_start_y + min(crop_height, frame_height)
-    
-    frame_end_x = start_x + (crop_end_x - crop_start_x)
-    frame_end_y = start_y + (crop_end_y - crop_start_y)
-    
-    # Place crop in frame
-    frame[start_y:frame_end_y, start_x:frame_end_x] = crop[crop_start_y:crop_end_y, crop_start_x:crop_end_x]
+    # Place resized crop in frame
+    frame[start_y:start_y + new_height, start_x:start_x + new_width] = resized
     
     return frame
 
 
-def create_gif_for_person(person, h5_person_group, gifs_dir, fps=20, num_frames=75):
+def create_gif_for_person(person, h5_person_group, gifs_dir, frame_width=256, frame_height=384, fps=15, num_frames=50):
     """
     Create an animated GIF for a single person using HDF5 data.
     
     person: dict with 'person_id', 'frame_numbers'
     h5_person_group: HDF5 group for this person (e.g., h5f['person_03'])
     gifs_dir: output directory for GIFs
-    fps: frames per second (20 for 3.75 second GIFs)
-    num_frames: number of frames to include (75)
+    frame_width: fixed frame width (256)
+    frame_height: fixed frame height (384)
+    fps: frames per second (15 for faster generation)
+    num_frames: number of frames to include (50)
     """
     person_id = person['person_id']
     frames = person['frame_numbers']
-    
-    # Determine frame size for this person
-    frame_width, frame_height = compute_frame_size_for_person_hdf5(person, h5_person_group)
     
     # Collect frames
     gif_frames = []
@@ -226,9 +184,9 @@ def create_gif_for_person(person, h5_person_group, gifs_dir, fps=20, num_frames=
             # Convert BGR to RGB for proper color display in GIF
             crop_rgb = crop_bgr[..., ::-1]  # Reverse last axis: BGR -> RGB
             
-            # Pad crop to frame size
-            padded_frame = pad_crop_to_frame(crop_rgb, frame_width, frame_height)
-            gif_frames.append(padded_frame)
+            # Resize crop to frame size (maintains aspect ratio)
+            resized_frame = resize_crop_to_frame(crop_rgb, frame_width, frame_height)
+            gif_frames.append(resized_frame)
             frames_collected += 1
             
         except Exception as e:
@@ -256,7 +214,7 @@ def create_gif_for_person(person, h5_person_group, gifs_dir, fps=20, num_frames=
 
 
 def create_gifs_for_top_persons(canonical_file, crops_enriched_file, output_gifs_dir, 
-                                fps=20, num_frames=75):
+                                frame_width=256, frame_height=384, fps=15, num_frames=50):
     """Create GIFs for top 10 persons using crops_enriched.h5"""
     
     # Load canonical persons
@@ -295,6 +253,8 @@ def create_gifs_for_top_persons(canonical_file, crops_enriched_file, output_gifs
                     person,
                     h5_person_group,
                     gifs_dir,
+                    frame_width=frame_width,
+                    frame_height=frame_height,
                     fps=fps,
                     num_frames=num_frames
                 )
@@ -339,6 +299,13 @@ def main():
     # Use the parent directory of canonical_persons.npz (video-specific outputs folder)
     output_dir = str(Path(canonical_file).parent)
     
+    # Get GIF generation settings from config
+    gif_config = config.get('stage11', {}).get('gif_generation', {})
+    frame_width = gif_config.get('frame_width', 256)
+    frame_height = gif_config.get('frame_height', 384)
+    fps = gif_config.get('fps', 15)
+    num_frames = gif_config.get('max_frames', 50)
+    
     print(f"\n{'='*70}")
     print(f"🎬 STAGE 11: GENERATE PERSON GIFS (Experimental)")
     print(f"{'='*70}\n")
@@ -348,7 +315,11 @@ def main():
     success = create_gifs_for_top_persons(
         canonical_file,
         crops_enriched_file,
-        output_dir
+        output_dir,
+        frame_width=frame_width,
+        frame_height=frame_height,
+        fps=fps,
+        num_frames=num_frames
     )
     
     t_end = time.time()

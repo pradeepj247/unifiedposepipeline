@@ -222,10 +222,12 @@ stage10:
 stage11:
   
   gif_generation:
-    format: mp4              # Output format (mp4 or gif)
-    fps: 20                  # Frames per second
-    max_frames: 75           # Maximum frames per GIF
+    format: gif              # Output format (gif for HTML embedding)
+    fps: 15                  # Frames per second (15 fps = smooth playback at ~3.3 seconds)
+    max_frames: 50           # Maximum frames per GIF (reduced from 75 for faster generation)
     max_persons: 10          # Generate GIFs for top 10 persons
+    frame_width: 256         # Fixed frame width (maintains aspect ratio)
+    frame_height: 384        # Fixed frame height
   
   output:
     gifs_dir: ${outputs_dir}/${current_video}/gifs
