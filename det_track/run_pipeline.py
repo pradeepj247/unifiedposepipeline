@@ -351,8 +351,16 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         for output_file in outputs:
             output_path = Path(output_file)
             if output_path.exists():
-                size_mb = output_path.stat().st_size / (1024 * 1024)
-                print(f"  ✅ {output_path.name} ({size_mb:.2f} MB)")
+                if output_path.is_dir():
+                    # For directories, sum up all file sizes
+                    total_size = sum(f.stat().st_size for f in output_path.rglob('*') if f.is_file())
+                    size_mb = total_size / (1024 * 1024)
+                    file_count = len(list(output_path.rglob('*')))
+                    print(f"  ✅ {output_path.name} ({size_mb:.2f} MB, {file_count} files)")
+                else:
+                    # For files, get file size
+                    size_mb = output_path.stat().st_size / (1024 * 1024)
+                    print(f"  ✅ {output_path.name} ({size_mb:.2f} MB)")
             else:
                 print(f"  ⚠️  {output_path.name} (not found)")
     
