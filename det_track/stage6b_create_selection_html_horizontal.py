@@ -114,21 +114,21 @@ def encode_image_to_base64(image_bgr):
     return f"data:image/jpeg;base64,{base64_str}"
 
 
-def encode_gif_to_base64(gif_path):
-    """Encode GIF file to base64 data URI"""
+def encode_webp_to_base64(webp_path):
+    """Encode WebP file to base64 data URI"""
     try:
-        with open(gif_path, 'rb') as f:
-            gif_data = f.read()
+        with open(webp_path, 'rb') as f:
+            webp_data = f.read()
         
-        base64_str = base64.b64encode(gif_data).decode('utf-8')
-        return f"data:image/gif;base64,{base64_str}"
+        base64_str = base64.b64encode(webp_data).decode('utf-8')
+        return f"data:image/webp;base64,{base64_str}"
     except Exception as e:
-        print(f"      ⚠️  Error encoding GIF: {str(e)[:100]}")
+        print(f"      ⚠️  Error encoding WebP: {str(e)[:100]}")
         return None
 
 
-def create_selection_report_horizontal(canonical_file, crops_cache_file, output_html, gifs_dir=None, video_duration_frames=None):
-    """Create horizontal scrollable tape layout HTML with embedded animated GIFs"""
+def create_selection_report_horizontal(canonical_file, crops_cache_file, output_html, webp_dir=None, video_duration_frames=None):
+    """Create horizontal scrollable tape layout HTML with embedded animated WebPs"""
     
     # Load data
     print(f"📂 Loading canonical persons...")
@@ -145,11 +145,11 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
         video_duration_frames = max_frame + 1
         print(f"   Calculated video_duration_frames from data: {video_duration_frames}")
     
-    # Locate GIFs directory
-    if gifs_dir is None:
-        gifs_dir = Path(canonical_file).parent / 'gifs'
+    # Locate WebP directory
+    if webp_dir is None:
+        webp_dir = Path(canonical_file).parent / 'webp'
     else:
-        gifs_dir = Path(gifs_dir)
+        webp_dir = Path(webp_dir)
     
     print(f"📂 Loading crops cache...")
     with open(crops_cache_file, 'rb') as f:
@@ -393,7 +393,7 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
             <div class="tape" id="tape">
 """
     
-    print(f"🎬 Encoding GIFs and generating HTML...\n")
+    print(f"🎬 Encoding WebP files and generating HTML...\n")
     
     # Process top 10 persons
     for rank, person in enumerate(persons[:10], 1):
@@ -404,12 +404,12 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
         # Calculate % of video
         percent_video = (num_frames / video_duration_frames) * 100 if video_duration_frames > 0 else 0
         
-        # Locate GIF file (not MP4)
-        gif_filename = f"person_{person_id:02d}.gif"
-        gif_path = gifs_dir / gif_filename
+        # Locate WebP file
+        webp_filename = f"person_{person_id:02d}.webp"
+        webp_path = webp_dir / webp_filename
         
-        if not gif_path.exists():
-            print(f"  ⚠️  Rank {rank}: P{person_id} - GIF not found ({gif_filename})")
+        if not webp_path.exists():
+            print(f"  ⚠️  Rank {rank}: P{person_id} - WebP not found ({webp_filename})")
             html_content += f"""            <div class="person-card" onclick="selectPerson(this, {person_id})">
                 <div class="rank-badge">#{rank}</div>
                 <div class="video-thumb">
@@ -426,11 +426,11 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
 """
             continue
         
-        # Encode GIF to base64
-        print(f"  🎬 Rank {rank}: P{person_id} - Encoding GIF...", end='', flush=True)
-        gif_data = encode_gif_to_base64(gif_path)
+        # Encode WebP to base64
+        print(f"  🎬 Rank {rank}: P{person_id} - Encoding WebP...", end='', flush=True)
+        webp_data = encode_webp_to_base64(webp_path)
         
-        if not gif_data:
+        if not webp_data:
             print(f" ⚠️  Failed")
             html_content += f"""            <div class="person-card" onclick="selectPerson(this, {person_id})">
                 <div class="rank-badge">#{rank}</div>
@@ -450,11 +450,11 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
         
         print(f" ✅")
         
-        # Create person card with animated GIF (no video tag needed)
+        # Create person card with animated WebP (no video tag needed)
         html_content += f"""            <div class="person-card" onclick="selectPerson(this, {person_id})">
                 <div class="rank-badge">#{rank}</div>
                 <div class="video-thumb">
-                    <img src="{gif_data}" alt="Person {person_id}" class="gif-animation"/>
+                    <img src="{webp_data}" alt="Person {person_id}" class="webp-animation"/>
                 </div>
                 <div class="person-info">
                     <div class="person-id">P{person_id}</div>
@@ -509,8 +509,8 @@ def main():
     output_dir = Path(canonical_file).parent
     output_html = output_dir / 'person_selection_report.html'
     
-    # Try to find videos directory
-    gifs_dir = output_dir / 'gifs'
+    # Try to find WebP directory
+    webp_dir = output_dir / 'webp'
     
     # Get video duration from config
     video_duration_frames = config.get('global', {}).get('video_duration_frames', 0)
@@ -525,7 +525,7 @@ def main():
         canonical_file,
         crops_cache_file,
         output_html,
-        gifs_dir=gifs_dir,
+        webp_dir=webp_dir,
         video_duration_frames=video_duration_frames
     )
     

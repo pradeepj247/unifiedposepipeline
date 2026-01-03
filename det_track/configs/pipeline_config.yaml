@@ -217,18 +217,19 @@ stage10:
     selection_info: ${outputs_dir}/${current_video}/selection_grid_info.json
 
 # ============================================================================
-# Stage 11: Generate Person Animated GIFs
+# Stage 11: Generate Person Animated WebPs
 # ============================================================================
 # To disable this stage, set pipeline.stages.stage11 to false
 stage11:
   
   video_generation:
-    format: gif              # Output format (gif for auto-animating in HTML)
+    format: webp             # Output format (webp for auto-animating in HTML, smaller than GIF)
     fps: 10                  # Frames per second (10 fps = smooth playback at ~5 seconds)
-    max_frames: 50           # Maximum frames per GIF
-    max_persons: 10          # Generate GIFs for top 10 persons
+    max_frames: 50           # Maximum frames per WebP
+    max_persons: 10          # Generate WebPs for top 10 persons
     frame_width: 128         # Reduced width for horizontal tape (3.5x smaller area)
     frame_height: 192        # Reduced height for horizontal tape
+    quality: 80              # WebP quality (0-100, 80 is good balance)
   
   output:
-    gifs_dir: ${outputs_dir}/${current_video}/gifs
+    webp_dir: ${outputs_dir}/${current_video}/webp

@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Stage 11: Generate Animated GIFs for Top 10 Persons
+Stage 11: Generate Animated WebP Videos for Top 10 Persons
 
-Creates compact animated GIFs for each of the top 10 persons, showing their
+Creates compact animated WebP files for each of the top 10 persons, showing their
 first 50 frames at reduced size (128x192) for fast loading and embedding.
 
 Features:
 - Uses crops_enriched.h5 from Stage 6 for correct person-crop association
 - Fixed frame sizing (128x192) for consistent playback
 - Smart centering and padding of crops
-- 10 fps playback (~5 seconds per GIF)
-- Animated GIFs (work perfectly with <img> tags)
-- ~100-200 KB per GIF (~1-2 MB total for 10 persons)
-- Organized output in dedicated 'gifs' subfolder
+- 10 fps playback (~5 seconds per WebP)
+- Animated WebP (modern format, ~60% of GIF size, ~80% of MP4 speed)
+- ~50-100 KB per WebP (~0.5-1 MB total for 10 persons)
+- Organized output in dedicated 'webp' subfolder
 
 Usage:
     python stage9_generate_person_gifs.py --config configs/pipeline_config.yaml
@@ -25,7 +25,13 @@ import re
 import os
 import h5py
 import cv2
-import imageio
+try:
+    from PIL import Image
+except ImportError:
+    print("Installing Pillow for WebP support...")
+    import subprocess
+    subprocess.check_call(['pip', 'install', 'Pillow'])
+    from PIL import Image
 from pathlib import Path
 import time
 
@@ -141,13 +147,13 @@ def resize_crop_to_frame(crop, frame_width, frame_height, padding_color=(0, 0, 0
     return frame
 
 
-def create_gif_for_person(person, h5_person_group, gifs_dir, frame_width=128, frame_height=192, fps=10, num_frames=50):
+def create_webp_for_person(person, h5_person_group, webp_dir, frame_width=128, frame_height=192, fps=10, num_frames=50):
     """
-    Create an animated GIF for a single person using HDF5 data.
+    Create an animated WebP for a single person using HDF5 data.
     
     person: dict with 'person_id', 'frame_numbers'
     h5_person_group: HDF5 group for this person (e.g., h5f['person_03'])
-    gifs_dir: output directory for GIFs
+    webp_dir: output directory for WebPs
     frame_width: fixed frame width (128)
     frame_height: fixed frame height (192)
     fps: frames per second (10)
@@ -156,8 +162,8 @@ def create_gif_for_person(person, h5_person_group, gifs_dir, frame_width=128, fr
     person_id = person['person_id']
     frames = person['frame_numbers']
     
-    # Prepare GIF filename
-    gif_filename = gifs_dir / f"person_{person_id:02d}.gif"
+    # Prepare WebP filename
+    webp_filename = webp_dir / f"person_{person_id:02d}.webp"
     
     frames_list = []
     frames_written = 0
@@ -185,14 +191,14 @@ def create_gif_for_person(person, h5_person_group, gifs_dir, frame_width=128, fr
                 frames_skipped += 1
                 continue
             
-            # Convert BGR to RGB for imageio (GIF expects RGB)
+            # Convert BGR to RGB for PIL (WebP expects RGB)
             crop_rgb = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB)
             
             # Resize crop to frame size (maintains aspect ratio)
             resized_frame = resize_crop_to_frame(crop_rgb, frame_width, frame_height)
             
-            # Add frame to GIF list
-            frames_list.append(resized_frame)
+            # Convert to PIL Image
+            frames_list.append(Image.fromarray(resized_frame.astype('uint8')))
             frames_written += 1
             
         except Exception as e:
@@ -204,22 +210,30 @@ def create_gif_for_person(person, h5_person_group, gifs_dir, frame_width=128, fr
     if frames_written == 0:
         return False, f"No frames found for person {person_id}"
     
-    # Write GIF with duration based on fps
-    duration = 1.0 / fps  # Duration per frame in seconds
+    # Write animated WebP
+    duration = int(1000 / fps)  # Duration per frame in milliseconds
     try:
-        imageio.mimsave(str(gif_filename), frames_list, duration=duration, loop=0)
+        frames_list[0].save(
+            str(webp_filename),
+            format='WEBP',
+            save_all=True,
+            append_images=frames_list[1:],
+            duration=duration,
+            loop=0,
+            quality=80  # Quality setting for WebP (0-100)
+        )
     except Exception as e:
-        return False, f"Failed to save GIF for person {person_id}: {str(e)[:100]}"
+        return False, f"Failed to save WebP for person {person_id}: {str(e)[:100]}"
     
     # Get file size in MB
-    file_size_mb = gif_filename.stat().st_size / (1024 * 1024)
+    file_size_mb = webp_filename.stat().st_size / (1024 * 1024)
     
-    return True, f"person_{person_id:02d}.gif ({frames_written} frames, {frame_width}x{frame_height}, {file_size_mb:.2f} MB)"
+    return True, f"person_{person_id:02d}.webp ({frames_written} frames, {frame_width}x{frame_height}, {file_size_mb:.2f} MB)"
 
 
-def create_gifs_for_top_persons(canonical_file, crops_enriched_file, output_gifs_dir, 
+def create_webp_for_top_persons(canonical_file, crops_enriched_file, output_webp_dir, 
                                  frame_width=128, frame_height=192, fps=10, num_frames=50):
-    """Create animated GIFs for top 10 persons using crops_enriched.h5"""
+    """Create animated WebP files for top 10 persons using crops_enriched.h5"""
     
     # Load canonical persons
     print(f"📂 Loading canonical persons...")
@@ -228,12 +242,12 @@ def create_gifs_for_top_persons(canonical_file, crops_enriched_file, output_gifs
     persons.sort(key=lambda p: len(p['frame_numbers']), reverse=True)
     
     # Create output directory
-    gifs_dir = Path(output_gifs_dir) / 'gifs'
-    gifs_dir.mkdir(parents=True, exist_ok=True)
-    print(f"📁 Output directory: {gifs_dir}")
+    webp_dir = Path(output_webp_dir) / 'webp'
+    webp_dir.mkdir(parents=True, exist_ok=True)
+    print(f"📁 Output directory: {webp_dir}")
     
-    # Generate GIFs for top 10 persons using HDF5
-    print(f"\n🎬 Generating animated GIFs for top 10 persons...\n")
+    # Generate WebP files for top 10 persons using HDF5
+    print(f"\n🎬 Generating animated WebP files for top 10 persons...\n")
     
     success_count = 0
     failed_count = 0
@@ -253,10 +267,10 @@ def create_gifs_for_top_persons(canonical_file, crops_enriched_file, output_gifs
                 
                 h5_person_group = h5f[person_key]
                 
-                success, message = create_gif_for_person(
+                success, message = create_webp_for_person(
                     person,
                     h5_person_group,
-                    gifs_dir,
+                    webp_dir,
                     frame_width=frame_width,
                     frame_height=frame_height,
                     fps=fps,
@@ -279,9 +293,9 @@ def create_gifs_for_top_persons(canonical_file, crops_enriched_file, output_gifs
         return False
     
     print(f"\n{'='*70}")
-    print(f"📊 GIF Generation Summary:")
+    print(f"📊 WebP Generation Summary:")
     print(f"  ✅ Successful: {success_count}/10")
-    print(f"  📁 Output: {gifs_dir}")
+    print(f"  📁 Output: {webp_dir}")
     print(f"{'='*70}\n")
     
     return success_count > 0
@@ -289,7 +303,7 @@ def create_gifs_for_top_persons(canonical_file, crops_enriched_file, output_gifs
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Stage 11: Generate Animated GIFs for Top 10 Persons'
+        description='Stage 11: Generate Animated WebP Files for Top 10 Persons'
     )
     parser.add_argument('--config', type=str, required=True,
                        help='Path to pipeline configuration YAML')
@@ -303,20 +317,20 @@ def main():
     # Use the parent directory of canonical_persons.npz (video-specific outputs folder)
     output_dir = str(Path(canonical_file).parent)
     
-    # Get GIF generation settings from config
-    gif_config = config.get('stage11', {}).get('video_generation', {})
-    frame_width = gif_config.get('frame_width', 128)
-    frame_height = gif_config.get('frame_height', 192)
-    fps = gif_config.get('fps', 10)
-    num_frames = gif_config.get('max_frames', 50)
+    # Get WebP generation settings from config
+    webp_config = config.get('stage11', {}).get('video_generation', {})
+    frame_width = webp_config.get('frame_width', 128)
+    frame_height = webp_config.get('frame_height', 192)
+    fps = webp_config.get('fps', 10)
+    num_frames = webp_config.get('max_frames', 50)
     
     print(f"\n{'='*70}")
-    print(f"🎬 STAGE 11: GENERATE PERSON ANIMATED GIFS")
+    print(f"🎬 STAGE 11: GENERATE PERSON ANIMATED WEBP FILES")
     print(f"{'='*70}\n")
     
     t_start = time.time()
     
-    success = create_gifs_for_top_persons(
+    success = create_webp_for_top_persons(
         canonical_file,
         crops_enriched_file,
         output_dir,
