@@ -186,87 +186,83 @@ def create_selection_pdf(canonical_file, crops_cache_file, fps, output_pdf, temp
     
     print(f"📄 Creating PDF document...")
     
-    doc = SimpleDocTemplate(str(output_pdf), pagesize=A4, rightMargin=10, leftMargin=10,
-                           topMargin=20, bottomMargin=20)
-    
-    story = []
-    
-    # Title
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=24,
-        textColor=colors.HexColor('#1f4788'),
-        spaceAfter=30,
-        alignment='CENTER'
-    )
-    
-    story.append(Paragraph("Person Selection Report", title_style))
-    story.append(Spacer(1, 0.2*inch))
-    
-    # Create table with text only
-    table = Table(table_data, colWidths=[0.5*inch, 0.7*inch, 0.8*inch, 0.6*inch,
-                                         0.6*inch, 0.6*inch, 0.7*inch])
-    
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f4788')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 11),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTSIZE', (0, 1), (-1, -1), 9),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0f0f0')]),
-    ]))
-    
-    story.append(table)
-    story.append(Spacer(1, 0.3*inch))
-    
-    # Add thumbnail grid on separate pages
-    if crop_image_pairs:
-        story.append(PageBreak())
-        story.append(Paragraph("Person Thumbnails", title_style))
+    try:
+        doc = SimpleDocTemplate(str(output_pdf), pagesize=A4, rightMargin=15, leftMargin=15,
+                               topMargin=25, bottomMargin=25)
+        
+        story = []
+        styles = getSampleStyleSheet()
+        
+        # Title
+        title = Paragraph("Person Selection Report", styles['Title'])
+        story.append(title)
         story.append(Spacer(1, 0.2*inch))
         
-        # Create grid of thumbnails (3 per row)
-        thumb_data = []
-        current_row = []
+        # Create table with text only
+        table = Table(table_data, colWidths=[0.5*inch, 0.8*inch, 0.9*inch, 0.6*inch,
+                                             0.6*inch, 0.6*inch, 0.7*inch])
         
-        for rank, person_id, crop_path in crop_image_pairs:
-            if Path(crop_path).exists():
+        # Simple styling without problematic alignment
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
+        ]))
+        
+        story.append(table)
+        story.append(Spacer(1, 0.3*inch))
+        
+        # Add thumbnails section
+        if crop_image_pairs:
+            story.append(Paragraph("Person Thumbnails", styles['Heading2']))
+            story.append(Spacer(1, 0.1*inch))
+            
+            # Add thumbnails in 3 columns
+            thumb_table_data = []
+            current_row = []
+            
+            for rank, person_id, crop_path in crop_image_pairs:
+                if Path(crop_path).exists():
+                    try:
+                        img = RLImage(crop_path, width=1.2*inch, height=1.4*inch)
+                        # Create a cell with image and label
+                        label = f"P{person_id} (Rank {rank})"
+                        current_row.append([img, label])
+                        
+                        if len(current_row) >= 3:
+                            thumb_table_data.append(current_row)
+                            current_row = []
+                    except Exception as e:
+                        print(f"  ⚠️  Failed to add thumbnail for P{person_id}: {e}")
+            
+            if current_row:
+                thumb_table_data.append(current_row)
+            
+            # Add thumbnail table if we have any thumbnails
+            if thumb_table_data:
                 try:
-                    img = RLImage(crop_path, width=1.5*inch, height=1.8*inch)
-                    caption = Paragraph(f"<b>P{person_id}</b><br/>Rank {rank}", 
-                                      ParagraphStyle('thumb', parent=styles['Normal'], 
-                                                   fontSize=9, alignment='CENTER'))
-                    current_row.append(img)
-                    current_row.append(caption)
-                    
-                    if len(current_row) >= 6:  # 2 persons per row (image + caption)
-                        thumb_data.append(current_row)
-                        current_row = []
+                    thumb_table = Table(thumb_table_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch])
+                    thumb_table.setStyle(TableStyle([
+                        ('GRID', (0, 0), (-1, -1), 1, colors.lightgrey),
+                        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ]))
+                    story.append(thumb_table)
                 except Exception as e:
-                    print(f"  ⚠️  Failed to add thumbnail for P{person_id}: {e}")
+                    print(f"  ⚠️  Failed to create thumbnail table: {e}")
         
-        if current_row:
-            thumb_data.append(current_row)
-        
-        # Add to story
-        for row in thumb_data:
-            story.append(Spacer(1, 0.2*inch))
-            # Simple horizontal layout
-            for item in row:
-                story.append(item)
-    
-    # Build PDF
-    try:
+        # Build PDF
         doc.build(story)
         return True
+        
     except Exception as e:
         print(f"❌ Error building PDF: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
