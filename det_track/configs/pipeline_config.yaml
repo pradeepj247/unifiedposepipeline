@@ -61,7 +61,6 @@ stage1_detect:
     min_confidence: 0.3  # Minimum confidence threshold
   
   processing:
-    processing_resolution: null  # Use original 1920x1080 (downscaling adds 19% overhead)
     batch_size: 1
   
   input:
@@ -178,8 +177,6 @@ stage6_create_output_video:
   visualization:
     min_duration_seconds: 5    # Minimum appearance time to be included
     max_persons_shown: 10      # Show top 10 persons (or all if <10 qualify)
-    output_resolution: 720     # Output video height (720p)
-    output_fps: 22.5           # Output video framerate
   
   input:
     canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
