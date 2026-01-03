@@ -23,6 +23,7 @@ import yaml
 import re
 import os
 import h5py
+import cv2
 from pathlib import Path
 import time
 import imageio
@@ -191,6 +192,8 @@ def create_gif_for_person(person, h5_person_group, gifs_dir, frame_width=256, fr
             
         except Exception as e:
             frames_skipped += 1
+            if frames_skipped <= 3:  # Log first few errors only
+                print(f"      [DEBUG] Frame {frame_idx} error: {str(e)[:100]}")
             continue
     
     if not gif_frames:
