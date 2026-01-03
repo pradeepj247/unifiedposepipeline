@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Stage 9: Generate Animated GIFs for Top 10 Persons (Experimental)
+Stage 11: Generate Animated GIFs for Top 10 Persons
 
 Creates compact animated GIFs for each of the top 10 persons, showing their
 first 75 frames with smart padding to center smaller crops within a
 consistent frame size per person.
 
 Features:
-- Uses crops_enriched.h5 from Stage 4b.5 for correct person-crop association
+- Uses crops_enriched.h5 from Stage 6 for correct person-crop association
 - Dynamic frame sizing per person (based on largest bbox in first 75 frames)
 - Smart centering and padding of crops
 - 20 fps playback (3.75 seconds per GIF)
@@ -140,343 +140,6 @@ def compute_frame_size_for_person_hdf5(person, h5_person_group, padding=15):
     final_height = max_height + (2 * padding)
     
     return int(final_width), int(final_height)
-
-
-def pad_crop_to_frame(crop, frame_width, frame_height, padding_color=(0, 0, 0)):
-    """
-    Pad a crop to fit within frame_width x frame_height.
-    Center the crop within the frame.
-    
-    padding_color: BGR tuple (default black)
-    """
-    if crop is None:
-        return np.zeros((frame_height, frame_width, 3), dtype=np.uint8)
-    
-    crop_height, crop_width = crop.shape[:2]
-    
-    # If crop is already the right size, return it
-    if crop_width == frame_width and crop_height == frame_height:
-        return crop
-    
-    # Create frame with padding color
-    frame = np.full((frame_height, frame_width, 3), padding_color, dtype=np.uint8)
-    
-    # Calculate position to center crop
-    start_x = max(0, (frame_width - crop_width) // 2)
-    start_y = max(0, (frame_height - crop_height) // 2)
-    
-    # Handle case where crop is larger than frame (shouldn't happen, but just in case)
-    crop_start_x = max(0, (crop_width - frame_width) // 2)
-    crop_start_y = max(0, (crop_height - frame_height) // 2)
-    crop_end_x = crop_start_x + min(crop_width, frame_width)
-    crop_end_y = crop_start_y + min(crop_height, frame_height)
-    
-    frame_end_x = start_x + (crop_end_x - crop_start_x)
-    frame_end_y = start_y + (crop_end_y - crop_start_y)
-    
-    # Place crop in frame
-    frame[start_y:frame_end_y, start_x:frame_end_x] = crop[crop_start_y:crop_end_y, crop_start_x:crop_end_x]
-    
-    return frame
-
-
-def create_gif_for_person(person, h5_person_group, gifs_dir, fps=20, num_frames=75):
-    """
-    Create an animated GIF for a single person using HDF5 data.
-    
-    person: dict with 'person_id', 'frame_numbers'
-    h5_person_group: HDF5 group for this person (e.g., h5f['person_03'])
-    gifs_dir: output directory for GIFs
-    fps: frames per second (20 for 3.75 second GIFs)
-    num_frames: number of frames to include (75)
-    """
-    person_id = person['person_id']
-    frames = person['frame_numbers']
-    
-    # Determine frame size for this person
-    frame_width, frame_height = compute_frame_size_for_person_hdf5(person, h5_person_group)
-    
-    # Collect frames
-    gif_frames = []
-    frames_collected = 0
-    frames_skipped = 0
-    
-    for frame_idx in frames:
-        if frames_collected >= num_frames:
-            break
-        
-        frame_idx = int(frame_idx)
-        frame_key = f'frame_{frame_idx:06d}'
-        
-        # Check if frame exists in HDF5
-        if frame_key not in h5_person_group:
-            frames_skipped += 1
-            continue
-        
-        frame_group = h5_person_group[frame_key]
-        
-        # Load crop image from HDF5
-        try:
-            crop = frame_group['image_bgr'][()]
-            
-            if crop is None or crop.size == 0:
-                frames_skipped += 1
-                continue
-            
-            # Pad crop to frame size
-            padded_frame = pad_crop_to_frame(crop, frame_width, frame_height)
-            gif_frames.append(padded_frame)
-            frames_collected += 1
-            
-        except Exception as e:
-            frames_skipped += 1
-            continue
-    
-    if not gif_frames:
-        return False, f"No frames found for person {person_id}"
-    
-    # Save GIF
-    gif_filename = gifs_dir / f"person_{person_id:02d}.gif"
-    
-    try:
-        # imageio.mimsave expects frames in sequence
-        # fps controls playback speed
-        imageio.mimsave(
-            str(gif_filename),
-            gif_frames,
-            fps=fps,
-            loop=0  # Loop indefinitely
-        )
-        return True, f"person_{person_id:02d}.gif ({len(gif_frames)} frames, {frame_width}x{frame_height})"
-    except Exception as e:
-        return False, f"Failed to save GIF for person {person_id}: {str(e)}"
-
-
-def create_gifs_for_top_persons(canonical_file, crops_enriched_file, output_gifs_dir, 
-                                fps=20, num_frames=75):
-    """Create GIFs for top 10 persons using crops_enriched.h5"""
-    
-    # Load canonical persons
-    print(f"📂 Loading canonical persons...")
-    data = np.load(canonical_file, allow_pickle=True)
-    persons = list(data['persons'])
-    persons.sort(key=lambda p: len(p['frame_numbers']), reverse=True)
-    
-    # Create output directory
-    gifs_dir = Path(output_gifs_dir) / 'gifs'
-    gifs_dir.mkdir(parents=True, exist_ok=True)
-    print(f"📁 Output directory: {gifs_dir}")
-    
-    # Generate GIFs for top 10 persons using HDF5
-    print(f"\n🎬 Generating GIFs for top 10 persons...\n")
-    
-    success_count = 0
-    failed_count = 0
-    
-    try:
-        with h5py.File(crops_enriched_file, 'r') as h5f:
-            for rank, person in enumerate(persons[:10], 1):
-                person_id = person['person_id']
-                num_person_frames = len(person['frame_numbers'])
-                
-                # Check if person exists in HDF5
-                person_key = f'person_{person_id:02d}'
-                if person_key not in h5f:
-                    print(f"  ⚠️  Rank {rank}: P{person_id} - Not found in crops_enriched.h5")
-                    failed_count += 1
-                    continue
-                
-                h5_person_group = h5f[person_key]
-                
-                success, message = create_gif_for_person(
-                    person,
-                    h5_person_group,
-                    gifs_dir,
-                    fps=fps,
-                    num_frames=num_frames
-                )
-                
-                if success:
-                    print(f"  ✅ Rank {rank}: P{person_id} - {message}")
-                    success_count += 1
-                else:
-                    print(f"  ❌ Rank {rank}: P{person_id} - {message}")
-                    failed_count += 1
-    
-    except FileNotFoundError:
-        print(f"❌ crops_enriched.h5 not found: {crops_enriched_file}")
-        print(f"   Make sure Stage 4b.5 has run successfully")
-        return False
-    except Exception as e:
-        print(f"❌ Error reading HDF5 file: {str(e)}")
-        return False
-    
-    print(f"\n{'='*70}")
-    print(f"📊 GIF Generation Summary:")
-    print(f"  ✅ Successful: {success_count}/10")
-    print(f"  ❌ Failed: {failed_count}/10")
-    print(f"  📁 Output: {gifs_dir}")
-    print(f"{'='*70}\n")
-    
-    return success_count > 0
-
-
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description='Stage 11: Generate Animated GIFs for Top 10 Persons (Experimental)'
-    )
-    parser.add_argument('--config', type=str, required=True,
-                       help='Path to pipeline configuration YAML')
-    
-    args = parser.parse_args()
-    config = load_config(args.config)
-    
-    # Get paths from config
-    canonical_file = config['stage7']['input']['canonical_persons_file']
-    crops_enriched_file = config['stage6']['output']['crops_enriched_file']
-    output_dir = config['global']['outputs_dir']
-    
-    print(f"\n{'='*70}")
-    print(f"🎬 STAGE 11: GENERATE PERSON GIFS (Experimental)")
-    print(f"{'='*70}\n")
-    
-    t_start = time.time()
-    
-    success = create_gifs_for_top_persons(
-        canonical_file,
-        crops_enriched_file,
-        output_dir
-    )
-    
-    t_end = time.time()
-    
-    if success:
-        print(f"✅ Stage 11 completed in {t_end - t_start:.2f}s\n")
-        return 0
-    else:
-        print(f"❌ Stage 11 failed\n")
-        return 1
-
-
-if __name__ == '__main__':
-    exit(main())
-
-
-# End of file - removed duplicate code
-    """Recursively resolve ${variable} in config"""
-    global_vars = config.get('global', {})
-    
-    def resolve_string_once(s, vars_dict):
-        if not isinstance(s, str):
-            return s
-        return re.sub(
-            r'\$\{(\w+)\}',
-            lambda m: str(vars_dict.get(m.group(1), m.group(0))),
-            s
-        )
-    
-    max_iterations = 10
-    for _ in range(max_iterations):
-        resolved_globals = {}
-        changed = False
-        for key, value in global_vars.items():
-            if isinstance(value, str):
-                resolved = resolve_string_once(value, global_vars)
-                resolved_globals[key] = resolved
-                if resolved != value:
-                    changed = True
-            else:
-                resolved_globals[key] = value
-        global_vars = resolved_globals
-        if not changed:
-            break
-    
-    def resolve_string(s):
-        return re.sub(
-            r'\$\{(\w+)\}',
-            lambda m: str(global_vars.get(m.group(1), m.group(0))),
-            s
-        )
-    
-    def resolve_recursive(obj):
-        if isinstance(obj, dict):
-            return {k: resolve_recursive(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [resolve_recursive(v) for v in obj]
-        elif isinstance(obj, str):
-            return resolve_string(obj)
-        return obj
-    
-    result = resolve_recursive(config)
-    result['global'] = global_vars
-    return result
-
-
-def load_config(config_path):
-    """Load and resolve YAML configuration"""
-    with open(config_path, 'r') as f:
-        config = yaml.safe_load(f)
-    
-    # Auto-extract current_video from video_file
-    video_file = config.get('global', {}).get('video_file', '')
-    if video_file:
-        import os
-        video_name = os.path.splitext(video_file)[0]
-        config['global']['current_video'] = video_name
-    
-    return resolve_path_variables(config)
-
-
-def compute_frame_size_for_person_hdf5(person, h5_person_group, padding=15):
-    """
-    Compute the frame size needed for this person using HDF5 data.
-    
-    Scans first 75 frames and finds the largest bbox.
-    Adds padding around it to create the final frame size.
-    
-    Returns: (width, height) for this person's GIF frames
-    """
-    frames = person['frame_numbers']
-    
-    # Look at first 75 frames (or all if less than 75)
-    num_frames_to_check = min(75, len(frames))
-    
-    max_width = 0
-    max_height = 0
-    
-    frame_idx_counter = 0
-    for frame_idx in frames:
-        if frame_idx_counter >= num_frames_to_check:
-            break
-        
-        frame_idx = int(frame_idx)
-        frame_key = f'frame_{frame_idx:06d}'
-        
-        # Check if frame exists in HDF5
-        if frame_key not in h5_person_group:
-            continue
-        
-        frame_group = h5_person_group[frame_key]
-        
-        # Get bbox from metadata
-        if 'bbox' in frame_group.attrs:
-            bbox = frame_group.attrs['bbox']
-            width = int(bbox[2] - bbox[0])
-            height = int(bbox[3] - bbox[1])
-            
-            max_width = max(max_width, width)
-            max_height = max(max_height, height)
-        
-        frame_idx_counter += 1
-    
-    # Add padding on all sides
-    final_width = max_width + (2 * padding)
-    final_height = max_height + (2 * padding)
-    
-    return int(final_width), int(final_height)
-
 
 
 def pad_crop_to_frame(crop, frame_width, frame_height, padding_color=(0, 0, 0)):
@@ -642,7 +305,7 @@ def create_gifs_for_top_persons(canonical_file, crops_enriched_file, output_gifs
     
     except FileNotFoundError:
         print(f"❌ crops_enriched.h5 not found: {crops_enriched_file}")
-        print(f"   Make sure Stage 4b.5 has run successfully")
+        print(f"   Make sure Stage 6 has run successfully")
         return False
     except Exception as e:
         print(f"❌ Error reading HDF5 file: {str(e)}")
@@ -660,7 +323,7 @@ def create_gifs_for_top_persons(canonical_file, crops_enriched_file, output_gifs
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Stage 9: Generate Animated GIFs for Top 10 Persons (Experimental)'
+        description='Stage 11: Generate Animated GIFs for Top 10 Persons (Experimental)'
     )
     parser.add_argument('--config', type=str, required=True,
                        help='Path to pipeline configuration YAML')
@@ -669,12 +332,12 @@ def main():
     config = load_config(args.config)
     
     # Get paths from config
-    canonical_file = config['stage5_rank']['input']['canonical_persons_file']
-    crops_enriched_file = config['stage4b5_enrich_crops']['output']['crops_enriched_file']
+    canonical_file = config['stage7']['input']['canonical_persons_file']
+    crops_enriched_file = config['stage6']['output']['crops_enriched_file']
     output_dir = config['global']['outputs_dir']
     
     print(f"\n{'='*70}")
-    print(f"🎬 STAGE 9: GENERATE PERSON GIFS (Experimental)")
+    print(f"🎬 STAGE 11: GENERATE PERSON GIFS (Experimental)")
     print(f"{'='*70}\n")
     
     t_start = time.time()
@@ -688,10 +351,10 @@ def main():
     t_end = time.time()
     
     if success:
-        print(f"✅ Stage 9 completed in {t_end - t_start:.2f}s\n")
+        print(f"✅ Stage 11 completed in {t_end - t_start:.2f}s\n")
         return 0
     else:
-        print(f"❌ Stage 9 failed\n")
+        print(f"❌ Stage 11 failed\n")
         return 1
 
 
