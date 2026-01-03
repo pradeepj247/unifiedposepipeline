@@ -165,10 +165,27 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     enabled_stages = config['pipeline']['stages']
     
     if stages_to_run is not None:
-        # User specified stages
-        stage_indices = [int(s.strip()) for s in stages_to_run.split(',')]
-        stages = [all_stages[i-1] for i in stage_indices if 1 <= i <= len(all_stages)]
-        print(f"Running stages: {', '.join([str(i) for i in stage_indices])}")
+        # User specified stages - can be numbers or stage keys
+        stage_specs = [s.strip() for s in stages_to_run.split(',')]
+        stages = []
+        stage_nums = []
+        
+        for spec in stage_specs:
+            try:
+                # Try as number first
+                stage_num = int(spec)
+                if 1 <= stage_num <= len(all_stages):
+                    stages.append(all_stages[stage_num - 1])
+                    stage_nums.append(str(stage_num))
+            except ValueError:
+                # Try as stage key (e.g., "stage9_generate_gifs")
+                for idx, (name, script, key) in enumerate(all_stages):
+                    if key == spec:
+                        stages.append((name, script, key))
+                        stage_nums.append(f"{idx+1}")
+                        break
+        
+        print(f"Running stages: {', '.join(stage_nums)}")
     else:
         # Run all enabled stages
         stages = [
