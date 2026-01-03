@@ -151,7 +151,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         ('Stage 5: Ranking', 'stage5_rank_persons.py', 'stage5_rank'),
         ('Stage 5b: Visualize Grouping', 'stage5b_visualize_grouping.py', 'stage5b_visualize_grouping'),
         ('Stage 6: Visualization', 'stage6_create_output_video.py', 'stage6_create_output_video'),
-        ('Stage 6b: Selection Grid (No Seeking)', 'stage6b_create_selection_grid_fixed.py', 'stage6b_create_selection_grid')
+        ('Stage 6b: Selection HTML (3 Temporal Crops)', 'stage6b_create_selection_html.py', 'stage6b_create_selection_grid')
     ]
     
     # Print header
