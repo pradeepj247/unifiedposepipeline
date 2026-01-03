@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-Stage 6b Alternative: Create Person Selection PDF with Table and Thumbnails
+Stage 6b Alternative: Create Person Selection Report (CSV + Images)
 
-Creates a professional PDF document showing:
-- Table of all persons with statistics (duration, start frame, end frame, etc.)
-- Thumbnail crops for easy visual review
-- Sortable by duration, person ID, or other metrics
+Creates a simple report with:
+- CSV table of all persons with statistics
+- Thumbnail images saved separately for easy review
 
 Usage:
     python stage6b_create_selection_pdf.py --config configs/pipeline_config.yaml
@@ -18,21 +17,10 @@ import yaml
 import re
 import os
 import cv2
+import csv
 from pathlib import Path
 import time
 from datetime import timedelta
-
-# Try to import reportlab for PDF generation
-try:
-    from reportlab.lib.pagesizes import letter, A4
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import inch
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage, PageBreak
-    from reportlab.lib import colors
-    HAS_REPORTLAB = True
-except ImportError:
-    HAS_REPORTLAB = False
-    print("⚠️  reportlab not found. Install with: pip install reportlab")
 
 
 def resolve_path_variables(config):
@@ -116,14 +104,8 @@ def get_best_crop_for_person(person, crops_cache):
     return None
 
 
-def save_crop_to_temp_png(crop_bgr, temp_path):
-    """Save BGR crop to temporary PNG file"""
-    crop_rgb = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB)
-    cv2.imwrite(str(temp_path), cv2.cvtColor(crop_rgb, cv2.COLOR_RGB2BGR))
-
-
-def create_selection_pdf(canonical_file, crops_cache_file, fps, output_pdf, temp_dir):
-    """Create PDF with table and thumbnails"""
+def create_selection_report(canonical_file, crops_cache_file, fps, output_csv, thumbnails_dir):
+    """Create selection report with CSV table and thumbnail images"""
     
     # Load data
     print(f"📂 Loading canonical persons...")
@@ -135,140 +117,59 @@ def create_selection_pdf(canonical_file, crops_cache_file, fps, output_pdf, temp
     with open(crops_cache_file, 'rb') as f:
         crops_cache = pickle.load(f)
     
-    # Prepare table data
-    print(f"🎨 Preparing table data...")
-    temp_dir = Path(temp_dir)
-    temp_dir.mkdir(parents=True, exist_ok=True)
+    # Create thumbnails directory
+    print(f"🎨 Extracting thumbnails...")
+    thumbnails_dir = Path(thumbnails_dir)
+    thumbnails_dir.mkdir(parents=True, exist_ok=True)
     
-    # Create table with text data only (no images in table)
-    table_data = [
-        ['Rank', 'Person ID', 'Duration', 'Frames', 'Start', 'End', 'Avg Conf']
-    ]
+    # Create CSV file
+    print(f"📄 Creating CSV report...")
+    output_csv = Path(output_csv)
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
     
-    crop_image_pairs = []  # Store (rank, person_id, crop_path) for later
-    
-    for rank, person in enumerate(persons[:20], 1):  # Top 20 persons
-        person_id = person['person_id']
-        frames = person['frame_numbers']
-        durations = len(frames)
-        start_frame = int(frames[0])
-        end_frame = int(frames[-1])
-        avg_conf = np.mean(person['confidences'])
+    with open(output_csv, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['Rank', 'Person_ID', 'Duration_Sec', 'Frames', 'Start_Frame', 'End_Frame', 'Avg_Confidence', 'Thumbnail_File'])
         
-        duration_seconds = durations / fps if fps > 0 else durations / 25
-        duration_str = str(timedelta(seconds=int(duration_seconds)))
-        
-        # Get crop and save
-        crop = get_best_crop_for_person(person, crops_cache)
-        
-        if crop is not None:
-            temp_file = temp_dir / f"person_{person_id:03d}.png"
-            save_crop_to_temp_png(crop, temp_file)
-            crop_image_pairs.append((rank, person_id, str(temp_file)))
-        
-        row = [
-            str(rank),
-            str(person_id),
-            duration_str,
-            str(durations),
-            str(start_frame),
-            str(end_frame),
-            f'{avg_conf:.3f}'
-        ]
-        
-        table_data.append(row)
-    
-    # Create PDF if reportlab available
-    if not HAS_REPORTLAB:
-        print(f"⚠️  reportlab not installed. Cannot create PDF.")
-        print(f"   Install with: pip install reportlab")
-        return False
-    
-    print(f"📄 Creating PDF document...")
-    
-    try:
-        doc = SimpleDocTemplate(str(output_pdf), pagesize=A4, rightMargin=15, leftMargin=15,
-                               topMargin=25, bottomMargin=25)
-        
-        story = []
-        styles = getSampleStyleSheet()
-        
-        # Title
-        title = Paragraph("Person Selection Report", styles['Title'])
-        story.append(title)
-        story.append(Spacer(1, 0.2*inch))
-        
-        # Create table with text only
-        table = Table(table_data, colWidths=[0.5*inch, 0.8*inch, 0.9*inch, 0.6*inch,
-                                             0.6*inch, 0.6*inch, 0.7*inch])
-        
-        # Simple styling without problematic alignment
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('FONTSIZE', (0, 1), (-1, -1), 8),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
-        ]))
-        
-        story.append(table)
-        story.append(Spacer(1, 0.3*inch))
-        
-        # Add thumbnails section
-        if crop_image_pairs:
-            story.append(Paragraph("Person Thumbnails", styles['Heading2']))
-            story.append(Spacer(1, 0.1*inch))
+        for rank, person in enumerate(persons[:50], 1):  # Top 50 persons
+            person_id = person['person_id']
+            frames = person['frame_numbers']
+            durations = len(frames)
+            start_frame = int(frames[0])
+            end_frame = int(frames[-1])
+            avg_conf = np.mean(person['confidences'])
             
-            # Add thumbnails in 3 columns
-            thumb_table_data = []
-            current_row = []
+            duration_seconds = durations / fps if fps > 0 else durations / 25
             
-            for rank, person_id, crop_path in crop_image_pairs:
-                if Path(crop_path).exists():
-                    try:
-                        img = RLImage(crop_path, width=1.2*inch, height=1.4*inch)
-                        # Create a cell with image and label
-                        label = f"P{person_id} (Rank {rank})"
-                        current_row.append([img, label])
-                        
-                        if len(current_row) >= 3:
-                            thumb_table_data.append(current_row)
-                            current_row = []
-                    except Exception as e:
-                        print(f"  ⚠️  Failed to add thumbnail for P{person_id}: {e}")
+            # Get crop and save
+            crop = get_best_crop_for_person(person, crops_cache)
+            thumbnail_file = ''
             
-            if current_row:
-                thumb_table_data.append(current_row)
+            if crop is not None:
+                # Convert BGR to RGB and save
+                crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+                thumb_path = thumbnails_dir / f"P{person_id:03d}_rank{rank:02d}.png"
+                cv2.imwrite(str(thumb_path), cv2.cvtColor(crop_rgb, cv2.COLOR_RGB2BGR))
+                thumbnail_file = thumb_path.name
             
-            # Add thumbnail table if we have any thumbnails
-            if thumb_table_data:
-                try:
-                    thumb_table = Table(thumb_table_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch])
-                    thumb_table.setStyle(TableStyle([
-                        ('GRID', (0, 0), (-1, -1), 1, colors.lightgrey),
-                        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                    ]))
-                    story.append(thumb_table)
-                except Exception as e:
-                    print(f"  ⚠️  Failed to create thumbnail table: {e}")
-        
-        # Build PDF
-        doc.build(story)
-        return True
-        
-    except Exception as e:
-        print(f"❌ Error building PDF: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+            # Write row
+            writer.writerow([
+                rank,
+                person_id,
+                f'{duration_seconds:.1f}',
+                durations,
+                start_frame,
+                end_frame,
+                f'{avg_conf:.3f}',
+                thumbnail_file
+            ])
+    
+    return True
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Stage 6b: Create Person Selection PDF'
+        description='Stage 6b: Create Person Selection Report (CSV + Thumbnails)'
     )
     parser.add_argument('--config', type=str, required=True,
                        help='Path to pipeline configuration YAML')
@@ -278,37 +179,41 @@ def main():
     
     canonical_file = config['stage4b_group_canonical']['output']['canonical_persons_file']
     crops_cache_file = config['stage4a_reid_recovery']['input']['crops_cache_file']
-    output_pdf = Path(config.get('stage6b_create_selection_pdf', {}).get('output', {}).get(
-        'selection_pdf', 
-        str(Path(canonical_file).parent / 'person_selection_report.pdf')
-    ))
+    
+    output_dir = Path(canonical_file).parent
+    output_csv = output_dir / 'person_selection_report.csv'
+    thumbnails_dir = output_dir / 'person_thumbnails'
     
     fps = config.get('global', {}).get('video_fps', 25)
     
     print(f"\n{'='*70}")
-    print(f"📄 STAGE 6b: CREATE PERSON SELECTION PDF")
+    print(f"📄 STAGE 6b: CREATE PERSON SELECTION REPORT")
     print(f"{'='*70}\n")
     
     t_start = time.time()
     
-    success = create_selection_pdf(
+    success = create_selection_report(
         canonical_file,
         crops_cache_file,
         fps,
-        output_pdf,
-        output_pdf.parent / 'temp_crops'
+        output_csv,
+        thumbnails_dir
     )
     
     t_end = time.time()
     
     if success:
-        size_mb = output_pdf.stat().st_size / (1024 * 1024) if output_pdf.exists() else 0
-        print(f"\n✅ PDF created: {output_pdf.name} ({size_mb:.2f} MB)")
+        csv_size_mb = output_csv.stat().st_size / (1024 * 1024) if output_csv.exists() else 0
+        thumb_count = len(list(thumbnails_dir.glob('*.png'))) if thumbnails_dir.exists() else 0
+        
+        print(f"\n✅ Report created!")
+        print(f"   CSV file: {output_csv.name} ({csv_size_mb:.2f} MB)")
+        print(f"   Thumbnails: {thumb_count} images in {thumbnails_dir.name}/")
         print(f"⏱️  Time: {t_end - t_start:.2f}s")
         print(f"\n{'='*70}\n")
         return True
     else:
-        print(f"\n❌ Failed to create PDF")
+        print(f"\n❌ Failed to create report")
         print(f"{'='*70}\n")
         return False
 
