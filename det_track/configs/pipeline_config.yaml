@@ -221,11 +221,12 @@ stage10:
 # To disable this stage, set pipeline.stages.stage11 to false
 stage11:
   
-  gif_generation:
-    format: gif              # Output format (gif for HTML embedding)
+  video_generation:
+    format: mp4              # Output format (mp4 for faster encoding & smaller file size)
+    codec: mp4v              # MPEG-4 video codec (widely supported)
     fps: 15                  # Frames per second (15 fps = smooth playback at ~3.3 seconds)
-    max_frames: 50           # Maximum frames per GIF (reduced from 75 for faster generation)
-    max_persons: 10          # Generate GIFs for top 10 persons
+    max_frames: 50           # Maximum frames per MP4 (same as GIF for fair comparison)
+    max_persons: 10          # Generate MP4s for top 10 persons
     frame_width: 256         # Fixed frame width (maintains aspect ratio)
     frame_height: 384        # Fixed frame height
   
