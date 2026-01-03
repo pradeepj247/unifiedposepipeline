@@ -174,12 +174,16 @@ def main():
     # Resolve paths
     config = resolve_path_variables(config)
     
-    # Get file paths
-    video_path = config['global']['video_file']
-    output_dir = config['global']['output_dir']
+    # Get file paths from config sections (like stage5b does)
+    tracklets_path = Path(config['stage2_track']['output']['tracklets_file'])
+    persons_path = Path(config['stage4b_group_canonical']['output']['canonical_persons_file'])
     
-    tracklets_path = Path(output_dir) / 'tracklets_raw.npz'
-    persons_path = Path(output_dir) / 'canonical_persons.npz'
+    # Get video path
+    video_dir = config['global']['video_dir']
+    video_file = config['global']['video_file']
+    video_path = f"{video_dir}{video_file}" if video_dir.endswith('/') else f"{video_dir}/{video_file}"
+    
+    output_dir = Path(config['global']['outputs_dir'])
     
     output_video = Path(output_dir) / 'debug_tracklets_vs_canonical.mp4'
     
@@ -188,6 +192,17 @@ def main():
     print(f"Persons: {persons_path}")
     print(f"Output: {output_video}")
     print(f"Max frames: {args.max_frames}")
+    
+    # Verify files exist
+    if not Path(tracklets_path).exists():
+        print(f"ERROR: {tracklets_path} not found")
+        return 1
+    if not Path(persons_path).exists():
+        print(f"ERROR: {persons_path} not found")
+        return 1
+    if not Path(video_path).exists():
+        print(f"ERROR: {video_path} not found")
+        return 1
     
     # Load data
     print("\nLoading NPZ files...")
