@@ -359,8 +359,6 @@ def run_detection(config):
     
     detections_file = output_config['detections_file']
     
-    processing_resolution = processing_config.get('processing_resolution')
-    
     # Print header
     print(f"\n{'='*70}")
     print(f"📍 STAGE 1: DETECTION")
@@ -383,22 +381,11 @@ def run_detection(config):
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
-    # Determine processing resolution
-    if processing_resolution is not None:
-        proc_width, proc_height = processing_resolution
-        scale_x = width / proc_width
-        scale_y = height / proc_height
-        use_downscaling = True
-    else:
-        proc_width, proc_height = width, height
-        scale_x, scale_y = 1.0, 1.0
-        use_downscaling = False
-    
+    # Use original resolution (downscaling adds 19% overhead with no benefit)
+    proc_width, proc_height = width, height
     num_frames = min(max_frames, total_frames) if max_frames > 0 else total_frames
     
     print(f"  Resolution: {width}x{height} @ {fps:.2f} fps")
-    if use_downscaling:
-        print(f"  Processing: {proc_width}x{proc_height} (downscaled {scale_x:.2f}x)")
     print(f"  Total frames: {total_frames}")
     print(f"  Processing: {num_frames} frames")
     
@@ -433,28 +420,15 @@ def run_detection(config):
         if not ret:
             break
         
-        # Downscale if needed
-        if use_downscaling:
-            frame_proc = cv2.resize(frame, (proc_width, proc_height))
-        else:
-            frame_proc = frame
+        # Detect (all coordinates in original 1920x1080 resolution)
+        detections, classes = detect_frame(detector, frame, confidence, detect_only_humans)
         
-        # Detect (detections are in processing resolution coordinates)
-        detections, classes = detect_frame(detector, frame_proc, confidence, detect_only_humans)
-        
-        # Draw on processing frame BEFORE scaling (for visualization)
-        frame_vis = draw_detections_on_frame(frame_proc, detections, frame_idx)
+        # Draw detections on frame for visualization
+        frame_vis = draw_detections_on_frame(frame, detections, frame_idx)
         
         # Write visualization frame to output video
         if out_video is not None:
             out_video.write(frame_vis)
-        
-        # Scale to original resolution for storage in NPZ
-        if use_downscaling and len(detections) > 0:
-            detections[:, 0] *= scale_x  # x1
-            detections[:, 1] *= scale_y  # y1
-            detections[:, 2] *= scale_x  # x2
-            detections[:, 3] *= scale_y  # y2
         
         # Filter detections
         detections, classes = filter_detections(

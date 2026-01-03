@@ -54,7 +54,7 @@ stage1_detect:
     min_confidence: 0.3  # Minimum confidence threshold
   
   processing:
-    processing_resolution: [1280, 720]  # Downscale for speed (null = original)
+    processing_resolution: null  # Use original 1920x1080 (downscaling adds 19% overhead)
     batch_size: 1
   
   input:
