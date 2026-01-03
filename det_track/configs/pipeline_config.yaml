@@ -49,7 +49,6 @@ pipeline:
 # ============================================================================
 stage1_detect:
   detector:
-    type: yolo
     model_path: ${models_dir}/yolo/yolov8s.pt  # Use .engine for TensorRT (requires tensorrt package)
     confidence: 0.3
     device: cuda
@@ -70,10 +69,8 @@ stage1_detect:
 # ============================================================================
 # Stage 2: Tracking (ByteTrack Offline)
 # ============================================================================
+# NOTE: Only ByteTrack is currently supported (hardcoded in stage2_track.py)
 stage2_track:
-  tracker:
-    type: bytetrack  # Only bytetrack/ocsort supported for offline mode
-  
   params:
     track_thresh: 0.15     # Confidence threshold for tracking (lowered for better recall)
     track_buffer: 30       # Buffer size for lost tracks (frames)
