@@ -321,9 +321,11 @@ def create_gifs_for_top_persons(canonical_file, crops_enriched_file, output_gifs
     return success_count > 0
 
 
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description='Stage 9: Generate Animated GIFs for Top 10 Persons (Experimental)'
+        description='Stage 11: Generate Animated GIFs for Top 10 Persons (Experimental)'
     )
     parser.add_argument('--config', type=str, required=True,
                        help='Path to pipeline configuration YAML')
@@ -332,12 +334,12 @@ def main():
     config = load_config(args.config)
     
     # Get paths from config
-    canonical_file = config['stage5_rank']['input']['canonical_persons_file']
-    crops_enriched_file = config['stage4b5_enrich_crops']['output']['crops_enriched_file']
+    canonical_file = config['stage7']['input']['canonical_persons_file']
+    crops_enriched_file = config['stage6']['output']['crops_enriched_file']
     output_dir = config['global']['outputs_dir']
     
     print(f"\n{'='*70}")
-    print(f"🎬 STAGE 9: GENERATE PERSON GIFS (Experimental)")
+    print(f"🎬 STAGE 11: GENERATE PERSON GIFS (Experimental)")
     print(f"{'='*70}\n")
     
     t_start = time.time()
@@ -351,10 +353,10 @@ def main():
     t_end = time.time()
     
     if success:
-        print(f"✅ Stage 9 completed in {t_end - t_start:.2f}s\n")
+        print(f"✅ Stage 11 completed in {t_end - t_start:.2f}s\n")
         return 0
     else:
-        print(f"❌ Stage 9 failed\n")
+        print(f"❌ Stage 11 failed\n")
         return 1
 
 
@@ -362,8 +364,7 @@ if __name__ == '__main__':
     exit(main())
 
 
-
-def resolve_path_variables(config):
+# End of file - removed duplicate code
     """Recursively resolve ${variable} in config"""
     global_vars = config.get('global', {})
     
