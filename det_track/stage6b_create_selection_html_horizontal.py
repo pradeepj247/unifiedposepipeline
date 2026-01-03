@@ -496,7 +496,7 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
                 <div class="video-thumb" onmouseenter="playVideo(this)" onmouseleave="pauseVideo(this)">
                     <img src="{poster_data}" alt="Person {person_id}" class="poster"/>
                     <video class="video-player" playsinline muted onclick="event.stopPropagation(); togglePlay(this)">
-                        <source src="{video_rel_path}" type="video/mp4">
+                        <source src="{video_data}" type="video/mp4">
                     </video>
                     <div class="play-icon"></div>
                 </div>
