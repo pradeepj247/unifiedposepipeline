@@ -131,10 +131,14 @@ def main():
     
     # Load config
     import yaml
+    import sys
+    from pathlib import Path
+    
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
     
-    # Resolve paths
+    # Resolve paths - add parent to path for imports
+    sys.path.insert(0, str(Path(__file__).parent.parent))
     from det_track.utils.path_utils import resolve_config_paths
     config = resolve_config_paths(config)
     
