@@ -289,53 +289,6 @@ def filter_detections(detections, classes, method='hybrid', max_count=15, min_co
     return detections, classes
 
 
-def draw_detections_on_frame(frame, detections, frame_num, bbox_color=(0, 255, 0), text_color=(255, 255, 255)):
-    """
-    Draw bboxes with numbering and frame number on frame
-    
-    Args:
-        frame: Input frame (BGR)
-        detections: (N, 5) array of [x1, y1, x2, y2, confidence]
-        frame_num: Frame number to display
-        bbox_color: BGR color for bboxes
-        text_color: BGR color for text
-    
-    Returns:
-        frame_vis: Frame with drawn detections
-    """
-    frame_vis = frame.copy()
-    
-    # Draw frame number on top-left
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 1.0
-    font_thickness = 2
-    
-    frame_text = f"Frame: {frame_num}"
-    text_size = cv2.getTextSize(frame_text, font, font_scale, font_thickness)[0]
-    
-    # Draw background rectangle for text
-    cv2.rectangle(frame_vis, (5, 5), (5 + text_size[0] + 10, 35), (0, 0, 0), -1)
-    cv2.putText(frame_vis, frame_text, (10, 30), font, font_scale, text_color, font_thickness)
-    
-    # Draw bboxes with numbering
-    for idx, det in enumerate(detections):
-        x1, y1, x2, y2, conf = det
-        x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-        
-        # Draw bbox rectangle
-        cv2.rectangle(frame_vis, (x1, y1), (x2, y2), bbox_color, 2)
-        
-        # Draw detection number
-        num_text = f"{idx}"
-        cv2.putText(frame_vis, num_text, (x1 + 5, y1 + 25), font, 0.8, bbox_color, 2)
-        
-        # Draw confidence score
-        conf_text = f"{conf:.2f}"
-        cv2.putText(frame_vis, conf_text, (x1 + 5, y1 + 50), font, 0.7, bbox_color, 1)
-    
-    return frame_vis
-
-
 def run_detection(config):
     """Run Stage 1: Detection"""
     
@@ -389,17 +342,6 @@ def run_detection(config):
     print(f"  Total frames: {total_frames}")
     print(f"  Processing: {num_frames} frames")
     
-    # Setup output video writer for visualization
-    output_video_path = Path(detections_file).parent / 'stage1_detections_debug.mp4'
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out_video = cv2.VideoWriter(str(output_video_path), fourcc, fps, (proc_width, proc_height))
-    
-    if not out_video.isOpened():
-        print(f"  ⚠️  Warning: Could not open video writer. Continuing without visualization.")
-        out_video = None
-    else:
-        print(f"  📹 Output video: {output_video_path.name} ({proc_width}x{proc_height})")
-    
     # Storage
     all_frame_numbers = []
     all_bboxes = []
@@ -422,13 +364,6 @@ def run_detection(config):
         
         # Detect (all coordinates in original 1920x1080 resolution)
         detections, classes = detect_frame(detector, frame, confidence, detect_only_humans)
-        
-        # Draw detections on frame for visualization
-        frame_vis = draw_detections_on_frame(frame, detections, frame_idx)
-        
-        # Write visualization frame to output video
-        if out_video is not None:
-            out_video.write(frame_vis)
         
         # Filter detections
         detections, classes = filter_detections(
@@ -453,8 +388,6 @@ def run_detection(config):
     
     pbar.close()
     cap.release()
-    if out_video is not None:
-        out_video.release()
     
     t_end = time.time()
     total_time = t_end - t_start

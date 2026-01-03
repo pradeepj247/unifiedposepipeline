@@ -191,16 +191,61 @@ def group_tracklets_heuristic(tracklets, criteria):
 
 
 def merge_group(tracklets, group_indices):
-    """Merge tracklets in a group into one canonical tracklet"""
+    """
+    Merge tracklets in a group into one canonical tracklet.
+    
+    For overlapping frames, compute union bbox.
+    For non-overlapping frames, use the tracklet's bbox.
+    """
     member_tracklets = [tracklets[i] for i in group_indices]
     
     # Sort by start frame
     member_tracklets.sort(key=lambda t: t['frame_numbers'][0])
     
-    # Concatenate
-    merged_frames = np.concatenate([t['frame_numbers'] for t in member_tracklets])
-    merged_bboxes = np.concatenate([t['bboxes'] for t in member_tracklets])
-    merged_confs = np.concatenate([t['confidences'] for t in member_tracklets])
+    # Collect all unique frames and their data
+    frame_to_data = {}  # frame_num -> (bboxes, confs from all tracklets for that frame)
+    
+    for tracklet in member_tracklets:
+        for frame_idx, frame_num in enumerate(tracklet['frame_numbers']):
+            frame_num = int(frame_num)
+            bbox = tracklet['bboxes'][frame_idx]
+            conf = tracklet['confidences'][frame_idx]
+            
+            if frame_num not in frame_to_data:
+                frame_to_data[frame_num] = {'bboxes': [], 'confs': []}
+            
+            frame_to_data[frame_num]['bboxes'].append(bbox)
+            frame_to_data[frame_num]['confs'].append(conf)
+    
+    # Build merged sequence
+    sorted_frames = sorted(frame_to_data.keys())
+    merged_frames = []
+    merged_bboxes = []
+    merged_confs = []
+    
+    for frame_num in sorted_frames:
+        bboxes_in_frame = frame_to_data[frame_num]['bboxes']
+        confs_in_frame = frame_to_data[frame_num]['confs']
+        
+        # Compute union bbox (encompasses all tracklets in this frame)
+        bboxes_array = np.array(bboxes_in_frame)
+        x1 = np.min(bboxes_array[:, 0])
+        y1 = np.min(bboxes_array[:, 1])
+        x2 = np.max(bboxes_array[:, 2])
+        y2 = np.max(bboxes_array[:, 3])
+        union_bbox = np.array([x1, y1, x2, y2], dtype=np.float32)
+        
+        # Use maximum confidence in frame
+        max_conf = np.max(confs_in_frame)
+        
+        merged_frames.append(frame_num)
+        merged_bboxes.append(union_bbox)
+        merged_confs.append(max_conf)
+    
+    # Convert to arrays
+    merged_frames = np.array(merged_frames, dtype=np.int64)
+    merged_bboxes = np.array(merged_bboxes, dtype=np.float32)
+    merged_confs = np.array(merged_confs, dtype=np.float32)
     
     # Canonical ID is the first tracklet ID in the group
     canonical_id = member_tracklets[0]['tracklet_id']
