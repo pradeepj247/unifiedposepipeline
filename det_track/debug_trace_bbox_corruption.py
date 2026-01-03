@@ -24,17 +24,21 @@ def parse_yolo_720p_file(txt_file):
         lines = f.readlines()
     
     in_detections = False
-    for line in lines:
-        line = line.strip()
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
         
         if 'DETECTIONS:' in line:
             in_detections = True
+            i += 1
             continue
         
         if '---' in line or '===' in line:
+            i += 1
             continue
         
         if not line or not in_detections:
+            i += 1
             continue
         
         # Parse detection blocks
@@ -45,38 +49,48 @@ def parse_yolo_720p_file(txt_file):
             try:
                 idx = int(idx_str)
             except:
+                i += 1
                 continue
             
-            # Read next lines for bbox, size, confidence
-            idx_in_block = lines.index(line)
             detection = {'index': idx}
             
-            # Look ahead for bbox line
-            for i in range(idx_in_block + 1, min(idx_in_block + 5, len(lines))):
-                next_line = lines[i].strip()
+            # Look ahead for bbox, size, confidence
+            for j in range(i + 1, min(i + 5, len(lines))):
+                next_line = lines[j].strip()
                 
                 if 'bbox:' in next_line:
                     # Parse: bbox: [x1:1280.0, y1:22.0, x2:1513.0, y2:669.0]
-                    bbox_str = next_line.split('[')[1].split(']')[0]
-                    coords = {}
-                    for coord in bbox_str.split(','):
-                        k, v = coord.strip().split(':')
-                        coords[k] = float(v)
-                    detection['bbox'] = [coords['x1'], coords['y1'], coords['x2'], coords['y2']]
+                    try:
+                        bbox_str = next_line.split('[')[1].split(']')[0]
+                        coords = {}
+                        for coord in bbox_str.split(','):
+                            k, v = coord.strip().split(':')
+                            coords[k] = float(v)
+                        detection['bbox'] = [coords['x1'], coords['y1'], coords['x2'], coords['y2']]
+                    except:
+                        pass
                 
                 elif 'size:' in next_line:
                     # Parse: size: 233.0×648.0
-                    size_str = next_line.split(': ')[1]
-                    w, h = size_str.split('×')
-                    detection['size'] = (float(w), float(h))
+                    try:
+                        size_str = next_line.split(': ')[1]
+                        w, h = size_str.split('×')
+                        detection['size'] = (float(w), float(h))
+                    except:
+                        pass
                 
                 elif 'confidence:' in next_line:
                     # Parse: confidence: 0.90
-                    conf_str = next_line.split(': ')[1]
-                    detection['confidence'] = float(conf_str)
+                    try:
+                        conf_str = next_line.split(': ')[1]
+                        detection['confidence'] = float(conf_str)
+                    except:
+                        pass
             
             if 'bbox' in detection:
                 detections.append(detection)
+        
+        i += 1
     
     return detections
 
