@@ -194,18 +194,21 @@ def main():
     
     args = parser.parse_args()
     
-    # Load config
+    # Load config and resolve all path variables
     config = load_config(args.config)
     
     # Use model name directly - ultralytics will auto-download if needed
     model_path = 'yolo_master_n'
     
-    # Get video path
+    # Get video path from resolved config
     video_file = config['global'].get('video_file', '')
     
     if not video_file or not os.path.exists(video_file):
         print(f"❌ Could not find video: {video_file}")
+        print(f"Debug: video_file from config = '{video_file}'")
         sys.exit(1)
+    
+    print(f"✅ Video found: {video_file}")
     
     # Run benchmark (ultralytics will auto-download model if not found)
     benchmark_yolo_master_n(model_path, video_file, args.frames, args.verbose)
