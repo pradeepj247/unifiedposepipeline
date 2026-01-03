@@ -34,6 +34,7 @@ pipeline:
     stage3_analyze: true                   # Tracklet statistics & candidate analysis
     stage4a_reid_recovery: true            # Load crops cache (lightweight)
     stage4b_group_canonical: true          # Group tracklets into canonical persons
+    stage4b5_enrich_crops: true            # Enrich crops with person IDs and metadata (HDF5)
     stage5_rank: true                      # Rank persons by appearance time
     stage5b_visualize_grouping: true       # Optional: Show grouping tables (debug)
     stage6_create_output_video: true       # Create video visualization of top 10 persons
@@ -140,6 +141,27 @@ stage4b_group_canonical:
   output:
     canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
     grouping_log_file: ${outputs_dir}/${current_video}/grouping_log.json
+
+# ============================================================================
+# Stage 4b.5: Enrich Crops with Person IDs and Metadata (HDF5)
+# ============================================================================
+# NEW STAGE: Creates crops_enriched.h5 with fast indexed lookups
+# Input: canonical_persons.npz + crops_cache.pkl
+# Output: crops_enriched.h5 with structure: person_ID -> frame_ID -> {image_bgr, bbox, width, height}
+stage4b5_enrich_crops:
+  
+  enrichment:
+    format: hdf5              # Output format (HDF5 for fast indexed lookups)
+    color_space: bgr          # Store BGR (native OpenCV format)
+    compression: gzip         # HDF5 compression level (gzip)
+  
+  input:
+    canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
+    crops_cache_file: ${outputs_dir}/${current_video}/crops_cache.pkl
+    detections_file: ${outputs_dir}/${current_video}/detections_raw.npz
+  
+  output:
+    crops_enriched_file: ${outputs_dir}/${current_video}/crops_enriched.h5
 
 # ============================================================================
 # Stage 5: Ranking and Primary Person Selection

@@ -148,6 +148,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         ('Stage 3: Analysis', 'stage3_analyze_tracklets.py', 'stage3_analyze'),
         ('Stage 4a: Load Crops Cache', 'stage4a_load_crops_cache.py', 'stage4a_reid_recovery'),
         ('Stage 4b: Canonical Grouping', 'stage4b_group_canonical.py', 'stage4b_group_canonical'),
+        ('Stage 4b.5: Enrich Crops (HDF5)', 'stage4b5_enrich_crops.py', 'stage4b5_enrich_crops'),
         ('Stage 5: Ranking', 'stage5_rank_persons.py', 'stage5_rank'),
         ('Stage 5b: Visualize Grouping', 'stage5b_visualize_grouping.py', 'stage5b_visualize_grouping'),
         ('Stage 6: Visualization', 'stage6_create_output_video.py', 'stage6_create_output_video'),
