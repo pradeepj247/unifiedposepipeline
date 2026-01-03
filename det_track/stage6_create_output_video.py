@@ -141,14 +141,11 @@ def load_top_persons(canonical_persons_file, min_duration_seconds=5.0, video_fps
     
     print(f"   Found {len(persons_with_duration)} persons with >={min_frames} frames")
     
-    # Limit to top 10 persons (or fewer if less than 10 meet criteria)
-    top_n = min(10, len(persons_with_duration))
-    top_persons = persons_with_duration[:top_n]
+    # Show all persons meeting criteria (removed top 10 limit)
+    top_n = len(persons_with_duration)
+    top_persons = persons_with_duration
     
-    if len(persons_with_duration) > 10:
-        print(f"   Showing top {top_n} persons (out of {len(persons_with_duration)})")
-    else:
-        print(f"   Showing all {top_n} persons")
+    print(f"   Showing all {top_n} persons")
     
     # Create person_id -> data mapping
     persons_dict = {}
