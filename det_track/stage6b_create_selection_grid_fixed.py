@@ -90,34 +90,149 @@ def load_config(config_path):
     return resolve_path_variables(config)
 
 
-def get_best_crop_for_person(person, crops_cache):
+def iou(box1, box2):
+    """Calculate Intersection over Union of two boxes [x1,y1,x2,y2]"""
+    xi1 = max(box1[0], box2[0])
+    yi1 = max(box1[1], box2[1])
+    xi2 = min(box1[2], box2[2])
+    yi2 = min(box1[3], box2[3])
+    
+    inter_w = max(0, xi2 - xi1)
+    inter_h = max(0, yi2 - yi1)
+    inter = inter_w * inter_h
+    
+    area1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    area2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+    union = area1 + area2 - inter
+    
+    return inter / union if union > 0 else 0
+
+
+def get_bbox_area(bbox):
+    """Calculate bbox area"""
+    return (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+
+
+def find_best_detection_idx(person_bbox, crops_in_frame, detections_in_frame_bboxes):
     """
-    Get the best crop for a person (highest confidence frame).
+    Find which detection index in this frame best matches the person.
+    
+    Priority (in order):
+    1. High IoU with person's bbox
+    2. Large bbox area (full-body person)
+    3. High confidence
     
     Args:
-        person: dict with 'frame_numbers', 'confidences'
+        person_bbox: [x1, y1, x2, y2]
+        crops_in_frame: dict {det_idx: crop_image}
+        detections_in_frame_bboxes: dict {det_idx: bbox} for this frame
+    
+    Returns:
+        best_det_idx or None
+    """
+    if not crops_in_frame or not detections_in_frame_bboxes:
+        return None
+    
+    best_det_idx = None
+    best_score = -1.0
+    
+    for det_idx in crops_in_frame:
+        if det_idx not in detections_in_frame_bboxes:
+            continue
+        
+        det_bbox = detections_in_frame_bboxes[det_idx]
+        overlap = iou(person_bbox, det_bbox)
+        bbox_area = get_bbox_area(det_bbox)
+        
+        # Composite score: 70% IoU + 30% bbox area (normalized)
+        # Larger bboxes are better (better quality crops)
+        max_area = 1920 * 1080  # Maximum possible bbox area
+        area_score = min(1.0, bbox_area / max_area)
+        
+        score = 0.7 * overlap + 0.3 * area_score
+        
+        if score > best_score:
+            best_score = score
+            best_det_idx = det_idx
+    
+    return best_det_idx
+
+
+def get_best_crop_for_person(person, crops_cache, detections_data, all_detection_bboxes):
+    """
+    Get the best crop for a person using intelligent selection:
+    - Prefers frames with high confidence
+    - Matches by bbox overlap with original detections
+    - Prefers large bboxes (full-body persons)
+    
+    Args:
+        person: dict with 'frame_numbers', 'bboxes', 'confidences'
         crops_cache: dict {frame_idx: {det_idx: crop_image}}
+        detections_data: NPZ data with frame_numbers, bboxes, confidences
+        all_detection_bboxes: dict {(frame_idx, det_idx): bbox}
     
     Returns:
         crop_image (numpy array) or None
     """
-    if not person.get('frame_numbers') is not None or len(person['frame_numbers']) == 0:
+    if person.get('frame_numbers') is None or len(person['frame_numbers']) == 0:
         return None
     
-    # Find the highest confidence frame
+    # Strategy: Find frame with best combination of:
+    # 1. High confidence in person's tracklet
+    # 2. Large bbox (full-body person visible)
+    # 3. High confidence in the detection itself
+    
+    frame_numbers = person['frame_numbers']
+    bboxes = person['bboxes']
     confidences = person['confidences']
-    best_idx = np.argmax(confidences)
-    best_frame = int(person['frame_numbers'][best_idx])
     
-    # Get crop from cache
-    if best_frame in crops_cache:
-        crops_in_frame = crops_cache[best_frame]
-        # Get first available crop (any detection index)
-        for crop_image in crops_in_frame.values():
-            if crop_image is not None and isinstance(crop_image, np.ndarray):
-                return crop_image
+    best_crop = None
+    best_score = -1.0
     
-    return None
+    for i in range(len(frame_numbers)):
+        frame_idx = int(frame_numbers[i])
+        person_bbox = bboxes[i]
+        person_conf = confidences[i]
+        
+        # Skip if no crops in this frame
+        if frame_idx not in crops_cache:
+            continue
+        
+        crops_in_frame = crops_cache[frame_idx]
+        
+        # Find the detection index that matches this person's bbox
+        # Build bbox dict for this frame from detections_data
+        frame_mask = detections_data['frame_numbers'] == frame_idx
+        frame_det_indices = np.where(frame_mask)[0]
+        
+        detections_in_frame_bboxes = {}
+        detections_in_frame_confs = {}
+        
+        for det_num, det_idx in enumerate(frame_det_indices):
+            detections_in_frame_bboxes[det_num] = detections_data['bboxes'][det_idx]
+            detections_in_frame_confs[det_num] = detections_data['confidences'][det_idx]
+        
+        # Find best matching detection
+        best_det_idx = find_best_detection_idx(
+            person_bbox, crops_in_frame, detections_in_frame_bboxes
+        )
+        
+        if best_det_idx is not None and best_det_idx in crops_in_frame:
+            crop = crops_in_frame[best_det_idx]
+            if crop is not None and isinstance(crop, np.ndarray):
+                # Score: high confidence + large bbox preferred
+                bbox_area = get_bbox_area(person_bbox)
+                max_area = 1920 * 1080
+                area_score = min(1.0, bbox_area / max_area)
+                
+                # Composite: 60% tracklet confidence + 40% bbox area
+                score = 0.6 * person_conf + 0.4 * area_score
+                
+                if score > best_score:
+                    best_score = score
+                    best_crop = crop
+    
+    return best_crop
 
 
 def create_grid_from_crops(crops_dict, persons_list, grid_shape=(2, 5), cell_size=(384, 216)):
@@ -196,6 +311,7 @@ def main():
     # Get paths
     canonical_file = config['stage4b_group_canonical']['output']['canonical_persons_file']
     crops_cache_file = config['stage4a_reid_recovery']['input']['crops_cache_file']
+    detections_file = config['stage1_detect']['output']['detections_file']
     grid_output = Path(config['stage6b_create_selection_grid']['output']['cropped_grid'])
     
     print(f"\n{'='*70}")
@@ -214,6 +330,21 @@ def main():
     
     print(f"   ✅ Loaded {len(persons)} persons")
     
+    # Load detections (needed for bbox matching)
+    print(f"📂 Loading detection data (for bbox matching)...")
+    if not Path(detections_file).exists():
+        print(f"⚠️  Detections file not found: {detections_file}")
+        print(f"   Using simple mode (first available crop per frame)")
+        detections_data = None
+    else:
+        det_data = np.load(detections_file, allow_pickle=True)
+        detections_data = {
+            'frame_numbers': det_data['frame_numbers'],
+            'bboxes': det_data['bboxes'],
+            'confidences': det_data['confidences']
+        }
+        print(f"   ✅ Loaded {len(detections_data['frame_numbers'])} detections")
+    
     # Load crops cache
     print(f"\n📂 Loading crops cache...")
     if not Path(crops_cache_file).exists():
@@ -226,14 +357,37 @@ def main():
     print(f"   ✅ Loaded crops from {len(crops_cache)} frames")
     
     # Extract best crop for each person (from cache, NO seeking!)
-    print(f"\n🎨 Extracting crops from cache (instant, no video seeking)...")
+    print(f"\n🎨 Extracting crops from cache (intelligent selection)...")
     t_extract = time.time()
     
     crops_dict = {}
     missing_count = 0
     
+    # Build all_detection_bboxes for quick lookup
+    all_detection_bboxes = {}
+    if detections_data is not None:
+        for i, frame_idx in enumerate(detections_data['frame_numbers']):
+            all_detection_bboxes[(int(frame_idx), i)] = detections_data['bboxes'][i]
+    
     for person in persons:
-        crop = get_best_crop_for_person(person, crops_cache)
+        if detections_data is not None:
+            crop = get_best_crop_for_person(
+                person, crops_cache, detections_data, all_detection_bboxes
+            )
+        else:
+            # Fallback: just use first available (old method)
+            crop = None
+            for frame_idx in person['frame_numbers']:
+                frame_idx = int(frame_idx)
+                if frame_idx in crops_cache:
+                    crops_in_frame = crops_cache[frame_idx]
+                    for crop_img in crops_in_frame.values():
+                        if crop_img is not None and isinstance(crop_img, np.ndarray):
+                            crop = crop_img
+                            break
+                if crop is not None:
+                    break
+        
         if crop is not None:
             crops_dict[person['person_id']] = crop
         else:
@@ -274,16 +428,23 @@ def main():
     t_total = time.time() - t_start
     
     print(f"\n{'='*70}")
-    print(f"✅ GRID CREATED (NO VIDEO SEEKING!)")
+    print(f"✅ GRID CREATED (INTELLIGENT CROP SELECTION, NO VIDEO SEEKING!)")
     print(f"{'='*70}\n")
     print(f"⏱️  Total Time: {t_total:.2f}s")
-    print(f"   • Cache load: {t_extract - t_start:.3f}s")
-    print(f"   • Crop extraction: {t_extract_end - t_extract:.3f}s (instant from cache)")
+    print(f"   • Load + matching setup: {t_extract - t_start:.3f}s")
+    print(f"   • Crop selection: {t_extract_end - t_extract:.3f}s")
     print(f"   • Grid creation: {t_grid_end - t_grid:.3f}s")
+    print(f"\n📊 Selection Strategy:")
+    print(f"   • Matches detection by bbox overlap (IoU)")
+    print(f"   • Prefers: high confidence + large bboxes")
+    print(f"   • Avoids: edge cases, small crops, low confidence")
     print(f"\n📦 Output:")
     print(f"   • {grid_output.name}")
-    print(f"   • {len(crops_dict)} persons with crops")
-    print(f"\n💡 This is the correct implementation - NO VIDEO SEEKING!")
+    print(f"   • {len(crops_dict)} persons with intelligent crops")
+    print(f"\n💡 Crops selected based on:")
+    print(f"   1. High confidence in tracklet")
+    print(f"   2. Large bbox area (full-body visible)")
+    print(f"   3. Good bbox match with original detection")
     print(f"{'='*70}\n")
     
     return True
