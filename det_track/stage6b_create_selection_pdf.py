@@ -78,7 +78,7 @@ def resolve_path_variables(config):
         elif isinstance(obj, list):
             return [resolve_recursive(v) for v in obj]
         elif isinstance(obj, str):
-            return resolve_string(s)
+            return resolve_string(obj)
         return obj
     
     result = resolve_recursive(config)
