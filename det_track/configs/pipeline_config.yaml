@@ -19,19 +19,24 @@ global:
   video_file: kohli_nets.mp4
 
 # ============================================================================
-# Pipeline Stage Control
+# Pipeline Stage Control - SINGLE SOURCE OF TRUTH
+# ============================================================================
+# NOTE: These settings ALONE control which stages execute.
+# Individual stage configs (e.g., stage6_create_output_video: enabled:) are
+# IGNORED by run_pipeline.py and should NOT be used to enable/disable stages.
+# Use ONLY the settings below to control pipeline execution.
 # ============================================================================
 pipeline:
   stages:
-    stage1_detect: true       # YOLO detection
-    stage2_track: true        # ByteTrack offline tracking
-    stage3_analyze: true      # Tracklet statistics
-    stage4a_reid_recovery: true   # ReID-based tracklet merging (ONNX OSNet)
-    stage4b_group_canonical: true # Geometric grouping (optional)
-    stage5_rank: true         # Primary person selection
-    stage5b_visualize_grouping: false  # Optional: Show grouping results tables
-    stage6_create_output_video: true  # Visualization of top 10 persons
-    stage6b_create_selection_grid: false  # Alternative: Create selection grid images
+    stage1_detect: true                    # YOLO detection
+    stage2_track: true                     # ByteTrack offline tracking
+    stage3_analyze: true                   # Tracklet statistics & candidate analysis
+    stage4a_reid_recovery: true            # Load crops cache (lightweight)
+    stage4b_group_canonical: true          # Group tracklets into canonical persons
+    stage5_rank: true                      # Rank persons by appearance time
+    stage5b_visualize_grouping: false      # Optional: Show grouping tables (debug)
+    stage6_create_output_video: true       # Create video visualization of top 10 persons
+    stage6b_create_selection_grid: false   # Create HTML selection report (alternative to video)
   
   # Data flow options
   skip_if_exists: false  # Skip stages if output files already exist
@@ -187,8 +192,9 @@ stage5_rank:
 # ============================================================================
 # Stage 6: Create Output Video - Visualization of Top 10 Persons
 # ============================================================================
+# NOTE: To enable/disable this stage, use pipeline.stages.stage6_create_output_video
+# (not an 'enabled' field - that would be IGNORED)
 stage6_create_output_video:
-  enabled: true
   
   visualization:
     min_duration_seconds: 5    # Minimum appearance time to be included
@@ -207,10 +213,11 @@ stage6_create_output_video:
     verbose: false
 
 # ============================================================================
-# Stage 6b: Create Selection Grid Images (Alternative to Stage 6 Video)
+# Stage 6b: Create Selection HTML Report (Alternative to Stage 6 Video)
 # ============================================================================
+# NOTE: To enable/disable this stage, use pipeline.stages.stage6b_create_selection_grid
+# (not an 'enabled' field - that would be IGNORED)
 stage6b_create_selection_grid:
-  enabled: false  # Set true to generate selection grids instead of/in addition to video
   
   filters:
     min_duration_seconds: 5    # Minimum appearance time to be included
