@@ -197,29 +197,8 @@ def main():
     # Load config
     config = load_config(args.config)
     
-    # Get model path
-    repo_root = config['global'].get('repo_root', '')
-    models_dir = config['global'].get('models_dir', '')
-    
-    # Try to find yolo_master_n.pt
-    possible_paths = [
-        'yolo_master_n.pt',
-        os.path.join(models_dir, 'yolo', 'yolo_master_n.pt'),
-        os.path.join(repo_root, 'models', 'yolo', 'yolo_master_n.pt'),
-    ]
-    
-    model_path = None
-    for path in possible_paths:
-        if os.path.exists(path):
-            model_path = path
-            break
-    
-    if model_path is None:
-        print(f"❌ Could not find yolo_master_n.pt")
-        print(f"Searched in:")
-        for path in possible_paths:
-            print(f"  - {path}")
-        sys.exit(1)
+    # Use model name directly - ultralytics will auto-download if needed
+    model_path = 'yolo_master_n'
     
     # Get video path
     video_file = config['global'].get('video_file', '')
@@ -228,7 +207,7 @@ def main():
         print(f"❌ Could not find video: {video_file}")
         sys.exit(1)
     
-    # Run benchmark
+    # Run benchmark (ultralytics will auto-download model if not found)
     benchmark_yolo_master_n(model_path, video_file, args.frames, args.verbose)
 
 
