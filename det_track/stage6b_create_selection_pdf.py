@@ -29,7 +29,6 @@ try:
     from reportlab.lib.units import inch
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage, PageBreak
     from reportlab.lib import colors
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
     HAS_REPORTLAB = True
 except ImportError:
     HAS_REPORTLAB = False
@@ -200,7 +199,7 @@ def create_selection_pdf(canonical_file, crops_cache_file, fps, output_pdf, temp
         fontSize=24,
         textColor=colors.HexColor('#1f4788'),
         spaceAfter=30,
-        alignment=TA_CENTER
+        alignment='CENTER'
     )
     
     story.append(Paragraph("Person Selection Report", title_style))
@@ -213,15 +212,14 @@ def create_selection_pdf(canonical_file, crops_cache_file, fps, output_pdf, temp
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f4788')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), TA_CENTER),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('FONTSIZE', (0, 0), (-1, 0), 11),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('FONTSIZE', (0, 1), (-1, -1), 9),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0f0f0')]),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     
     story.append(table)
@@ -243,7 +241,7 @@ def create_selection_pdf(canonical_file, crops_cache_file, fps, output_pdf, temp
                     img = RLImage(crop_path, width=1.5*inch, height=1.8*inch)
                     caption = Paragraph(f"<b>P{person_id}</b><br/>Rank {rank}", 
                                       ParagraphStyle('thumb', parent=styles['Normal'], 
-                                                   fontSize=9, alignment=TA_CENTER))
+                                                   fontSize=9, alignment='CENTER'))
                     current_row.append(img)
                     current_row.append(caption)
                     
