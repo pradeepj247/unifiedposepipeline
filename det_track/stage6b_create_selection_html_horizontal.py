@@ -522,24 +522,65 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
     </div>
     
     <script>
-        // Auto-play video on hover
+        // Track which video is currently playing to prevent conflicts
+        let currentlyPlayingVideo = null;
+        
+        // Auto-play video on hover with proper promise handling
         function playVideo(element) {
             const video = element.querySelector('.video-player');
-            if (video) {
-                video.currentTime = 0;
-                video.play();
-                video.classList.add('playing');
+            if (!video) return;
+            
+            // Don't interrupt if already playing
+            if (currentlyPlayingVideo === video && !video.paused) {
+                return;
+            }
+            
+            // Stop any other playing videos first
+            if (currentlyPlayingVideo && currentlyPlayingVideo !== video) {
+                currentlyPlayingVideo.pause();
+                currentlyPlayingVideo.classList.remove('playing');
+            }
+            
+            // Reset and play
+            video.currentTime = 0;
+            currentlyPlayingVideo = video;
+            
+            // Use catch to handle AbortError if play is interrupted
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        video.classList.add('playing');
+                    })
+                    .catch(error => {
+                        // Ignore AbortError - it's expected if user moves mouse away
+                        if (error.name !== 'AbortError') {
+                            console.error('Video play error:', error);
+                        }
+                    });
             }
         }
         
-        // Pause and rewind on mouse leave
+        // Pause and rewind on mouse leave with proper cleanup
         function pauseVideo(element) {
             const video = element.querySelector('.video-player');
-            if (video) {
-                video.pause();
-                video.currentTime = 0;
-                video.classList.remove('playing');
+            if (!video) return;
+            
+            // Only pause if this is the currently playing video
+            if (currentlyPlayingVideo === video) {
+                const pausePromise = video.pause();
+                if (pausePromise !== undefined) {
+                    pausePromise.catch(error => {
+                        if (error.name !== 'AbortError') {
+                            console.error('Video pause error:', error);
+                        }
+                    });
+                }
+                currentlyPlayingVideo = null;
             }
+            
+            video.currentTime = 0;
+            video.classList.remove('playing');
         }
         
         // Person selection
@@ -565,19 +606,22 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
         
         // Pause all videos when scrolling (performance optimization)
         const tapeWrapper = document.querySelector('.tape-wrapper');
-        let scrollTimeout;
         
         tapeWrapper.addEventListener('scroll', function() {
-            // Pause all videos
-            document.querySelectorAll('.video-player').forEach(video => {
-                video.pause();
+            // Pause the currently playing video
+            if (currentlyPlayingVideo) {
+                currentlyPlayingVideo.pause().catch(error => {
+                    if (error.name !== 'AbortError') {
+                        console.error('Pause error:', error);
+                    }
+                });
+                currentlyPlayingVideo = null;
+            }
+            
+            // Remove playing class from all videos
+            document.querySelectorAll('.video-player.playing').forEach(video => {
                 video.classList.remove('playing');
             });
-            
-            clearTimeout(scrollTimeout);
-            scrollTimeout = setTimeout(function() {
-                // Could resume playing if needed
-            }, 100);
         }, { passive: true });
     </script>
 </body>
