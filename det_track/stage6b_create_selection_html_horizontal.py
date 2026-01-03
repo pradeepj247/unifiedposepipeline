@@ -493,9 +493,12 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
         # Create person card with video
         html_content += f"""            <div class="person-card" onclick="selectPerson(this, {person_id})">
                 <div class="rank-badge">#{rank}</div>
-                <div class="video-thumb" onmouseenter="playVideo(this)" onmouseleave="pauseVideo(this)">
-                    <img src="{poster_data}" alt="Person {person_id}" class="poster"/>
-                    <video class="video-player" playsinline muted onclick="event.stopPropagation(); togglePlay(this)">
+                <div class="video-thumb"
+                     onmouseenter="hoverPlay(this)"
+                     onmouseleave="hoverStop(this)">
+                    <img src="{poster_data}" alt="Person {person_id}"/>
+                    <video playsinline muted
+                           onclick="event.stopPropagation(); togglePlay(this)">
                         <source src="{video_data}" type="video/mp4">
                     </video>
                     <div class="play-icon"></div>
@@ -522,82 +525,37 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
     </div>
     
     <script>
-        // Track which video is currently playing
-        let currentlyPlayingVideo = null;
-        
-        // Toggle play/pause on direct click
         function togglePlay(video) {
             if (video.paused) {
-                video.currentTime = 0;
-                video.play().catch(() => {});
-                video.classList.add('playing');
-                currentlyPlayingVideo = video;
+                video.play().catch(()=>{});
+                video.classList.add("playing");
             } else {
                 video.pause();
-                video.classList.remove('playing');
-                if (currentlyPlayingVideo === video) {
-                    currentlyPlayingVideo = null;
-                }
+                video.classList.remove("playing");
             }
         }
-        
-        // Play on hover
-        function playVideo(container) {
-            const video = container.querySelector('.video-player');
-            if (!video) return;
-            
-            // Stop any other playing videos
-            if (currentlyPlayingVideo && currentlyPlayingVideo !== video) {
-                currentlyPlayingVideo.pause();
-                currentlyPlayingVideo.classList.remove('playing');
-            }
-            
-            video.currentTime = 0;
-            video.play().catch(() => {});
-            video.classList.add('playing');
-            currentlyPlayingVideo = video;
+
+        function hoverPlay(container) {
+            const v = container.querySelector("video");
+            if (!v) return;
+            v.play().catch(()=>{});
+            v.classList.add("playing");
         }
-        
-        // Pause and reset on mouse leave
-        function pauseVideo(container) {
-            const video = container.querySelector('.video-player');
-            if (!video) return;
-            
-            video.pause();
-            video.currentTime = 0;
-            video.classList.remove('playing');
-            if (currentlyPlayingVideo === video) {
-                currentlyPlayingVideo = null;
-            }
+
+        function hoverStop(container) {
+            const v = container.querySelector("video");
+            if (!v) return;
+            v.pause();
+            v.currentTime = 0;
+            v.classList.remove("playing");
         }
-        
-        // Select person (separate from video playback)
-        function selectPerson(cardElement, personId) {
-            // Remove selected state from all cards
-            document.querySelectorAll('.person-card').forEach(card => {
-                card.classList.remove('selected');
-            });
-            
-            // Add selected state to clicked card
-            cardElement.classList.add('selected');
-            
-            // Update selection info
-            const info = document.getElementById('selection-info');
-            info.textContent = `✓ Person P${String(personId).padStart(2, '0')} selected`;
-            
-            console.log('Selected person:', personId);
+
+        function selectPerson(card, id) {
+            document.querySelectorAll(".person-card")
+                .forEach(c => c.classList.remove("selected"));
+            card.classList.add("selected");
+            console.log("Selected person:", id);
         }
-        
-        // Pause all videos when scrolling
-        const tapeWrapper = document.querySelector('.tape-wrapper');
-        
-        tapeWrapper.addEventListener('scroll', function() {
-            if (currentlyPlayingVideo) {
-                currentlyPlayingVideo.pause().catch(() => {});
-                currentlyPlayingVideo.classList.remove('playing');
-                currentlyPlayingVideo = null;
-            }
-        }, { passive: true });
     </script>
 </body>
 </html>
