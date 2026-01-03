@@ -39,7 +39,7 @@ pipeline:
     stage5b_visualize_grouping: true       # Optional: Show grouping tables (debug)
     stage6_create_output_video: true       # Create video visualization of top 10 persons
     stage6b_create_selection_grid: true    # Create HTML selection report (alternative to video)
-    stage9_generate_gifs: false            # Generate animated GIFs for top 10 persons (experimental)
+    stage9_generate_gifs: true             # Generate animated GIFs for top 10 persons (experimental)
   
   # Global settings inherited by all stages (can be overridden per-stage if needed)
   advanced:
