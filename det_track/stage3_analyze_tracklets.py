@@ -168,12 +168,12 @@ def identify_reid_candidates(tracklets, stats, criteria):
                 overlap_start = stat_j['start_frame']
                 overlap_end = stat_i['end_frame']
                 
-                # Compare middle bboxes of overlapping region
-                # Get bbox at overlap_start from tracklet j and at overlap_start from tracklet i
+                # Compare bboxes at overlap_start frame
                 i_frames = tracklets[i]['frame_numbers']
                 j_frames = tracklets[j]['frame_numbers']
                 
-                if overlap_start in i_frames and overlap_start in j_frames:
+                # Use np.isin for fast membership checking
+                if np.isin(overlap_start, i_frames) and np.isin(overlap_start, j_frames):
                     i_idx = np.where(i_frames == overlap_start)[0][0]
                     j_idx = np.where(j_frames == overlap_start)[0][0]
                     
