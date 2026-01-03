@@ -141,11 +141,12 @@ def create_selection_pdf(canonical_file, crops_cache_file, fps, output_pdf, temp
     temp_dir = Path(temp_dir)
     temp_dir.mkdir(parents=True, exist_ok=True)
     
+    # Create table with text data only (no images in table)
     table_data = [
-        ['Rank', 'Person ID', 'Duration', 'Frames', 'Start', 'End', 'Avg Conf', 'Thumbnail']
+        ['Rank', 'Person ID', 'Duration', 'Frames', 'Start', 'End', 'Avg Conf']
     ]
     
-    crop_temp_files = []
+    crop_image_pairs = []  # Store (rank, person_id, crop_path) for later
     
     for rank, person in enumerate(persons[:20], 1):  # Top 20 persons
         person_id = person['person_id']
@@ -158,36 +159,23 @@ def create_selection_pdf(canonical_file, crops_cache_file, fps, output_pdf, temp
         duration_seconds = durations / fps if fps > 0 else durations / 25
         duration_str = str(timedelta(seconds=int(duration_seconds)))
         
-        # Get crop
+        # Get crop and save
         crop = get_best_crop_for_person(person, crops_cache)
         
         if crop is not None:
             temp_file = temp_dir / f"person_{person_id:03d}.png"
             save_crop_to_temp_png(crop, temp_file)
-            crop_temp_files.append(str(temp_file))
-            
-            # For reportlab, we need to create an Image object
-            row = [
-                str(rank),
-                str(person_id),
-                duration_str,
-                str(durations),
-                str(start_frame),
-                str(end_frame),
-                f'{avg_conf:.3f}',
-                str(temp_file)  # Placeholder - will be replaced with Image object
-            ]
-        else:
-            row = [
-                str(rank),
-                str(person_id),
-                duration_str,
-                str(durations),
-                str(start_frame),
-                str(end_frame),
-                f'{avg_conf:.3f}',
-                '(no crop)'
-            ]
+            crop_image_pairs.append((rank, person_id, str(temp_file)))
+        
+        row = [
+            str(rank),
+            str(person_id),
+            duration_str,
+            str(durations),
+            str(start_frame),
+            str(end_frame),
+            f'{avg_conf:.3f}'
+        ]
         
         table_data.append(row)
     
@@ -216,28 +204,11 @@ def create_selection_pdf(canonical_file, crops_cache_file, fps, output_pdf, temp
     )
     
     story.append(Paragraph("Person Selection Report", title_style))
-    story.append(Spacer(1, 0.3*inch))
+    story.append(Spacer(1, 0.2*inch))
     
-    # Convert table with images
-    final_table_data = []
-    final_table_data.append(table_data[0])  # Header
-    
-    for i, row in enumerate(table_data[1:], 1):
-        new_row = list(row)
-        
-        # Replace image path with actual RLImage if crop exists
-        if row[-1] != '(no crop)' and Path(row[-1]).exists():
-            try:
-                img = RLImage(row[-1], width=0.8*inch, height=1.0*inch)
-                new_row[-1] = img
-            except:
-                pass
-        
-        final_table_data.append(new_row)
-    
-    # Create table
-    table = Table(final_table_data, colWidths=[0.5*inch, 0.7*inch, 0.8*inch, 0.6*inch,
-                                               0.6*inch, 0.6*inch, 0.7*inch, 1.0*inch])
+    # Create table with text only
+    table = Table(table_data, colWidths=[0.5*inch, 0.7*inch, 0.8*inch, 0.6*inch,
+                                         0.6*inch, 0.6*inch, 0.7*inch])
     
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f4788')),
@@ -250,14 +221,55 @@ def create_selection_pdf(canonical_file, crops_cache_file, fps, output_pdf, temp
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
         ('FONTSIZE', (0, 1), (-1, -1), 9),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0f0f0')]),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     
     story.append(table)
+    story.append(Spacer(1, 0.3*inch))
+    
+    # Add thumbnail grid on separate pages
+    if crop_image_pairs:
+        story.append(PageBreak())
+        story.append(Paragraph("Person Thumbnails", title_style))
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Create grid of thumbnails (3 per row)
+        thumb_data = []
+        current_row = []
+        
+        for rank, person_id, crop_path in crop_image_pairs:
+            if Path(crop_path).exists():
+                try:
+                    img = RLImage(crop_path, width=1.5*inch, height=1.8*inch)
+                    caption = Paragraph(f"<b>P{person_id}</b><br/>Rank {rank}", 
+                                      ParagraphStyle('thumb', parent=styles['Normal'], 
+                                                   fontSize=9, alignment=TA_CENTER))
+                    current_row.append(img)
+                    current_row.append(caption)
+                    
+                    if len(current_row) >= 6:  # 2 persons per row (image + caption)
+                        thumb_data.append(current_row)
+                        current_row = []
+                except Exception as e:
+                    print(f"  ⚠️  Failed to add thumbnail for P{person_id}: {e}")
+        
+        if current_row:
+            thumb_data.append(current_row)
+        
+        # Add to story
+        for row in thumb_data:
+            story.append(Spacer(1, 0.2*inch))
+            # Simple horizontal layout
+            for item in row:
+                story.append(item)
     
     # Build PDF
-    doc.build(story)
-    
-    return True
+    try:
+        doc.build(story)
+        return True
+    except Exception as e:
+        print(f"❌ Error building PDF: {e}")
+        return False
 
 
 def main():
