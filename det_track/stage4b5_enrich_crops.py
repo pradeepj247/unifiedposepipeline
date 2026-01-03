@@ -316,62 +316,108 @@ def enrich_crops_to_hdf5(canonical_persons_file: str, crops_cache_file: str,
 def main():
     """
     Main entry point for stage4b5_enrich_crops.py.
-    Reads from command-line arguments or environment config.
+    Reads from YAML config like other pipeline stages.
     """
     import argparse
     from pathlib import Path
     import sys
-    
-    # Resolve repo root
-    script_dir = Path(__file__).parent
-    repo_root = script_dir.parent
+    import yaml
     
     parser = argparse.ArgumentParser(
         description='Stage 4b.5: Enrich crops with person IDs and metadata (HDF5)'
     )
-    parser.add_argument('--repo_root', type=str, default=str(repo_root),
-                       help='Repository root directory')
-    parser.add_argument('--outputs_dir', type=str, 
-                       default=str(repo_root / 'demo_data' / 'outputs'),
-                       help='Outputs directory')
-    parser.add_argument('--video_name', type=str, default='kohli_nets',
-                       help='Video name (without extension)')
-    parser.add_argument('--iou_threshold', type=float, default=0.3,
-                       help='IoU threshold for bbox matching')
-    parser.add_argument('--compression', type=str, default='gzip',
-                       help='HDF5 compression method')
+    parser.add_argument('--config', type=str, required=True,
+                       help='Path to pipeline configuration YAML')
     
     args = parser.parse_args()
     
-    # Construct paths
-    video_output_dir = Path(args.outputs_dir) / args.video_name
-    video_output_dir.mkdir(parents=True, exist_ok=True)
+    # Load config
+    with open(args.config, 'r') as f:
+        config = yaml.safe_load(f)
     
-    canonical_persons_file = video_output_dir / 'canonical_persons.npz'
-    crops_cache_file = video_output_dir / 'crops_cache.pkl'
-    detections_file = video_output_dir / 'detections_raw.npz'
-    crops_enriched_file = video_output_dir / 'crops_enriched.h5'
+    # Resolve paths using the same resolver as other stages
+    from pathlib import Path
+    import re
+    
+    def resolve_path_variables(cfg):
+        """Recursively resolve ${variable} in config"""
+        global_vars = cfg.get('global', {})
+        
+        def resolve_string_once(s, vars_dict):
+            if not isinstance(s, str):
+                return s
+            return re.sub(
+                r'\$\{(\w+)\}',
+                lambda m: str(vars_dict.get(m.group(1), m.group(0))),
+                s
+            )
+        
+        max_iterations = 10
+        for _ in range(max_iterations):
+            resolved_globals = {}
+            changed = False
+            for key, value in global_vars.items():
+                if isinstance(value, str):
+                    resolved = resolve_string_once(value, global_vars)
+                    resolved_globals[key] = resolved
+                    if resolved != value:
+                        changed = True
+                else:
+                    resolved_globals[key] = value
+            global_vars = resolved_globals
+            if not changed:
+                break
+        
+        def resolve_string(s):
+            return re.sub(
+                r'\$\{(\w+)\}',
+                lambda m: str(global_vars.get(m.group(1), m.group(0))),
+                s
+            )
+        
+        def resolve_recursive(obj):
+            if isinstance(obj, dict):
+                return {k: resolve_recursive(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [resolve_recursive(v) for v in obj]
+            elif isinstance(obj, str):
+                return resolve_string(obj)
+            return obj
+        
+        result = resolve_recursive(cfg)
+        result['global'] = global_vars
+        return result
+    
+    config = resolve_path_variables(config)
+    
+    # Get paths from config
+    stage_config = config['stage4b5_enrich_crops']
+    canonical_persons_file = stage_config['input']['canonical_persons_file']
+    crops_cache_file = stage_config['input']['crops_cache_file']
+    detections_file = stage_config['input']['detections_file']
+    crops_enriched_file = stage_config['output']['crops_enriched_file']
     
     # Validate inputs
-    if not canonical_persons_file.exists():
+    if not Path(canonical_persons_file).exists():
         logger.error(f"canonical_persons.npz not found: {canonical_persons_file}")
         sys.exit(1)
-    if not crops_cache_file.exists():
+    if not Path(crops_cache_file).exists():
         logger.error(f"crops_cache.pkl not found: {crops_cache_file}")
         sys.exit(1)
-    if not detections_file.exists():
+    if not Path(detections_file).exists():
         logger.error(f"detections_raw.npz not found: {detections_file}")
         sys.exit(1)
     
     # Run enrichment
     enrich_crops_to_hdf5(
-        str(canonical_persons_file),
-        str(crops_cache_file),
-        str(detections_file),
-        str(crops_enriched_file),
-        compression=args.compression,
-        iou_threshold=args.iou_threshold
+        canonical_persons_file,
+        crops_cache_file,
+        detections_file,
+        crops_enriched_file,
+        compression=stage_config.get('enrichment', {}).get('compression', 'gzip'),
+        iou_threshold=0.3
     )
+
 
 
 if __name__ == '__main__':
