@@ -135,7 +135,7 @@ def check_stage_outputs_exist(config, stage_key):
     return True
 
 
-def run_pipeline(config_path, stages_to_run=None, verbose=False):
+def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     """Run the full pipeline"""
     
     # Load config
@@ -184,8 +184,8 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False):
     stage_times = []  # Track timing for each stage
     
     for stage_name, stage_script, stage_key in stages:
-        # Check if stage outputs already exist
-        if check_stage_outputs_exist(config, stage_key):
+        # Check if stage outputs already exist (skip unless --force is used)
+        if not force and check_stage_outputs_exist(config, stage_key):
             print(f"\n⏭️  Skipping {stage_name} (outputs already exist)")
             stage_times.append((stage_name, 0.0, True))  # Mark as skipped
             continue
@@ -327,11 +327,13 @@ Examples:
                        help='Comma-separated stage numbers to run (e.g., "1,2,3,5")')
     parser.add_argument('--verbose', action='store_true',
                        help='Enable verbose output')
+    parser.add_argument('--force', action='store_true',
+                       help='Re-run stages even if outputs already exist')
     
     args = parser.parse_args()
     
     # Run pipeline
-    success = run_pipeline(args.config, args.stages, args.verbose)
+    success = run_pipeline(args.config, args.stages, args.verbose, args.force)
     
     sys.exit(0 if success else 1)
 
