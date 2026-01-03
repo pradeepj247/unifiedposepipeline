@@ -135,22 +135,24 @@ def find_crop_for_person_in_frame(person_bbox, frame_to_detections, crops_cache,
     """
     Find the crop that matches a person's bbox in a specific frame.
     Uses IoU to find the best matching detection.
+    frame_to_detections: {frame_idx: {local_idx: bbox, ...}}
+    crops_cache: {frame_idx: {local_idx: crop_image, ...}}
     """
     if frame_idx not in frame_to_detections or frame_idx not in crops_cache:
         return None
     
-    detections_in_frame = frame_to_detections[frame_idx]
-    crops_in_frame = crops_cache[frame_idx]
+    detections_in_frame = frame_to_detections[frame_idx]  # {local_idx: bbox, ...}
+    crops_in_frame = crops_cache[frame_idx]  # {local_idx: crop_image, ...}
     
     # Find detection with highest IoU to person_bbox
     best_det_idx = None
     best_iou = 0.0
     
-    for det_idx, det_bbox in detections_in_frame:
+    for local_idx, det_bbox in detections_in_frame.items():
         iou = bbox_iou(person_bbox, det_bbox)
         if iou > best_iou:
             best_iou = iou
-            best_det_idx = det_idx
+            best_det_idx = local_idx
     
     # Return crop if found and IoU is reasonable (>0.5)
     if best_det_idx is not None and best_iou > 0.5:
@@ -195,14 +197,34 @@ def create_selection_report(canonical_file, crops_cache_file, fps, video_duratio
     detections_data = np.load(str(detections_file), allow_pickle=True)
     detection_frame_numbers = detections_data['frame_numbers']
     detection_bboxes = detections_data['bboxes']
-    # Build frame->detection mapping: {frame_idx: [(det_idx, bbox), ...]}
+    
+    # Build frame->detection mapping using LOCAL frame indices
+    # {frame_idx: {local_frame_idx: bbox, ...}}
+    # local_frame_idx is the 0-based index of detections in that frame
     frame_to_detections = {}
-    for det_idx in range(len(detection_frame_numbers)):
-        frame_idx = int(detection_frame_numbers[det_idx])
-        bbox = detection_bboxes[det_idx]
+    frame_detection_counts = {}  # Count detections per frame
+    
+    # First pass: count detections per frame
+    for frame_idx in detection_frame_numbers:
+        frame_idx = int(frame_idx)
+        frame_detection_counts[frame_idx] = frame_detection_counts.get(frame_idx, 0) + 1
+    
+    # Second pass: build the mapping with local indices
+    frame_local_indices = {}  # {frame_idx: current_count}
+    for global_det_idx in range(len(detection_frame_numbers)):
+        frame_idx = int(detection_frame_numbers[global_det_idx])
+        bbox = detection_bboxes[global_det_idx]
+        
+        # Get local index for this frame
+        if frame_idx not in frame_local_indices:
+            frame_local_indices[frame_idx] = 0
+        local_idx = frame_local_indices[frame_idx]
+        frame_local_indices[frame_idx] += 1
+        
+        # Store with local index (matches crops_cache indexing)
         if frame_idx not in frame_to_detections:
-            frame_to_detections[frame_idx] = []
-        frame_to_detections[frame_idx].append((det_idx, bbox))
+            frame_to_detections[frame_idx] = {}
+        frame_to_detections[frame_idx][local_idx] = bbox
     
     # Create HTML report
     print(f"📄 Creating HTML report...")
