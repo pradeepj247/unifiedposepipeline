@@ -242,6 +242,19 @@ def main():
     tracklets_data = load_npz_data(tracklets_path)
     persons_data = load_npz_data(persons_path)
     
+    # Debug: Print data structure
+    print(f"\nTracklets NPZ keys: {tracklets_data.files}")
+    tracklets_list = tracklets_data['tracklets'].tolist()
+    print(f"  Number of tracklets: {len(tracklets_list)}")
+    if len(tracklets_list) > 0:
+        print(f"  First tracklet keys: {tracklets_list[0].dtype.names if hasattr(tracklets_list[0], 'dtype') else tracklets_list[0].keys()}")
+    
+    print(f"\nPersons NPZ keys: {persons_data.files}")
+    persons_list = persons_data['persons'].tolist()
+    print(f"  Number of persons: {len(persons_list)}")
+    if len(persons_list) > 0:
+        print(f"  First person keys: {persons_list[0].dtype.names if hasattr(persons_list[0], 'dtype') else persons_list[0].keys()}")
+    
     # Open video
     print(f"Opening video: {video_path}")
     cap = cv2.VideoCapture(video_path)
@@ -290,6 +303,10 @@ def main():
         # Get detections for this frame
         tracklets_in_frame = extract_tracklets_for_frame(tracklets_data, frame_count)
         persons_in_frame = extract_persons_for_frame(persons_data, frame_count)
+        
+        # Debug output every 50 frames
+        if frame_count % 50 == 0:
+            print(f"Frame {frame_count}: {len(tracklets_in_frame)} tracklets, {len(persons_in_frame)} persons")
         
         # Create left panel (tracklets)
         left_panel = frame.copy()
