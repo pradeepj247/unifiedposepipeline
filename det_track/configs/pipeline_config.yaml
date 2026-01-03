@@ -63,6 +63,7 @@ stage1_detect:
   
   output:
     detections_file: ${outputs_dir}/${current_video}/detections_raw.npz
+    crops_cache_file: ${outputs_dir}/${current_video}/crops_cache.pkl
   
   advanced:
     verbose: true

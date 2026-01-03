@@ -17,6 +17,7 @@ import time
 import re
 import os
 import sys
+import pickle
 from pathlib import Path
 from tqdm import tqdm
 
@@ -289,6 +290,34 @@ def filter_detections(detections, classes, method='hybrid', max_count=15, min_co
     return detections, classes
 
 
+def extract_crop(frame, bbox):
+    """Extract crop from frame using bbox
+    
+    Args:
+        frame: cv2 image (BGR)
+        bbox: [x1, y1, x2, y2]
+        
+    Returns:
+        crop: resized to (256, 128, 3) for ReID compatibility
+    """
+    x1, y1, x2, y2 = bbox.astype(int)
+    
+    # Clip to frame bounds
+    x1 = max(0, x1)
+    y1 = max(0, y1)
+    x2 = min(frame.shape[1], x2)
+    y2 = min(frame.shape[0], y2)
+    
+    crop = frame[y1:y2, x1:x2]
+    
+    if crop.size == 0:
+        return None
+    
+    # Resize to (256, 128) for ReID model compatibility
+    crop = cv2.resize(crop, (128, 256))  # width, height
+    return crop
+
+
 def run_detection(config):
     """Run Stage 1: Detection"""
     
@@ -311,6 +340,8 @@ def run_detection(config):
     max_frames = input_config['max_frames']
     
     detections_file = output_config['detections_file']
+    crops_cache_file = output_config.get('crops_cache_file', 
+                                          str(Path(detections_file).parent / 'crops_cache.pkl'))
     
     # Print header
     print(f"\n{'='*70}")
@@ -348,10 +379,13 @@ def run_detection(config):
     all_confidences = []
     all_classes = []
     num_detections_per_frame = []
+    crops_cache = {}  # {frame_idx: {det_idx: crop_image}}
     
     # Process frames
     print(f"\n⚡ Running detection...")
-    t_start = time.time()
+    t_detection_start = time.time()
+    t_crop_start = None
+    t_crop_total = 0.0
     
     pbar = tqdm(total=num_frames, desc="Detecting", mininterval=1.0)
     
@@ -377,11 +411,22 @@ def run_detection(config):
         num_dets = len(detections)
         num_detections_per_frame.append(num_dets)
         
+        # Extract crops for this frame
+        if t_crop_start is None:
+            t_crop_start = time.time()
+        
+        crops_cache[frame_idx] = {}
+        
         for i in range(num_dets):
             all_frame_numbers.append(frame_idx)
             all_bboxes.append(detections[i, :4])
             all_confidences.append(detections[i, 4])
             all_classes.append(classes[i])
+            
+            # Extract crop
+            crop = extract_crop(frame, detections[i, :4])
+            if crop is not None:
+                crops_cache[frame_idx][i] = crop
         
         frame_idx += 1
         pbar.update(1)
@@ -389,9 +434,12 @@ def run_detection(config):
     pbar.close()
     cap.release()
     
-    t_end = time.time()
-    total_time = t_end - t_start
-    processing_fps = num_frames / total_time if total_time > 0 else 0
+    if t_crop_start is not None:
+        t_crop_total = time.time() - t_crop_start
+    
+    t_detection_end = time.time()
+    t_detection_total = t_detection_end - t_detection_start
+    processing_fps = num_frames / t_detection_total if t_detection_total > 0 else 0
     
     # Convert to numpy arrays
     frame_numbers = np.array(all_frame_numbers, dtype=np.int64)
@@ -409,7 +457,9 @@ def run_detection(config):
     print(f"  Total detections: {total_detections}")
     print(f"  Avg detections/frame: {avg_detections_per_frame:.1f}")
     print(f"  Processing FPS: {processing_fps:.1f}")
-    print(f"  Time taken: {total_time:.2f}s")
+    print(f"  Detection time: {t_detection_total:.2f}s")
+    print(f"  Crop extraction time: {t_crop_total:.2f}s")
+    print(f"  Total time: {t_detection_total + t_crop_total:.2f}s")
     
     # Save NPZ
     print(f"\n💾 Saving detections...")
@@ -428,8 +478,26 @@ def run_detection(config):
     print(f"  ✅ Saved: {output_path}")
     print(f"  Shape: {total_detections} detections across {num_frames} frames")
     
+    # Save crops cache
+    print(f"\n💾 Saving crops cache...")
+    t_save_start = time.time()
+    
+    crops_path = Path(crops_cache_file)
+    crops_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(crops_path, 'wb') as f:
+        pickle.dump(crops_cache, f)
+    
+    t_save_end = time.time()
+    crops_size_mb = crops_path.stat().st_size / (1024 * 1024)
+    
+    print(f"  ✅ Saved: {crops_path}")
+    print(f"  Cache size: {crops_size_mb:.1f} MB")
+    print(f"  Save time: {t_save_end - t_save_start:.2f}s")
+    
     return {
         'detections_file': str(output_path),
+        'crops_cache_file': str(crops_path),
         'num_frames': num_frames,
         'total_detections': total_detections
     }
