@@ -60,9 +60,6 @@ stage1_detect:
     max_count: 15   # Maximum detections per frame
     min_confidence: 0.3  # Minimum confidence threshold
   
-  processing:
-    batch_size: 1
-  
   input:
     max_frames: 0  # 0 = all frames
   
