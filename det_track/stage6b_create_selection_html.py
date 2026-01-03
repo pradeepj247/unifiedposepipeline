@@ -116,6 +116,15 @@ def create_selection_report(canonical_file, crops_cache_file, fps, video_duratio
     persons = list(data['persons'])
     persons.sort(key=lambda p: len(p['frame_numbers']), reverse=True)
     
+    # If video_duration_frames not provided, calculate from max frame in data
+    if video_duration_frames is None or video_duration_frames == 0:
+        max_frame = 0
+        for person in persons:
+            if len(person['frame_numbers']) > 0:
+                max_frame = max(max_frame, int(person['frame_numbers'][-1]))
+        video_duration_frames = max_frame + 1
+        print(f"   Calculated video_duration_frames from data: {video_duration_frames}")
+    
     print(f"📂 Loading crops cache...")
     with open(crops_cache_file, 'rb') as f:
         crops_cache = pickle.load(f)
@@ -273,7 +282,7 @@ def create_selection_report(canonical_file, crops_cache_file, fps, video_duratio
 """
     
     # Write HTML file
-    with open(output_html, 'w') as f:
+    with open(output_html, 'w', encoding='utf-8') as f:
         f.write(html_content)
     
     return True
