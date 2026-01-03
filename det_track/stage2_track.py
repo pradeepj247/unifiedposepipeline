@@ -3,7 +3,8 @@
 Stage 2: Tracking (ByteTrack Offline)
 
 Runs ByteTrack tracker on pre-stored detections from Stage 1.
-Motion-only tracking (no video frames needed).
+Motion-only tracking using Kalman filters (no video pixels needed).
+Video frames are NOT read - only detection bboxes and motion are used.
 
 Usage:
     python stage2_track.py --config configs/pipeline_config.yaml
@@ -170,21 +171,15 @@ def run_tracking(config):
     print(f"📍 STAGE 2: TRACKING (BYTETRACK OFFLINE)")
     print(f"{'='*70}\n")
     
-    # Open video for frame reading and get metadata
+    # ByteTrack uses Kalman filters (motion-only), doesn't need actual frame pixels
+    # Skip video loading for performance (frame is only placeholder for BoxMOT API)
     import cv2
     frame_rate = 30  # default
-    cap = None
     video_width, video_height = 1920, 1080  # defaults
     
-    if video_path:
-        cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
-            raise ValueError(f"Could not open video: {video_path}")
-        frame_rate = cap.get(cv2.CAP_PROP_FPS)
-        video_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        video_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        if verbose:
-            print(f"📹 Video: {video_width}x{video_height} @ {frame_rate:.2f} fps")
+    if verbose:
+        print(f"📹 Using motion-only tracking (no video pixels needed)")
+        print(f"   Frame rate: {frame_rate} fps, Resolution: {video_width}x{video_height}")
     
     # Load detections
     print(f"📂 Loading detections: {detections_file}")
@@ -214,24 +209,12 @@ def run_tracking(config):
     debug_first_frame = True
     debug_first_tracking = True
     frame_count = 0
-    last_frame_id = -1
     for frame_id in sorted(unique_frames):
         frame_data = detections_by_frame[frame_id]
         
-        # Read frame from video (seek only when necessary)
-        frame = None
-        if cap is not None:
-            # Seek only if not sequential (avoid repeated seeking)
-            if frame_id != last_frame_id + 1:
-                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
-            ret, frame = cap.read()
-            if not ret:
-                # Frame read failed - create dummy frame
-                frame = np.zeros((video_height, video_width, 3), dtype=np.uint8)
-            last_frame_id = frame_id
-        else:
-            # No video available - create dummy frame
-            frame = np.zeros((video_height, video_width, 3), dtype=np.uint8)
+        # Use dummy frame (ByteTrack only uses Kalman filters, not pixel features)
+        # Passing None would fail BoxMOT API, so we pass empty frame placeholder
+        frame = np.zeros((video_height, video_width, 3), dtype=np.uint8)
         
         # Prepare detections for tracker: (N, 6) = [x1, y1, x2, y2, conf, cls]
         if len(frame_data['bboxes']) > 0:
@@ -293,10 +276,6 @@ def run_tracking(config):
             pbar.update(100 if frame_count + 100 <= num_frames else num_frames - frame_count + 100)
     
     pbar.close()
-    
-    # Release video capture
-    if cap is not None:
-        cap.release()
     
     t_end = time.time()
     total_time = t_end - t_start
