@@ -322,6 +322,7 @@ def main():
     from pathlib import Path
     import sys
     import yaml
+    import os
     
     parser = argparse.ArgumentParser(
         description='Stage 4b.5: Enrich crops with person IDs and metadata (HDF5)'
@@ -334,6 +335,12 @@ def main():
     # Load config
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
+    
+    # Auto-extract current_video from video_file (same as run_pipeline.py)
+    video_file = config.get('global', {}).get('video_file', '')
+    if video_file:
+        video_name = os.path.splitext(video_file)[0]
+        config['global']['current_video'] = video_name
     
     # Resolve paths using the same resolver as other stages
     from pathlib import Path
