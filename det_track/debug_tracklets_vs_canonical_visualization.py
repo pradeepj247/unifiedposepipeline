@@ -118,7 +118,7 @@ def extract_tracklets_for_frame(tracklets_data, frame_num):
             confidence = tracklet['confidences'][frame_idx]
             
             frame_tracklets.append({
-                'tracklet_id': tracklet_id,
+                'tracklet_id': tracklet['tracklet_id'],  # Use the actual tracklet ID, not index
                 'bbox': bbox,  # [x1, y1, x2, y2]
                 'confidence': confidence
             })
@@ -140,8 +140,13 @@ def extract_persons_for_frame(persons_data, frame_num):
             bbox = person['bboxes'][frame_idx]
             confidence = person['confidences'][frame_idx]
             
+            # Get original tracklet IDs for this person
+            original_tracklet_ids = person.get('original_tracklet_ids', [])
+            tracklet_id_str = f"P{person['person_id']}({original_tracklet_ids[0] if original_tracklet_ids else '?'})"
+            
             frame_persons.append({
-                'person_id': person_id,
+                'person_id': person['person_id'],
+                'tracklet_ids': original_tracklet_ids,  # Store for reference
                 'bbox': bbox,  # [x1, y1, x2, y2]
                 'confidence': confidence
             })
@@ -157,7 +162,12 @@ def draw_bboxes(image, detections, panel_name="Panel"):
             id_label = f"T{id_num}"
         else:
             id_num = det['person_id']
-            id_label = f"P{id_num}"
+            # Show which tracklet this person came from
+            tracklet_ids = det.get('tracklet_ids', [])
+            if tracklet_ids:
+                id_label = f"P{id_num}({tracklet_ids[0]})"
+            else:
+                id_label = f"P{id_num}"
         
         bbox = det['bbox']
         confidence = det['confidence']
@@ -245,6 +255,7 @@ def main():
     # Also try to load grouping log to understand merging
     grouping_log_path = Path(config['stage4b_group_canonical']['output']['grouping_log_file'])
     grouping_info = {}
+    included_tracklet_ids = set()
     if grouping_log_path.exists():
         import json
         with open(grouping_log_path, 'r') as f:
@@ -252,13 +263,26 @@ def main():
         print(f"\nGrouping Log: {len(grouping_log)} persons")
         for entry in grouping_log[:5]:
             grouping_info[entry['canonical_id']] = entry
+            for tid in entry['original_tracklet_ids']:
+                included_tracklet_ids.add(tid)
             print(f"  Person {entry['canonical_id']}: "
                   f"merged from {entry['num_merged']} tracklets, "
                   f"tracklet_ids={entry['original_tracklet_ids']}")
     
+    # Find filtered tracklets
+    all_tracklet_ids = set()
+    tracklets_list = tracklets_data['tracklets'].tolist()
+    for t in tracklets_list:
+        all_tracklet_ids.add(t['tracklet_id'])
+    
+    filtered_tracklets = all_tracklet_ids - included_tracklet_ids
+    if filtered_tracklets:
+        print(f"\n⚠️  FILTERED OUT {len(filtered_tracklets)} tracklets: {sorted(filtered_tracklets)}")
+    else:
+        print(f"\n✓ All tracklets included in grouping")
+    
     # Debug: Print data structure
     print(f"\nTracklets NPZ keys: {tracklets_data.files}")
-    tracklets_list = tracklets_data['tracklets'].tolist()
     print(f"  Number of tracklets: {len(tracklets_list)}")
     if len(tracklets_list) > 0:
         print(f"  First tracklet keys: {tracklets_list[0].dtype.names if hasattr(tracklets_list[0], 'dtype') else tracklets_list[0].keys()}")
