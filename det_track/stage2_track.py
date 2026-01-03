@@ -157,7 +157,6 @@ def run_tracking(config):
     verbose = stage_config.get('advanced', {}).get('verbose', False)
     
     # Extract configuration
-    tracker_config = stage_config['tracker']
     params = stage_config['params']
     input_config = stage_config['input']
     output_config = stage_config['output']

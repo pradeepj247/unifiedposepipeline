@@ -264,7 +264,6 @@ def run_reid_recovery(config):
     # Extract configuration
     input_config = stage_config['input']
     output_config = stage_config['output']
-    reid_config = stage_config['reid']
     
     video_file = config['global']['current_video']
     tracklet_stats_file = input_config['tracklet_stats_file']

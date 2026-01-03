@@ -206,12 +206,12 @@ def run_reid_recovery(config):
     
     input_config = stage_config['input']
     output_config = stage_config['output']
-    reid_config = stage_config['reid']
     
     tracklets_file = input_config['tracklets_file']
     candidates_file = input_config['candidates_file']
-    reid_model_path = reid_config['model_path']
-    similarity_threshold = reid_config['similarity_threshold']
+    # NOTE: ReID config removed - using defaults (this script is deprecated)
+    reid_model_path = input_config.get('reid_model_path', '/content/models/osnet_x0_25_msmt17.pth')
+    similarity_threshold = input_config.get('similarity_threshold', 0.5)
     
     tracklets_recovered_file = output_config['tracklets_recovered_file']
     reid_results_file = output_config['reid_results_file']
