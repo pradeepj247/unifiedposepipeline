@@ -200,18 +200,19 @@ def main():
     # Use model name directly - ultralytics will auto-download if needed
     model_path = 'yolo_master_n'
     
-    # Get video path from resolved config
+    # Construct full video path from config
+    video_dir = config['global'].get('video_dir', '')
     video_file = config['global'].get('video_file', '')
+    full_video_path = os.path.join(video_dir, video_file)
     
-    if not video_file or not os.path.exists(video_file):
-        print(f"❌ Could not find video: {video_file}")
-        print(f"Debug: video_file from config = '{video_file}'")
+    if not os.path.exists(full_video_path):
+        print(f"❌ Could not find video: {full_video_path}")
+        print(f"Debug: video_dir = '{video_dir}'")
+        print(f"Debug: video_file = '{video_file}'")
         sys.exit(1)
     
-    print(f"✅ Video found: {video_file}")
-    
     # Run benchmark (ultralytics will auto-download model if not found)
-    benchmark_yolo_master_n(model_path, video_file, args.frames, args.verbose)
+    benchmark_yolo_master_n(model_path, full_video_path, args.frames, args.verbose)
 
 
 if __name__ == '__main__':
