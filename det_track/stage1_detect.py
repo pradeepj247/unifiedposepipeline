@@ -439,10 +439,17 @@ def run_detection(config):
         else:
             frame_proc = frame
         
-        # Detect
+        # Detect (detections are in processing resolution coordinates)
         detections, classes = detect_frame(detector, frame_proc, confidence, detect_only_humans)
         
-        # Scale back to original resolution
+        # Draw on processing frame BEFORE scaling (for visualization)
+        frame_vis = draw_detections_on_frame(frame_proc, detections, frame_idx)
+        
+        # Write visualization frame to output video
+        if out_video is not None:
+            out_video.write(frame_vis)
+        
+        # Scale to original resolution for storage in NPZ
         if use_downscaling and len(detections) > 0:
             detections[:, 0] *= scale_x  # x1
             detections[:, 1] *= scale_y  # y1
@@ -456,13 +463,6 @@ def run_detection(config):
             max_count=detection_limit['max_count'],
             min_confidence=detection_limit['min_confidence']
         )
-        
-        # Draw detections on processing frame (for output video)
-        frame_vis = draw_detections_on_frame(frame_proc, detections, frame_idx)
-        
-        # Write visualization frame to output video (at processing resolution)
-        if out_video is not None:
-            out_video.write(frame_vis)
         
         # Store detections for this frame
         num_dets = len(detections)
