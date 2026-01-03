@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Stage 6b: Create Person Selection Report (HTML with 3 Temporal Crops)
+Stage 10: Create Person Selection Report (HTML with Embedded MP4 Videos)
 
 Creates an interactive HTML report with:
-- Top 10 persons with temporal spread (25%, 50%, 75% of tracklet)
-- 3 thumbnail images per person showing start, middle, end appearance
-- Clean, sortable table format
-- No external dependencies
+- Top 10 persons sorted by appearance duration
+- Embedded MP4 videos (50 frames each, ~3.3 seconds)
+- Play/pause controls, timeline scrubbing
+- Clean, responsive layout
+- Lightweight HTML with embedded video data
 
 Usage:
     python stage6b_create_selection_html.py --config configs/pipeline_config.yaml
@@ -169,8 +170,8 @@ def find_crop_for_person_in_frame(person_bbox, frame_to_detections, crops_cache,
     return None
 
 
-def create_selection_report(canonical_file, crops_cache_file, fps, video_duration_frames, output_html):
-    """Create HTML selection report with 3 temporal crops per person"""
+def create_selection_report(canonical_file, crops_cache_file, fps, video_duration_frames, output_html, videos_dir=None):
+    """Create HTML selection report with embedded MP4 videos"""
     
     # Load data
     print(f"📂 Loading canonical persons...")
@@ -187,6 +188,12 @@ def create_selection_report(canonical_file, crops_cache_file, fps, video_duratio
         video_duration_frames = max_frame + 1
         print(f"   Calculated video_duration_frames from data: {video_duration_frames}")
     
+    # If videos_dir not provided, try to find it relative to canonical file
+    if videos_dir is None:
+        videos_dir = Path(canonical_file).parent / 'videos'
+    else:
+        videos_dir = Path(videos_dir)
+    
     print(f"📂 Loading crops cache...")
     with open(crops_cache_file, 'rb') as f:
         crops_cache = pickle.load(f)
@@ -199,10 +206,8 @@ def create_selection_report(canonical_file, crops_cache_file, fps, video_duratio
     detection_bboxes = detections_data['bboxes']
     
     # Build frame->detection mapping using LOCAL frame indices
-    # {frame_idx: {local_frame_idx: bbox, ...}}
-    # local_frame_idx is the 0-based index of detections in that frame
     frame_to_detections = {}
-    frame_detection_counts = {}  # Count detections per frame
+    frame_detection_counts = {}
     
     # First pass: count detections per frame
     for frame_idx in detection_frame_numbers:
@@ -210,110 +215,198 @@ def create_selection_report(canonical_file, crops_cache_file, fps, video_duratio
         frame_detection_counts[frame_idx] = frame_detection_counts.get(frame_idx, 0) + 1
     
     # Second pass: build the mapping with local indices
-    frame_local_indices = {}  # {frame_idx: current_count}
+    frame_local_indices = {}
     for global_det_idx in range(len(detection_frame_numbers)):
         frame_idx = int(detection_frame_numbers[global_det_idx])
         bbox = detection_bboxes[global_det_idx]
         
-        # Get local index for this frame
         if frame_idx not in frame_local_indices:
             frame_local_indices[frame_idx] = 0
         local_idx = frame_local_indices[frame_idx]
         frame_local_indices[frame_idx] += 1
         
-        # Store with local index (matches crops_cache indexing)
         if frame_idx not in frame_to_detections:
             frame_to_detections[frame_idx] = {}
         frame_to_detections[frame_idx][local_idx] = bbox
     
     # Create HTML report
-    print(f"📄 Creating HTML report...")
+    print(f"📄 Creating HTML report with embedded videos...")
     output_html = Path(output_html)
     output_html.parent.mkdir(parents=True, exist_ok=True)
     
-    # Start HTML
+    # Start HTML with embedded video support
     html_content = """<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Person Selection Report</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Person Selection Report with Videos</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f5f5f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
         }
-        h1 {
-            color: #1f4788;
-            text-align: center;
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background-color: white;
-            margin: 20px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        th {
-            background-color: #1f4788;
+        
+        header {
+            background: linear-gradient(135deg, #1f4788 0%, #2c3e50 100%);
             color: white;
-            padding: 12px;
-            text-align: left;
-            font-weight: bold;
-        }
-        td {
-            padding: 12px;
-            border-bottom: 1px solid #ddd;
-        }
-        tr:hover {
-            background-color: #f9f9f9;
-        }
-        .thumbnail {
-            max-width: 100px;
-            max-height: 120px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            margin: 4px;
-        }
-        .thumbnails-cell {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 4px;
-        }
-        .rank {
-            font-weight: bold;
-            color: #1f4788;
-        }
-        .person-id {
-            background-color: #e8f0f7;
-            font-weight: bold;
-        }
-        .stats {
+            padding: 30px;
             text-align: center;
+        }
+        
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .persons-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+            padding: 30px;
+        }
+        
+        .person-card {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .person-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        
+        .person-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .person-rank {
+            font-size: 1.8em;
+            font-weight: bold;
+        }
+        
+        .person-id {
+            font-size: 2em;
+            font-weight: bold;
+        }
+        
+        .video-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 2 / 3;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+        }
+        
+        .person-stats {
+            padding: 15px;
+            background: white;
+            font-size: 0.95em;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .stat-value {
+            color: #333;
+            font-weight: bold;
+        }
+        
+        .no-video {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 300px;
+            background: #f0f0f0;
+            color: #999;
+            font-size: 1em;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            background: #f5f5f5;
+            color: #666;
             font-size: 0.9em;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .rank-badge {
+            display: inline-block;
+            background: gold;
+            color: #333;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.85em;
         }
     </style>
 </head>
 <body>
-    <h1>🎯 Person Selection Report - Top 10 Persons</h1>
-    <p style="text-align: center; color: #666;">
-        Thumbnails show person at 25%, 50%, and 75% of their tracked appearance
-    </p>
-    <table>
-        <thead>
-            <tr>
-                <th>Rank</th>
-                <th>Person ID</th>
-                <th>Frames Present</th>
-                <th>% of Video (time)</th>
-                <th>Thumbnails (25% / 50% / 75%)</th>
-            </tr>
-        </thead>
-        <tbody>
+    <div class="container">
+        <header>
+            <h1>🎯 Person Selection Report</h1>
+            <p>Top 10 Persons with Embedded Video Preview (50 frames each)</p>
+        </header>
+        
+        <div class="persons-grid">
 """
     
-    # Add top 10 persons
+    # Add top 10 persons with embedded videos
     for rank, person in enumerate(persons[:10], 1):
         person_id = person['person_id']
         frames = person['frame_numbers']
@@ -322,51 +415,59 @@ def create_selection_report(canonical_file, crops_cache_file, fps, video_duratio
         # Calculate % of video
         percent_video = (num_frames / video_duration_frames) * 100 if video_duration_frames > 0 else 0
         
-        # Get 3 temporal crops: 25%, 50%, 75%
-        indices = [
-            int(num_frames * 0.25),  # 25%
-            int(num_frames * 0.50),  # 50%
-            int(num_frames * 0.75)   # 75%
-        ]
+        # Duration in seconds (assuming 25 fps source, but videos are 15 fps so ~3.3s for 50 frames)
+        video_duration_sec = 50 / 15.0  # ~3.3 seconds
         
-        thumbnail_html = ""
+        # Try to find the corresponding MP4 file
+        mp4_file = videos_dir / f"person_{person_id:02d}.mp4"
+        video_html = ""
         
-        for i, idx in enumerate(indices):
-            # Clamp to valid range
-            idx = min(idx, num_frames - 1)
-            frame_num = int(frames[idx])
-            person_bbox = person['bboxes'][idx]  # Get person's bbox at this frame
-            
-            # Find crop matching this person's bbox in this frame
-            crop = find_crop_for_person_in_frame(person_bbox, frame_to_detections, crops_cache, frame_num)
-            
-            if crop is not None:
-                # Convert BGR to RGB
-                crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-                
-                # Encode to PNG in memory
-                success, png_array = cv2.imencode('.png', cv2.cvtColor(crop_rgb, cv2.COLOR_RGB2BGR))
-                if success:
-                    png_base64 = base64.b64encode(png_array.tobytes()).decode('utf-8')
-                    percent_label = ['25%', '50%', '75%'][i]
-                    thumbnail_html += f'<img src="data:image/png;base64,{png_base64}" class="thumbnail" title="{percent_label}" alt="{percent_label}">'
+        if mp4_file.exists():
+            # Embed video as base64
+            with open(mp4_file, 'rb') as f:
+                video_data = f.read()
+            video_base64 = base64.b64encode(video_data).decode('utf-8')
+            video_html = f'''<video controls playsinline style="width: 100%; height: 100%;">
+                <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>'''
+        else:
+            # Show placeholder if video not found
+            video_html = f'<div class="no-video">Video not found<br/>({mp4_file.name})</div>'
         
-        # Add row
-        html_content += f"""        <tr>
-            <td class="rank">{rank}</td>
-            <td class="person-id">P{person_id}</td>
-            <td class="stats">{num_frames}</td>
-            <td class="stats">{percent_video:.1f}%</td>
-            <td class="thumbnails-cell">{thumbnail_html}</td>
-        </tr>
-"""
+        html_content += f'''        <div class="person-card">
+            <div class="person-header">
+                <span class="person-rank">#{rank}</span>
+                <span class="person-id">P{person_id}</span>
+            </div>
+            <div class="video-container">
+                {video_html}
+            </div>
+            <div class="person-stats">
+                <div class="stat-row">
+                    <span class="stat-label">Frames Present:</span>
+                    <span class="stat-value">{num_frames}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Video Coverage:</span>
+                    <span class="stat-value">{percent_video:.1f}%</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Video Duration:</span>
+                    <span class="stat-value">~{video_duration_sec:.1f}s @ 15fps</span>
+                </div>
+            </div>
+        </div>
+'''
     
     # Close HTML
-    html_content += """        </tbody>
-    </table>
-    <footer style="text-align: center; color: #666; margin-top: 30px;">
-        <p>Generated by Unified Pose Pipeline - Person Selection Report</p>
-    </footer>
+    html_content += """        </div>
+        
+        <footer>
+            <p>Generated by Unified Pose Pipeline - Person Selection Report with Embedded Videos</p>
+            <p>Videos are embedded with H.264 codec for wide browser compatibility</p>
+        </footer>
+    </div>
 </body>
 </html>
 """
@@ -380,7 +481,7 @@ def create_selection_report(canonical_file, crops_cache_file, fps, video_duratio
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Stage 6b: Create Person Selection Report (HTML with 3 Temporal Crops)'
+        description='Stage 10: Create Person Selection Report (HTML with Embedded MP4 Videos)'
     )
     parser.add_argument('--config', type=str, required=True,
                        help='Path to pipeline configuration YAML')
@@ -394,11 +495,14 @@ def main():
     output_dir = Path(canonical_file).parent
     output_html = output_dir / 'person_selection_report.html'
     
+    # Try to find videos directory (from Stage 11 output)
+    videos_dir = output_dir / 'videos'
+    
     # Get video duration from config (or 0 to auto-calculate from data)
     video_duration_frames = config.get('global', {}).get('video_duration_frames', 0)
     
     print(f"\n{'='*70}")
-    print(f"📄 STAGE 10: CREATE HTML SELECTION REPORT")
+    print(f"📄 STAGE 10: CREATE HTML SELECTION REPORT WITH EMBEDDED VIDEOS")
     print(f"{'='*70}\n")
     
     t_start = time.time()
@@ -408,7 +512,8 @@ def main():
         crops_cache_file,
         fps=None,
         video_duration_frames=video_duration_frames,
-        output_html=output_html
+        output_html=output_html,
+        videos_dir=videos_dir
     )
     
     t_end = time.time()
