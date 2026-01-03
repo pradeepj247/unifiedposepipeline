@@ -495,8 +495,8 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
                 <div class="rank-badge">#{rank}</div>
                 <div class="video-thumb" onmouseenter="playVideo(this)" onmouseleave="pauseVideo(this)">
                     <img src="{poster_data}" alt="Person {person_id}" class="poster"/>
-                    <video class="video-player" playsinline muted>
-                        <source src="{video_data}" type="video/mp4">
+                    <video class="video-player" playsinline muted onclick="event.stopPropagation(); togglePlay(this)">
+                        <source src="{video_rel_path}" type="video/mp4">
                     </video>
                     <div class="play-icon"></div>
                 </div>
@@ -522,70 +522,56 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
     </div>
     
     <script>
-        // Track which video is currently playing to prevent conflicts
+        // Track which video is currently playing
         let currentlyPlayingVideo = null;
         
-        // Auto-play video on hover with proper promise handling
-        function playVideo(element) {
-            const video = element.querySelector('.video-player');
+        // Toggle play/pause on direct click
+        function togglePlay(video) {
+            if (video.paused) {
+                video.currentTime = 0;
+                video.play().catch(() => {});
+                video.classList.add('playing');
+                currentlyPlayingVideo = video;
+            } else {
+                video.pause();
+                video.classList.remove('playing');
+                if (currentlyPlayingVideo === video) {
+                    currentlyPlayingVideo = null;
+                }
+            }
+        }
+        
+        // Play on hover
+        function playVideo(container) {
+            const video = container.querySelector('.video-player');
             if (!video) return;
             
-            // Don't interrupt if already playing
-            if (currentlyPlayingVideo === video && !video.paused) {
-                return;
-            }
-            
-            // Stop any other playing videos first
+            // Stop any other playing videos
             if (currentlyPlayingVideo && currentlyPlayingVideo !== video) {
                 currentlyPlayingVideo.pause();
                 currentlyPlayingVideo.classList.remove('playing');
             }
             
-            // Reset and play
             video.currentTime = 0;
+            video.play().catch(() => {});
+            video.classList.add('playing');
             currentlyPlayingVideo = video;
-            
-            // Use catch to handle AbortError if play is interrupted
-            const playPromise = video.play();
-            if (playPromise !== undefined) {
-                playPromise
-                    .then(() => {
-                        video.classList.add('playing');
-                    })
-                    .catch(error => {
-                        // Ignore AbortError - it's expected if user moves mouse away
-                        if (error.name !== 'AbortError') {
-                            console.error('Video play error:', error);
-                        }
-                    });
-            }
         }
         
-        // Pause and rewind on mouse leave with proper cleanup
-        function pauseVideo(element) {
-            const video = element.querySelector('.video-player');
+        // Pause and reset on mouse leave
+        function pauseVideo(container) {
+            const video = container.querySelector('.video-player');
             if (!video) return;
             
-            // Only pause if this is the currently playing video
-            if (currentlyPlayingVideo === video) {
-                const pausePromise = video.pause();
-                if (pausePromise !== undefined) {
-                    pausePromise.catch(error => {
-                        if (error.name !== 'AbortError') {
-                            console.error('Video pause error:', error);
-                        }
-                    });
-                }
-                currentlyPlayingVideo = null;
-            }
-            
+            video.pause();
             video.currentTime = 0;
             video.classList.remove('playing');
+            if (currentlyPlayingVideo === video) {
+                currentlyPlayingVideo = null;
+            }
         }
         
-        // Person selection
-        let selectedPersonId = null;
-        
+        // Select person (separate from video playback)
         function selectPerson(cardElement, personId) {
             // Remove selected state from all cards
             document.querySelectorAll('.person-card').forEach(card => {
@@ -594,34 +580,23 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
             
             // Add selected state to clicked card
             cardElement.classList.add('selected');
-            selectedPersonId = personId;
             
             // Update selection info
             const info = document.getElementById('selection-info');
             info.textContent = `✓ Person P${String(personId).padStart(2, '0')} selected`;
             
-            // Optional: Log selection (could be sent to server)
             console.log('Selected person:', personId);
         }
         
-        // Pause all videos when scrolling (performance optimization)
+        // Pause all videos when scrolling
         const tapeWrapper = document.querySelector('.tape-wrapper');
         
         tapeWrapper.addEventListener('scroll', function() {
-            // Pause the currently playing video
             if (currentlyPlayingVideo) {
-                currentlyPlayingVideo.pause().catch(error => {
-                    if (error.name !== 'AbortError') {
-                        console.error('Pause error:', error);
-                    }
-                });
+                currentlyPlayingVideo.pause().catch(() => {});
+                currentlyPlayingVideo.classList.remove('playing');
                 currentlyPlayingVideo = null;
             }
-            
-            // Remove playing class from all videos
-            document.querySelectorAll('.video-player.playing').forEach(video => {
-                video.classList.remove('playing');
-            });
         }, { passive: true });
     </script>
 </body>
