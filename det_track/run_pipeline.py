@@ -186,7 +186,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         ('Stage 7: Rank Persons', 'stage5_rank_persons.py', 'stage7'),
         ('Stage 8: Visualize Grouping (Debug)', 'stage5b_visualize_grouping.py', 'stage8'),
         ('Stage 9: Output Video Visualization', 'stage6_create_output_video.py', 'stage9'),
-        ('Stage 10: HTML Selection Report', 'stage6b_create_selection_html.py', 'stage10'),
+        ('Stage 10: HTML Selection Report (Horizontal Tape)', 'stage6b_create_selection_html_horizontal.py', 'stage10'),
         ('Stage 11: Generate Person MP4 Videos', 'stage9_generate_person_gifs.py', 'stage11')
     ]
     

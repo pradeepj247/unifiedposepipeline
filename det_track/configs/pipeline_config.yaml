@@ -224,11 +224,12 @@ stage11:
   video_generation:
     format: mp4              # Output format (mp4 for faster encoding & smaller file size)
     codec: mp4v              # MPEG-4 video codec (widely supported)
-    fps: 15                  # Frames per second (15 fps = smooth playback at ~3.3 seconds)
+    fps: 10                  # Frames per second (10 fps = smooth playback at ~5 seconds)
     max_frames: 50           # Maximum frames per MP4 (same as GIF for fair comparison)
     max_persons: 10          # Generate MP4s for top 10 persons
-    frame_width: 256         # Fixed frame width (maintains aspect ratio)
-    frame_height: 384        # Fixed frame height
+    frame_width: 128         # Reduced width for horizontal tape (3.5x smaller area)
+    frame_height: 192        # Reduced height for horizontal tape
+    bitrate: 200k            # Target bitrate (kbps) - reduces file size to ~0.1-0.15 MB per video
   
   output:
     videos_dir: ${outputs_dir}/${current_video}/videos

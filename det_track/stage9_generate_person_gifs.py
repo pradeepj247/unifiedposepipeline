@@ -140,7 +140,7 @@ def resize_crop_to_frame(crop, frame_width, frame_height, padding_color=(0, 0, 0
     return frame
 
 
-def create_mp4_for_person(person, h5_person_group, videos_dir, frame_width=256, frame_height=384, fps=15, num_frames=50):
+def create_mp4_for_person(person, h5_person_group, videos_dir, frame_width=128, frame_height=192, fps=10, num_frames=50, bitrate='200k'):
     """
     Create an MP4 video for a single person using HDF5 data.
     
@@ -225,7 +225,7 @@ def create_mp4_for_person(person, h5_person_group, videos_dir, frame_width=256, 
 
 
 def create_videos_for_top_persons(canonical_file, crops_enriched_file, output_videos_dir, 
-                                 frame_width=256, frame_height=384, fps=15, num_frames=50):
+                                 frame_width=128, frame_height=192, fps=10, num_frames=50, bitrate='200k'):
     """Create MP4 videos for top 10 persons using crops_enriched.h5"""
     
     # Load canonical persons
@@ -267,7 +267,8 @@ def create_videos_for_top_persons(canonical_file, crops_enriched_file, output_vi
                     frame_width=frame_width,
                     frame_height=frame_height,
                     fps=fps,
-                    num_frames=num_frames
+                    num_frames=num_frames,
+                    bitrate=bitrate
                 )
                 
                 if success:
@@ -310,12 +311,13 @@ def main():
     # Use the parent directory of canonical_persons.npz (video-specific outputs folder)
     output_dir = str(Path(canonical_file).parent)
     
-    # Get GIF generation settings from config
-    gif_config = config.get('stage11', {}).get('gif_generation', {})
-    frame_width = gif_config.get('frame_width', 256)
-    frame_height = gif_config.get('frame_height', 384)
-    fps = gif_config.get('fps', 15)
-    num_frames = gif_config.get('max_frames', 50)
+    # Get video generation settings from config
+    video_config = config.get('stage11', {}).get('video_generation', {})
+    frame_width = video_config.get('frame_width', 128)
+    frame_height = video_config.get('frame_height', 192)
+    fps = video_config.get('fps', 10)
+    num_frames = video_config.get('max_frames', 50)
+    bitrate = video_config.get('bitrate', '200k')
     
     print(f"\n{'='*70}")
     print(f"🎬 STAGE 11: GENERATE PERSON MP4 VIDEOS")
@@ -330,7 +332,8 @@ def main():
         frame_width=frame_width,
         frame_height=frame_height,
         fps=fps,
-        num_frames=num_frames
+        num_frames=num_frames,
+        bitrate=bitrate
     )
     
     t_end = time.time()
