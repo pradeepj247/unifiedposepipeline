@@ -20,6 +20,7 @@ import pickle
 import yaml
 import re
 import os
+import cv2
 from pathlib import Path
 import time
 from PIL import Image, ImageDraw, ImageFont
@@ -276,7 +277,9 @@ def create_grid_from_crops(crops_dict, persons_list, grid_shape=(2, 5), cell_siz
         
         if crop is not None:
             # Resize crop to fit cell
-            crop_pil = Image.fromarray(crop)
+            # Convert BGR (OpenCV) to RGB (PIL) to fix color inversion
+            crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+            crop_pil = Image.fromarray(crop_rgb)
             crop_pil.thumbnail((cell_w - 10, cell_h - 40), Image.Resampling.LANCZOS)
             
             # Center crop in cell

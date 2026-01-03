@@ -281,7 +281,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             config.get('stage6_create_output_video', {}).get('output', {}).get('video_file', 'N/A')
         ],
         'stage6b_create_selection_grid': [
-            config.get('stage6b_create_selection_grid', {}).get('output', {}).get('fullframe_grid', 'N/A'),
+            # Only check cropped_grid (fullframe_grid is optional/not implemented)
             config.get('stage6b_create_selection_grid', {}).get('output', {}).get('cropped_grid', 'N/A')
         ]
     }
