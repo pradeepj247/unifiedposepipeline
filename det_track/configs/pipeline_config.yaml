@@ -28,6 +28,7 @@ global:
 # ============================================================================
 pipeline:
   # Stage execution control - SIMPLE NUMERIC IDs 1-11 - the ONLY place to enable/disable stages
+  # NOTE: Order matters! Stage 11 MUST run before Stage 10 (generate GIFs before embedding in HTML)
   stages:
     stage1: true                           # Stage 1: YOLO detection
     stage2: true                           # Stage 2: ByteTrack offline tracking
@@ -38,8 +39,8 @@ pipeline:
     stage7: true                           # Stage 7: Rank persons by appearance time
     stage8: false                          # Stage 8: Optional: Show grouping tables (debug)
     stage9: true                           # Stage 9: Create video visualization of top 10 persons
-    stage10: true                          # Stage 10: Create HTML selection report
-    stage11: true                          # Stage 11: Generate animated GIFs for top 10 persons
+    stage11: true                          # Stage 11: Generate animated GIFs for top 10 persons (BEFORE stage10!)
+    stage10: true                          # Stage 10: Create HTML selection report (needs GIFs from stage11)
   
   # Global settings inherited by all stages (can be overridden per-stage if needed)
   advanced:
