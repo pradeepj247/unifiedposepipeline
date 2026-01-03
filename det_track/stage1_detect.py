@@ -335,7 +335,8 @@ def run_detection(config):
     device = detector_config['device']
     detect_only_humans = detector_config['detect_only_humans']
     
-    video_path = input_config['video_path']
+    # Get video path from global config (single source of truth)
+    video_path = config['global']['video_dir'] + config['global']['video_file']
     max_frames = input_config['max_frames']
     
     detections_file = output_config['detections_file']
