@@ -178,7 +178,12 @@ def main():
     
     # Get paths
     video_path = config['global']['video_dir'] + config['global']['video_file']
-    model_path = args.model
+    
+    # Resolve model path from config if not overridden
+    if args.model == 'yolov8s.pt':
+        model_path = config['stage1_detect']['detector']['model_path']
+    else:
+        model_path = args.model
     
     print(f"\n{'='*70}")
     print(f"🔍 YOLO RESOLUTION BENCHMARK")
