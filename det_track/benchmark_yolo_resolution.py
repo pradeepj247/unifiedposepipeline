@@ -225,25 +225,34 @@ def main():
     print(f"  Time: {time_720:.2f}s")
     print(f"  FPS: {fps_720:.1f}")
     
-    speedup = fps_720 / fps_1080 if fps_1080 > 0 else 0
-    time_savings = ((time_1080 - time_720) / time_1080 * 100) if time_1080 > 0 else 0
+    speedup = fps_1080 / fps_720 if fps_720 > 0 else 0
+    time_savings = ((time_720 - time_1080) / time_1080 * 100) if time_1080 > 0 else 0
     
     print(f"\n{'─'*70}")
-    print(f"720p is {speedup:.2f}x faster than 1080p")
-    print(f"Time savings: {time_savings:.1f}%")
+    if fps_1080 > fps_720:
+        print(f"1080p is {speedup:.2f}x faster than 720p")
+        print(f"Time overhead: +{abs(time_savings):.1f}%")
+    else:
+        print(f"720p is {speedup:.2f}x faster than 1080p")
+        print(f"Time savings: {time_savings:.1f}%")
     print(f"{'='*70}\n")
     
     # Interpretation
     print(f"💡 INTERPRETATION:")
-    if abs(speedup - 1.0) < 0.1:
+    if abs(fps_1080 - fps_720) / fps_1080 < 0.1:
         print(f"   ✅ YOLO speed is INDEPENDENT of input resolution")
-        print(f"   → Both 1080p and 720p run at similar speed")
+        print(f"   → Both 1080p and 720p run at similar speed (~{abs((fps_1080-fps_720)/fps_1080*100):.0f}% difference)")
         print(f"   → YOLO internally normalizes to 640p anyway")
         print(f"   → Recommendation: Use ORIGINAL 1080p for storage/accuracy")
+    elif fps_1080 > fps_720:
+        print(f"   ⚡ 1080p is FASTER than 720p!")
+        print(f"   → Input downscaling overhead > benefit")
+        print(f"   → YOLO's internal resizing is more efficient")
+        print(f"   → Recommendation: Use ORIGINAL 1080p (faster + more accurate)")
     else:
-        print(f"   ⚡ YOLO speed DOES vary with resolution")
-        print(f"   → 720p is significantly faster")
-        print(f"   → Tradeoff: Speed vs accuracy")
+        print(f"   ⚡ 720p is faster than 1080p")
+        print(f"   → Worth the downscaling overhead")
+        print(f"   → Tradeoff: {abs(time_savings):.1f}% speed gain vs resolution loss")
     print(f"\n{'='*70}\n")
 
 
