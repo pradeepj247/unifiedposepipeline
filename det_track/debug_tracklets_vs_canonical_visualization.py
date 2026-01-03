@@ -13,6 +13,44 @@ import argparse
 from pathlib import Path
 from collections import defaultdict
 import colorsys
+import yaml
+import re
+
+
+def resolve_path_variables(config):
+    """Recursively resolve ${variable} in config"""
+    global_vars = config.get('global', {})
+    
+    # First pass: resolve variables within global section itself
+    def resolve_string_once(s, vars_dict):
+        if not isinstance(s, str):
+            return s
+        return re.sub(
+            r'\$\{(\w+)\}',
+            lambda m: str(vars_dict.get(m.group(1), m.group(0))),
+            s
+        )
+    
+    # Resolve global variables iteratively
+    max_iterations = 10
+    for _ in range(max_iterations):
+        resolved_globals = {}
+        changed = False
+        for key, value in global_vars.items():
+            if isinstance(value, str):
+                resolved = resolve_string_once(value, global_vars)
+                resolved_globals[key] = resolved
+                if resolved != value:
+                    changed = True
+            else:
+                resolved_globals[key] = value
+        
+        global_vars = resolved_globals
+        if not changed:
+            break
+    
+    config['global'] = global_vars
+    return config
 
 
 def load_npz_data(npz_path):
@@ -130,17 +168,11 @@ def main():
     args = parser.parse_args()
     
     # Load config
-    import yaml
-    import sys
-    from pathlib import Path
-    
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
     
-    # Resolve paths - add parent to path for imports
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from det_track.utils.path_utils import resolve_config_paths
-    config = resolve_config_paths(config)
+    # Resolve paths
+    config = resolve_path_variables(config)
     
     # Get file paths
     video_path = config['global']['video_file']
