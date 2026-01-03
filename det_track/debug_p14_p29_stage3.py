@@ -93,14 +93,16 @@ stat_p29 = stats[p29_idx]
 tracklet_p14 = tracklets[p14_idx]
 tracklet_p29 = tracklets[p29_idx]
 
+print(f"\n📂 Stats dict keys: {list(stat_p14.keys())}")
+
 print(f"\nP14 Stats:")
 print(f"  - Frames: {stat_p14['start_frame']} - {stat_p14['end_frame']}")
-print(f"  - Count: {stat_p14['count']}")
+print(f"  - Appearances: {stat_p14['num_appearances']}")
 print(f"  - Mean area: {stat_p14['mean_area']:.1f}")
 
 print(f"\nP29 Stats:")
 print(f"  - Frames: {stat_p29['start_frame']} - {stat_p29['end_frame']}")
-print(f"  - Count: {stat_p29['count']}")
+print(f"  - Appearances: {stat_p29['num_appearances']}")
 print(f"  - Mean area: {stat_p29['mean_area']:.1f}")
 
 # Check gap

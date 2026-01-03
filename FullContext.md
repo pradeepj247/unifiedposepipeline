@@ -543,25 +543,6 @@ pose_estimation:
 
 **Performance:** Achieved 67.5 FPS on dance.mp4 (yolov8s + BoT-SORT + ReID)
 
-**Verbose Mode Control:**
-- **Silent mode (verbose: false)** - Shows critical info only:
-  - Video metadata (path, resolution, FPS, frames)
-  - Detector/tracker type and ReID status
-  - Processing progress bar with real-time FPS
-  - Performance summary (frames processed, overall FPS, time taken)
-  - Tracking statistics (unique track IDs count)
-  - File save confirmations with detection counts
-  - Video writing progress bar
-  
-- **Verbose mode (verbose: true)** - Adds detailed diagnostics:
-  - Model loading messages and paths
-  - Detailed FPS breakdown (detection/tracking/combined)
-  - Success rate and valid detections percentage
-  - Full track ID table with frame ranges
-  - File format specifications
-
-- **Note:** BoxMOT library prints `SUCCESS | ByteTrack:...` message that cannot be suppressed (library-level output)
-
 **Output Format (raw_detections.npz):**
 ```python
 {
