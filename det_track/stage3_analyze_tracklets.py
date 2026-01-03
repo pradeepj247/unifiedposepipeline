@@ -154,9 +154,10 @@ def identify_reid_candidates(tracklets, stats, criteria):
             stat_i = stats[i]
             stat_j = stats[j]
             
-            # Rule 1: Temporal proximity (i ends before j starts)
+            # Rule 1: Temporal proximity (tracklets close in time or overlapping)
             gap = stat_j['start_frame'] - stat_i['end_frame']
-            if gap < 0 or gap > max_temporal_gap:
+            # Allow overlapping tracklets (gap < 0) and tracklets with small gaps
+            if gap < -100 or gap > max_temporal_gap:  # Allow up to 100 frames overlap
                 continue
             
             # Rule 2: Spatial proximity (last bbox of i near first bbox of j)
