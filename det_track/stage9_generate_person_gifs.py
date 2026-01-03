@@ -336,7 +336,8 @@ def main():
     # Get paths from config
     canonical_file = config['stage7']['input']['canonical_persons_file']
     crops_enriched_file = config['stage6']['output']['crops_enriched_file']
-    output_dir = config['global']['outputs_dir']
+    # Use the parent directory of canonical_persons.npz (video-specific outputs folder)
+    output_dir = str(Path(canonical_file).parent)
     
     print(f"\n{'='*70}")
     print(f"🎬 STAGE 11: GENERATE PERSON GIFS (Experimental)")
