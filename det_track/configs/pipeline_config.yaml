@@ -216,7 +216,7 @@ stage10:
     selection_info: ${outputs_dir}/${current_video}/selection_grid_info.json
 
 # ============================================================================
-# Stage 11: Generate Person GIFs
+# Stage 11: Generate Person MP4 Videos
 # ============================================================================
 # To disable this stage, set pipeline.stages.stage11 to false
 stage11:
@@ -231,4 +231,4 @@ stage11:
     frame_height: 384        # Fixed frame height
   
   output:
-    gifs_dir: ${outputs_dir}/${current_video}/gifs
+    videos_dir: ${outputs_dir}/${current_video}/videos
