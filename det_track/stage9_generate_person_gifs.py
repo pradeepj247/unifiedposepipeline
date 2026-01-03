@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Stage 11: Generate MP4 Videos for Top 10 Persons
+Stage 11: Generate Animated GIFs for Top 10 Persons
 
-Creates compact MP4 videos for each of the top 10 persons, showing their
-first 50 frames with smart padding to center smaller crops within a
-consistent frame size.
+Creates compact animated GIFs for each of the top 10 persons, showing their
+first 50 frames at reduced size (128x192) for fast loading and embedding.
 
 Features:
 - Uses crops_enriched.h5 from Stage 6 for correct person-crop association
-- Fixed frame sizing (256x384) for consistent playback
+- Fixed frame sizing (128x192) for consistent playback
 - Smart centering and padding of crops
-- 15 fps playback (~3.3 seconds per video)
-- H.264 codec for wide compatibility
-- Organized output in dedicated 'videos' subfolder
+- 10 fps playback (~5 seconds per GIF)
+- Animated GIFs (work perfectly with <img> tags)
+- ~100-200 KB per GIF (~1-2 MB total for 10 persons)
+- Organized output in dedicated 'gifs' subfolder
 
 Usage:
     python stage9_generate_person_gifs.py --config configs/pipeline_config.yaml
@@ -25,6 +25,7 @@ import re
 import os
 import h5py
 import cv2
+import imageio
 from pathlib import Path
 import time
 
@@ -140,36 +141,25 @@ def resize_crop_to_frame(crop, frame_width, frame_height, padding_color=(0, 0, 0
     return frame
 
 
-def create_mp4_for_person(person, h5_person_group, videos_dir, frame_width=128, frame_height=192, fps=10, num_frames=50, bitrate='200k'):
+def create_gif_for_person(person, h5_person_group, gifs_dir, frame_width=128, frame_height=192, fps=10, num_frames=50):
     """
-    Create an MP4 video for a single person using HDF5 data.
+    Create an animated GIF for a single person using HDF5 data.
     
     person: dict with 'person_id', 'frame_numbers'
     h5_person_group: HDF5 group for this person (e.g., h5f['person_03'])
-    videos_dir: output directory for MP4s
-    frame_width: fixed frame width (256)
-    frame_height: fixed frame height (384)
-    fps: frames per second (15)
+    gifs_dir: output directory for GIFs
+    frame_width: fixed frame width (128)
+    frame_height: fixed frame height (192)
+    fps: frames per second (10)
     num_frames: number of frames to include (50)
     """
     person_id = person['person_id']
     frames = person['frame_numbers']
     
-    # Prepare VideoWriter
-    mp4_filename = videos_dir / f"person_{person_id:02d}.mp4"
+    # Prepare GIF filename
+    gif_filename = gifs_dir / f"person_{person_id:02d}.gif"
     
-    # Use H.264 codec via MPEG-4 container (mp4v)
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    writer = cv2.VideoWriter(
-        str(mp4_filename),
-        fourcc,
-        fps,
-        (frame_width, frame_height)
-    )
-    
-    if not writer.isOpened():
-        return False, f"Failed to open VideoWriter for person {person_id}"
-    
+    frames_list = []
     frames_written = 0
     frames_skipped = 0
     
@@ -195,12 +185,14 @@ def create_mp4_for_person(person, h5_person_group, videos_dir, frame_width=128, 
                 frames_skipped += 1
                 continue
             
-            # Keep as BGR (OpenCV VideoWriter expects BGR)
-            # Resize crop to frame size (maintains aspect ratio)
-            resized_frame = resize_crop_to_frame(crop_bgr, frame_width, frame_height)
+            # Convert BGR to RGB for imageio (GIF expects RGB)
+            crop_rgb = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB)
             
-            # Write frame to video
-            writer.write(resized_frame)
+            # Resize crop to frame size (maintains aspect ratio)
+            resized_frame = resize_crop_to_frame(crop_rgb, frame_width, frame_height)
+            
+            # Add frame to GIF list
+            frames_list.append(resized_frame)
             frames_written += 1
             
         except Exception as e:
@@ -209,24 +201,25 @@ def create_mp4_for_person(person, h5_person_group, videos_dir, frame_width=128, 
                 print(f"      [DEBUG] Frame {frame_idx} error: {str(e)[:100]}")
             continue
     
-    # Release writer
-    writer.release()
-    
     if frames_written == 0:
-        # Delete empty file
-        if mp4_filename.exists():
-            mp4_filename.unlink()
         return False, f"No frames found for person {person_id}"
     
-    # Get file size in MB
-    file_size_mb = mp4_filename.stat().st_size / (1024 * 1024)
+    # Write GIF with duration based on fps
+    duration = 1.0 / fps  # Duration per frame in seconds
+    try:
+        imageio.mimsave(str(gif_filename), frames_list, duration=duration, loop=0)
+    except Exception as e:
+        return False, f"Failed to save GIF for person {person_id}: {str(e)[:100]}"
     
-    return True, f"person_{person_id:02d}.mp4 ({frames_written} frames, {frame_width}x{frame_height}, {file_size_mb:.2f} MB)"
+    # Get file size in MB
+    file_size_mb = gif_filename.stat().st_size / (1024 * 1024)
+    
+    return True, f"person_{person_id:02d}.gif ({frames_written} frames, {frame_width}x{frame_height}, {file_size_mb:.2f} MB)"
 
 
-def create_videos_for_top_persons(canonical_file, crops_enriched_file, output_videos_dir, 
-                                 frame_width=128, frame_height=192, fps=10, num_frames=50, bitrate='200k'):
-    """Create MP4 videos for top 10 persons using crops_enriched.h5"""
+def create_gifs_for_top_persons(canonical_file, crops_enriched_file, output_gifs_dir, 
+                                 frame_width=128, frame_height=192, fps=10, num_frames=50):
+    """Create animated GIFs for top 10 persons using crops_enriched.h5"""
     
     # Load canonical persons
     print(f"📂 Loading canonical persons...")
@@ -235,12 +228,12 @@ def create_videos_for_top_persons(canonical_file, crops_enriched_file, output_vi
     persons.sort(key=lambda p: len(p['frame_numbers']), reverse=True)
     
     # Create output directory
-    videos_dir = Path(output_videos_dir) / 'videos'
-    videos_dir.mkdir(parents=True, exist_ok=True)
-    print(f"📁 Output directory: {videos_dir}")
+    gifs_dir = Path(output_gifs_dir) / 'gifs'
+    gifs_dir.mkdir(parents=True, exist_ok=True)
+    print(f"📁 Output directory: {gifs_dir}")
     
-    # Generate videos for top 10 persons using HDF5
-    print(f"\n🎬 Generating MP4 videos for top 10 persons...\n")
+    # Generate GIFs for top 10 persons using HDF5
+    print(f"\n🎬 Generating animated GIFs for top 10 persons...\n")
     
     success_count = 0
     failed_count = 0
@@ -260,15 +253,14 @@ def create_videos_for_top_persons(canonical_file, crops_enriched_file, output_vi
                 
                 h5_person_group = h5f[person_key]
                 
-                success, message = create_mp4_for_person(
+                success, message = create_gif_for_person(
                     person,
                     h5_person_group,
-                    videos_dir,
+                    gifs_dir,
                     frame_width=frame_width,
                     frame_height=frame_height,
                     fps=fps,
-                    num_frames=num_frames,
-                    bitrate=bitrate
+                    num_frames=num_frames
                 )
                 
                 if success:
@@ -287,9 +279,9 @@ def create_videos_for_top_persons(canonical_file, crops_enriched_file, output_vi
         return False
     
     print(f"\n{'='*70}")
-    print(f"📊 Video Generation Summary:")
+    print(f"📊 GIF Generation Summary:")
     print(f"  ✅ Successful: {success_count}/10")
-    print(f"  📁 Output: {videos_dir}")
+    print(f"  📁 Output: {gifs_dir}")
     print(f"{'='*70}\n")
     
     return success_count > 0
@@ -297,7 +289,7 @@ def create_videos_for_top_persons(canonical_file, crops_enriched_file, output_vi
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Stage 11: Generate MP4 Videos for Top 10 Persons'
+        description='Stage 11: Generate Animated GIFs for Top 10 Persons'
     )
     parser.add_argument('--config', type=str, required=True,
                        help='Path to pipeline configuration YAML')
@@ -311,29 +303,27 @@ def main():
     # Use the parent directory of canonical_persons.npz (video-specific outputs folder)
     output_dir = str(Path(canonical_file).parent)
     
-    # Get video generation settings from config
-    video_config = config.get('stage11', {}).get('video_generation', {})
-    frame_width = video_config.get('frame_width', 128)
-    frame_height = video_config.get('frame_height', 192)
-    fps = video_config.get('fps', 10)
-    num_frames = video_config.get('max_frames', 50)
-    bitrate = video_config.get('bitrate', '200k')
+    # Get GIF generation settings from config
+    gif_config = config.get('stage11', {}).get('video_generation', {})
+    frame_width = gif_config.get('frame_width', 128)
+    frame_height = gif_config.get('frame_height', 192)
+    fps = gif_config.get('fps', 10)
+    num_frames = gif_config.get('max_frames', 50)
     
     print(f"\n{'='*70}")
-    print(f"🎬 STAGE 11: GENERATE PERSON MP4 VIDEOS")
+    print(f"🎬 STAGE 11: GENERATE PERSON ANIMATED GIFS")
     print(f"{'='*70}\n")
     
     t_start = time.time()
     
-    success = create_videos_for_top_persons(
+    success = create_gifs_for_top_persons(
         canonical_file,
         crops_enriched_file,
         output_dir,
         frame_width=frame_width,
         frame_height=frame_height,
         fps=fps,
-        num_frames=num_frames,
-        bitrate=bitrate
+        num_frames=num_frames
     )
     
     t_end = time.time()

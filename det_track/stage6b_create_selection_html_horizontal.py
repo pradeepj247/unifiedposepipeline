@@ -99,24 +99,6 @@ def load_config(config_path):
     return resolve_path_variables(config)
 
 
-def extract_first_frame_from_mp4(mp4_path):
-    """Extract first frame from MP4 video file as JPEG"""
-    cap = cv2.VideoCapture(str(mp4_path))
-    
-    if not cap.isOpened():
-        print(f"      ⚠️  Could not open {mp4_path}")
-        return None
-    
-    ret, frame = cap.read()
-    cap.release()
-    
-    if not ret:
-        print(f"      ⚠️  Could not read first frame from {mp4_path}")
-        return None
-    
-    return frame
-
-
 def encode_image_to_base64(image_bgr):
     """Encode BGR image to base64 JPEG string"""
     if image_bgr is None:
@@ -132,21 +114,21 @@ def encode_image_to_base64(image_bgr):
     return f"data:image/jpeg;base64,{base64_str}"
 
 
-def encode_video_to_base64(mp4_path):
-    """Encode MP4 video to base64 string"""
+def encode_gif_to_base64(gif_path):
+    """Encode GIF file to base64 data URI"""
     try:
-        with open(mp4_path, 'rb') as f:
-            video_data = f.read()
+        with open(gif_path, 'rb') as f:
+            gif_data = f.read()
         
-        base64_str = base64.b64encode(video_data).decode('utf-8')
-        return f"data:video/mp4;base64,{base64_str}"
+        base64_str = base64.b64encode(gif_data).decode('utf-8')
+        return f"data:image/gif;base64,{base64_str}"
     except Exception as e:
-        print(f"      ⚠️  Error encoding video: {str(e)[:100]}")
+        print(f"      ⚠️  Error encoding GIF: {str(e)[:100]}")
         return None
 
 
-def create_selection_report_horizontal(canonical_file, crops_cache_file, output_html, videos_dir=None, video_duration_frames=None):
-    """Create horizontal scrollable tape layout HTML with embedded videos and poster images"""
+def create_selection_report_horizontal(canonical_file, crops_cache_file, output_html, gifs_dir=None, video_duration_frames=None):
+    """Create horizontal scrollable tape layout HTML with embedded animated GIFs"""
     
     # Load data
     print(f"📂 Loading canonical persons...")
@@ -163,11 +145,11 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
         video_duration_frames = max_frame + 1
         print(f"   Calculated video_duration_frames from data: {video_duration_frames}")
     
-    # Locate videos directory
-    if videos_dir is None:
-        videos_dir = Path(canonical_file).parent / 'videos'
+    # Locate GIFs directory
+    if gifs_dir is None:
+        gifs_dir = Path(canonical_file).parent / 'gifs'
     else:
-        videos_dir = Path(videos_dir)
+        gifs_dir = Path(gifs_dir)
     
     print(f"📂 Loading crops cache...")
     with open(crops_cache_file, 'rb') as f:
@@ -411,7 +393,7 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
             <div class="tape" id="tape">
 """
     
-    print(f"🎬 Encoding videos and extracting poster frames...")
+    print(f"🎬 Encoding GIFs and generating HTML...\n")
     
     # Process top 10 persons
     for rank, person in enumerate(persons[:10], 1):
@@ -422,19 +404,15 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
         # Calculate % of video
         percent_video = (num_frames / video_duration_frames) * 100 if video_duration_frames > 0 else 0
         
-        # Duration in seconds (50 frames at 10 fps)
-        video_duration_sec = 50 / 10.0  # 5 seconds
+        # Locate GIF file (not MP4)
+        gif_filename = f"person_{person_id:02d}.gif"
+        gif_path = gifs_dir / gif_filename
         
-        # Locate MP4 file
-        video_filename = f"person_{person_id:02d}.mp4"
-        video_path = videos_dir / video_filename
-        
-        if not video_path.exists():
-            print(f"  ⚠️  Rank {rank}: P{person_id} - Video not found ({video_filename})")
+        if not gif_path.exists():
+            print(f"  ⚠️  Rank {rank}: P{person_id} - GIF not found ({gif_filename})")
             html_content += f"""            <div class="person-card" onclick="selectPerson(this, {person_id})">
                 <div class="rank-badge">#{rank}</div>
                 <div class="video-thumb">
-                    <div class="play-icon"></div>
                     <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='210'%3E%3Crect fill='%23f0f0f0'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' fill='%23999' font-family='Arial' font-size='12'%3EMISSING%3C/text%3E%3C/svg%3E"/>
                 </div>
                 <div class="person-info">
@@ -448,36 +426,16 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
 """
             continue
         
-        # Extract first frame for poster
-        print(f"  🎬 Rank {rank}: P{person_id} - Extracting poster...", end='', flush=True)
-        first_frame = extract_first_frame_from_mp4(video_path)
+        # Encode GIF to base64
+        print(f"  🎬 Rank {rank}: P{person_id} - Encoding GIF...", end='', flush=True)
+        gif_data = encode_gif_to_base64(gif_path)
         
-        if first_frame is None:
-            print(" ⚠️  Failed")
-            # Use placeholder
-            poster_data = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='210'%3E%3Crect fill='%23f0f0f0'/%3E%3C/svg%3E"
-        else:
-            poster_data = encode_image_to_base64(first_frame)
-            if poster_data:
-                print(f" ✅", end='', flush=True)
-            else:
-                print(f" ⚠️  Encoding failed")
-                poster_data = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='210'%3E%3Crect fill='%23f0f0f0'/%3E%3C/svg%3E"
-        
-        # Encode video to base64
-        print(f" · Embedding video...", end='', flush=True)
-        video_data = encode_video_to_base64(video_path)
-        
-        if video_data:
-            print(f" ✅")
-        else:
+        if not gif_data:
             print(f" ⚠️  Failed")
-            # Create person card without video
             html_content += f"""            <div class="person-card" onclick="selectPerson(this, {person_id})">
                 <div class="rank-badge">#{rank}</div>
                 <div class="video-thumb">
-                    <div class="play-icon"></div>
-                    <img src="{poster_data}" alt="Person {person_id}"/>
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='210'%3E%3Crect fill='%23f0f0f0'/%3E%3C/svg%3E"/>
                 </div>
                 <div class="person-info">
                     <div class="person-id">P{person_id}</div>
@@ -490,18 +448,13 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
 """
             continue
         
-        # Create person card with video
+        print(f" ✅")
+        
+        # Create person card with animated GIF (no video tag needed)
         html_content += f"""            <div class="person-card" onclick="selectPerson(this, {person_id})">
                 <div class="rank-badge">#{rank}</div>
-                <div class="video-thumb"
-                     onmouseenter="hoverPlay(this)"
-                     onmouseleave="hoverStop(this)">
-                    <img src="{poster_data}" alt="Person {person_id}"/>
-                    <video playsinline muted
-                           onclick="event.stopPropagation(); togglePlay(this)">
-                        <source src="{video_data}" type="video/mp4">
-                    </video>
-                    <div class="play-icon"></div>
+                <div class="video-thumb">
+                    <img src="{gif_data}" alt="Person {person_id}" class="gif-animation"/>
                 </div>
                 <div class="person-info">
                     <div class="person-id">P{person_id}</div>
@@ -524,38 +477,7 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
         </footer>
     </div>
     
-    <script>
-        function togglePlay(video) {
-            if (video.paused) {
-                video.play().catch(()=>{});
-                video.classList.add("playing");
-            } else {
-                video.pause();
-                video.classList.remove("playing");
-            }
-        }
-
-        function hoverPlay(container) {
-            const v = container.querySelector("video");
-            if (!v) return;
-            v.play().catch(()=>{});
-            v.classList.add("playing");
-        }
-
-        function hoverStop(container) {
-            const v = container.querySelector("video");
-            if (!v) return;
-            v.pause();
-            v.currentTime = 0;
-            v.classList.remove("playing");
-        }
-
-        function selectPerson(card, id) {
-            document.querySelectorAll(".person-card")
-                .forEach(c => c.classList.remove("selected"));
-            card.classList.add("selected");
-            console.log("Selected person:", id);
-        }
+    <script>\n        function selectPerson(card, id) {\n            document.querySelectorAll(\".person-card\")\n                .forEach(c => c.classList.remove(\"selected\"));\n            card.classList.add(\"selected\");\n            console.log(\"Selected person:\", id);\n        }\n    </script>
     </script>
 </body>
 </html>
@@ -588,7 +510,7 @@ def main():
     output_html = output_dir / 'person_selection_report.html'
     
     # Try to find videos directory
-    videos_dir = output_dir / 'videos'
+    gifs_dir = output_dir / 'gifs'
     
     # Get video duration from config
     video_duration_frames = config.get('global', {}).get('video_duration_frames', 0)
@@ -603,7 +525,7 @@ def main():
         canonical_file,
         crops_cache_file,
         output_html,
-        videos_dir=videos_dir,
+        gifs_dir=gifs_dir,
         video_duration_frames=video_duration_frames
     )
     
