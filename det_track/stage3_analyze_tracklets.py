@@ -160,16 +160,43 @@ def identify_reid_candidates(tracklets, stats, criteria):
             if gap < -100 or gap > max_temporal_gap:  # Allow up to 100 frames overlap
                 continue
             
-            # Rule 2: Spatial proximity (last bbox of i near first bbox of j)
-            last_center_i = np.array([
-                (stat_i['last_bbox'][0] + stat_i['last_bbox'][2]) / 2,
-                (stat_i['last_bbox'][1] + stat_i['last_bbox'][3]) / 2
-            ])
-            first_center_j = np.array([
-                (stat_j['first_bbox'][0] + stat_j['first_bbox'][2]) / 2,
-                (stat_j['first_bbox'][1] + stat_j['first_bbox'][3]) / 2
-            ])
-            distance = np.linalg.norm(last_center_i - first_center_j)
+            # Rule 2: Spatial proximity
+            # For overlapping tracklets: compare bboxes at overlapping frames
+            # For non-overlapping: compare last of i with first of j
+            if gap < 0:  # Overlapping case
+                # Find overlapping frames
+                overlap_start = stat_j['start_frame']
+                overlap_end = stat_i['end_frame']
+                
+                # Compare middle bboxes of overlapping region
+                # Get bbox at overlap_start from tracklet j and at overlap_start from tracklet i
+                i_frames = tracklets[i]['frame_numbers']
+                j_frames = tracklets[j]['frame_numbers']
+                
+                if overlap_start in i_frames and overlap_start in j_frames:
+                    i_idx = np.where(i_frames == overlap_start)[0][0]
+                    j_idx = np.where(j_frames == overlap_start)[0][0]
+                    
+                    i_bbox = tracklets[i]['bboxes'][i_idx]
+                    j_bbox = tracklets[j]['bboxes'][j_idx]
+                    
+                    i_center = np.array([(i_bbox[0] + i_bbox[2]) / 2, (i_bbox[1] + i_bbox[3]) / 2])
+                    j_center = np.array([(j_bbox[0] + j_bbox[2]) / 2, (j_bbox[1] + j_bbox[3]) / 2])
+                    distance = np.linalg.norm(i_center - j_center)
+                else:
+                    # Can't find overlap, skip
+                    continue
+            else:  # Non-overlapping case
+                # Use last bbox of i and first bbox of j
+                last_center_i = np.array([
+                    (stat_i['last_bbox'][0] + stat_i['last_bbox'][2]) / 2,
+                    (stat_i['last_bbox'][1] + stat_i['last_bbox'][3]) / 2
+                ])
+                first_center_j = np.array([
+                    (stat_j['first_bbox'][0] + stat_j['first_bbox'][2]) / 2,
+                    (stat_j['first_bbox'][1] + stat_j['first_bbox'][3]) / 2
+                ])
+                distance = np.linalg.norm(last_center_i - first_center_j)
             
             if distance > max_spatial_distance:
                 continue
