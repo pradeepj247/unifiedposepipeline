@@ -89,6 +89,10 @@ def main():
     # Load config
     config = load_config(args.config)
     video_path = config['global']['video_dir'] + config['global']['video_file']
+    models_dir = config['global']['models_dir']
+    
+    # YOLOv11n model path
+    yolov11n_path = os.path.join(models_dir, 'yolo', 'yolov11n.pt')
     
     print(f"\n{'='*70}")
     print(f"⚡ YOLOv11n SPEED TEST")
@@ -101,13 +105,14 @@ def main():
     
     # Load YOLOv11n
     print(f"🛠️  Loading YOLOv11n...")
+    print(f"   Path: {yolov11n_path}")
     try:
-        model = YOLO('yolov11n.pt', task="detect")
+        model = YOLO(yolov11n_path, task="detect")
         model.to('cuda')
         print(f"  ✅ Model loaded\n")
     except Exception as e:
         print(f"  ❌ Error loading model: {e}")
-        print(f"  💡 Download: yolo11n might need to be downloaded first")
+        print(f"  💡 Make sure YOLOv11n is at: {yolov11n_path}")
         return
     
     # Open video
