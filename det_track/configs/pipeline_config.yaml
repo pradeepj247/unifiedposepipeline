@@ -153,7 +153,7 @@ stage4b_group_canonical:
 # ============================================================================
 stage5_rank:
   ranking:
-    method: auto  # Options: auto, manual
+    method: auto  # Options: auto (manual selection not yet implemented)
     
     # Auto-ranking weights
     weights:
@@ -161,10 +161,6 @@ stage5_rank:
       coverage: 0.3       # Percentage of frames covered
       center: 0.2         # Proximity to frame center
       smoothness: 0.1     # Motion stability (less jitter)
-    
-    # Manual selection (used if method = manual)
-    manual_selection:
-      canonical_id: null  # e.g., "A"
   
   input:
     canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
