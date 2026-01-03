@@ -151,7 +151,8 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         ('Stage 5: Ranking', 'stage5_rank_persons.py', 'stage5_rank'),
         ('Stage 5b: Visualize Grouping', 'stage5b_visualize_grouping.py', 'stage5b_visualize_grouping'),
         ('Stage 6: Visualization', 'stage6_create_output_video.py', 'stage6_create_output_video'),
-        ('Stage 6b: Selection HTML (3 Temporal Crops)', 'stage6b_create_selection_html.py', 'stage6b_create_selection_grid')
+        ('Stage 6b: Selection HTML (3 Temporal Crops)', 'stage6b_create_selection_html.py', 'stage6b_create_selection_grid'),
+        ('Stage 9: Generate Person GIFs', 'stage9_generate_person_gifs.py', 'stage9_generate_gifs')
     ]
     
     # Print header
@@ -283,6 +284,10 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         'stage6b_create_selection_grid': [
             # Only check cropped_grid (fullframe_grid is optional/not implemented)
             config.get('stage6b_create_selection_grid', {}).get('output', {}).get('cropped_grid', 'N/A')
+        ],
+        'stage9_generate_gifs': [
+            # Check gifs subfolder
+            str(Path(config['stage4b_group_canonical']['output']['canonical_persons_file']).parent / 'gifs')
         ]
     }
     
