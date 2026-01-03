@@ -169,27 +169,25 @@ def find_best_crop_for_bbox(frame_idx: int, target_bbox: np.ndarray,
     
     best_iou = -1
     best_crop = None
-    best_local_det_idx = None
     
-    for global_det_idx, detection_bbox, confidence in frame_detections:
-        # Convert global detection index to local frame index
-        # Global index within frame's detections list
-        local_det_idx = None
-        det_count = 0
-        for idx in range(global_det_idx + 1):
-            if frame_numbers[idx] == frame_idx:
-                det_count += 1
-        local_det_idx = det_count - 1  # 0-indexed within frame
+    # frame_detections is list of (global_det_idx, detection_bbox, confidence)
+    # We need to match each detection to its corresponding crop
+    # The local_det_idx in frame_crops should correspond to the position in frame_detections
+    
+    for local_idx, (global_det_idx, detection_bbox, confidence) in enumerate(frame_detections):
+        # local_idx is the position within this frame's detections
+        if local_idx not in frame_crops:
+            continue
         
-        if local_det_idx not in frame_crops:
+        crop = frame_crops[local_idx]
+        if crop is None or crop.size == 0:
             continue
         
         iou = compute_bbox_iou(target_bbox, detection_bbox)
         
         if iou > best_iou:
             best_iou = iou
-            best_crop = frame_crops[local_det_idx]
-            best_local_det_idx = local_det_idx
+            best_crop = crop
     
     if best_iou >= iou_threshold:
         return best_crop, True
