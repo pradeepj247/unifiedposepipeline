@@ -318,7 +318,8 @@ def main():
     stage_config = config['stage6_create_output_video']
     
     # Get paths from config
-    video_path = Path(stage_config['input']['video_file'])
+    # Video path comes from global config (single source of truth)
+    video_path = Path(config['global']['video_dir'] + config['global']['video_file'])
     canonical_persons_file = Path(stage_config['input']['canonical_persons_file'])
     output_video_path = Path(stage_config['output']['video_file'])
     
