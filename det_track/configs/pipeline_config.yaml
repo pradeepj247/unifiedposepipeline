@@ -26,7 +26,7 @@ pipeline:
     stage1_detect: true       # YOLO detection
     stage2_track: true        # ByteTrack offline tracking
     stage3_analyze: true      # Tracklet statistics
-    stage4a_reid_recovery: false   # DISABLED: boxmot.appearance not available
+    stage4a_reid_recovery: true   # ReID-based tracklet merging (ONNX OSNet)
     stage4b_group_canonical: true # Geometric grouping (optional)
     stage5_rank: true         # Primary person selection
     stage5b_visualize_grouping: false  # Optional: Show grouping results tables
@@ -117,34 +117,17 @@ stage3_analyze:
 # Stage 4a: Selective ReID Recovery (OPTIONAL - Toggle for benchmarking)
 # ============================================================================
 stage4a_reid_recovery:
-  enabled: false  # Disabled: boxmot.appearance module not available in current BoxMOT version
-  
   reid:
-    model_path: ${models_dir}/reid/osnet_x0_25_msmt17.pt  # Fast model
-    device: cuda
-    batch_size: 8  # Process multiple crops at once
-  
-  matching:
-    similarity_threshold: 0.75  # Cosine similarity threshold for merging
-    adaptive_threshold: true    # Adjust threshold based on temporal gap
-    adaptive_thresholds:
-      gap_0_10: 0.65   # Very close in time (lenient)
-      gap_10_30: 0.75  # Normal gap (standard)
-      gap_30_50: 0.85  # Large gap (strict)
-  
-  extraction:
-    frames_per_tracklet: 1  # How many frames to sample (1 = last/first only)
-    crop_padding: 10        # Pixels to add around bbox
+    model_path: ${models_dir}/reid/osnet_x0_25_msmt17.onnx  # ONNX OSNet model
+    similarity_threshold: 0.5  # Cosine similarity threshold for merging
   
   input:
-    video_path: ${video_dir}${video_file}
     tracklets_file: ${outputs_dir}/${current_video}/tracklets_raw.npz
-    tracklet_stats_file: ${outputs_dir}/${current_video}/tracklet_stats.npz
     candidates_file: ${outputs_dir}/${current_video}/reid_candidates.json
   
   output:
-    recovered_tracklets_file: ${outputs_dir}/${current_video}/tracklets_recovered.npz
-    merge_log_file: ${outputs_dir}/${current_video}/reid_merge_log.json
+    tracklets_recovered_file: ${outputs_dir}/${current_video}/tracklets_recovered.npz
+    reid_results_file: ${outputs_dir}/${current_video}/reid_results.json
   
   advanced:
     verbose: false
