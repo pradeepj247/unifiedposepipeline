@@ -6,7 +6,7 @@ Orchestrates all stages of the detection-tracking pipeline:
   Stage 1: YOLO Detection
   Stage 2: ByteTrack Tracking
   Stage 3: Tracklet Analysis
-  Stage 4a: ReID Recovery (optional)
+  Stage 4a: Load Crops Cache (lightweight - no ReID)
   Stage 4b: Canonical Grouping (optional)
   Stage 5: Primary Person Ranking
 
@@ -146,7 +146,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False):
         ('Stage 1: Detection', 'stage1_detect.py', 'stage1_detect'),
         ('Stage 2: Tracking', 'stage2_track.py', 'stage2_track'),
         ('Stage 3: Analysis', 'stage3_analyze_tracklets.py', 'stage3_analyze'),
-        ('Stage 4a: ReID Recovery', 'stage4a_reid_recovery_onnx.py', 'stage4a_reid_recovery'),
+        ('Stage 4a: Load Crops Cache', 'stage4a_load_crops_cache.py', 'stage4a_reid_recovery'),
         ('Stage 4b: Canonical Grouping', 'stage4b_group_canonical.py', 'stage4b_group_canonical'),
         ('Stage 5: Ranking', 'stage5_rank_persons.py', 'stage5_rank'),
         ('Stage 5b: Visualize Grouping', 'stage5b_visualize_grouping.py', 'stage5b_visualize_grouping'),
@@ -268,10 +268,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False):
             config['stage3_analyze']['output']['tracklet_stats_file'],
             config['stage3_analyze']['output']['candidates_file']
         ],
-        'stage4a_reid_recovery': [
-            config['stage4a_reid_recovery']['output']['tracklets_recovered_file'],
-            config['stage4a_reid_recovery']['output']['reid_results_file']
-        ],
+        'stage4a_reid_recovery': [],  # Lightweight stage - no outputs, just loads crops cache
         'stage4b_group_canonical': [
             config['stage4b_group_canonical']['output']['canonical_persons_file'],
             config['stage4b_group_canonical']['output']['grouping_log_file']

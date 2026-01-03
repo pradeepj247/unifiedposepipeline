@@ -115,23 +115,14 @@ stage3_analyze:
     verbose: false
 
 # ============================================================================
-# Stage 4a: Selective ReID Recovery (OPTIONAL - Toggle for benchmarking)
+# Stage 4a: Load Crops Cache (Lightweight - No ReID)
 # ============================================================================
 stage4a_reid_recovery:
-  reid:
-    model_path: ${models_dir}/reid/osnet_x0_25_msmt17.onnx  # ONNX OSNet model
-    similarity_threshold: 0.5  # Cosine similarity threshold for merging
-  
   input:
-    tracklets_file: ${outputs_dir}/${current_video}/tracklets_raw.npz
-    candidates_file: ${outputs_dir}/${current_video}/reid_candidates.json
+    crops_cache_file: ${outputs_dir}/${current_video}/crops_cache.pkl
   
   output:
-    tracklets_recovered_file: ${outputs_dir}/${current_video}/tracklets_recovered.npz
-    reid_results_file: ${outputs_dir}/${current_video}/reid_results.json
-  
-  advanced:
-    verbose: false
+    # No outputs - crops cache is loaded and passed to Stage 7
 
 # ============================================================================
 # Stage 4b: Canonical Person Grouping (OPTIONAL - Toggle for benchmarking)
