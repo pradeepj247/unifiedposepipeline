@@ -157,14 +157,15 @@ def resize_crop_to_frame(crop, frame_width, frame_height, padding_color=(0, 0, 0
     return frame
 
 
-def create_webp_for_person(person, crops_cache, detections_data, webp_dir, frame_width=128, frame_height=192, fps=10, num_frames=60):
+def create_webp_for_person(person, crops_cache, detections_data, detection_idx_to_frame_pos, webp_dir, frame_width=128, frame_height=192, fps=10, num_frames=60):
     """
     Create an animated WebP for a single person using in-memory crops_cache.
     
     Args:
         person: dict with 'person_id', 'frame_numbers' (video frame indices)
-        crops_cache: dict from Stage 1 with crops indexed by detection_id
+        crops_cache: dict from Stage 1 with structure {frame_idx: {position_in_frame: crop_image}}
         detections_data: detections_raw.npz data with frame_numbers array (detection's video frame index)
+        detection_idx_to_frame_pos: mapping from global detection index to (frame_idx, position_in_frame)
         webp_dir: output directory for WebPs
         frame_width: fixed frame width (128)
         frame_height: fixed frame height (192)
@@ -181,31 +182,20 @@ def create_webp_for_person(person, crops_cache, detections_data, webp_dir, frame
     if len(person_frame_numbers) == 0:
         return False, f"No frames found for person {person_id}"
     
-    # Debug: Show what we have
-    print(f"\n[DEBUG P{person_id}] person_frame_numbers type: {type(person_frame_numbers)}, len: {len(person_frame_numbers)}")
-    print(f"[DEBUG P{person_id}] First 5 frame_numbers: {person_frame_numbers[:5]}")
-    
     # Convert to set for O(1) lookup
     person_frame_set = set(int(fn) for fn in person_frame_numbers)
     
     # Get all detections' frame numbers
     detections_frame_numbers = detections_data.get('frame_numbers', np.array([]))
     
-    print(f"[DEBUG P{person_id}] detections_frame_numbers type: {type(detections_frame_numbers)}, len: {len(detections_frame_numbers)}")
-    print(f"[DEBUG P{person_id}] First 5 detection frame_numbers: {detections_frame_numbers[:5]}")
-    print(f"[DEBUG P{person_id}] Person frames in detection frames? {len(person_frame_set & set(detections_frame_numbers))} matches")
-    
     # Find ALL detection indices that belong to this person's frames
-    # This is better than dict mapping because multiple detections can be in same frame
     detection_indices_for_person = []
     for detection_idx, frame_num in enumerate(detections_frame_numbers):
         if int(frame_num) in person_frame_set:
             detection_indices_for_person.append(detection_idx)
     
-    print(f"[DEBUG P{person_id}] Found {len(detection_indices_for_person)} detection indices")
-    
     if len(detection_indices_for_person) == 0:
-        return False, f"No detection indices found for person {person_id}"
+        return False, f"No frames found for person {person_id}"
     
     # Apply adaptive offset to skip intro flicker
     # Skip first 20% of appearance, but at most 50 frames
@@ -225,20 +215,18 @@ def create_webp_for_person(person, crops_cache, detections_data, webp_dir, frame
     for detection_idx in detection_indices_to_use:
         detection_idx = int(detection_idx)
         
-        # Get crop from crops_cache
-        # crops_cache is a dict with 'crops' key containing detection_idx -> crop mapping
-        crop = None
-        if isinstance(crops_cache, dict) and 'crops' in crops_cache:
-            crop = crops_cache['crops'].get(detection_idx)
-        elif isinstance(crops_cache, dict):
-            # Try direct indexing if 'crops' key doesn't exist
-            crop = crops_cache.get(detection_idx)
+        # Convert global detection index to (frame_idx, position_in_frame) using mapping
+        if detection_idx not in detection_idx_to_frame_pos:
+            frames_skipped += 1
+            continue
         
-        if frames_written == 0:  # Debug first crop lookup
-            print(f"[DEBUG P{person_id}] crops_cache type: {type(crops_cache)}")
-            if isinstance(crops_cache, dict):
-                print(f"[DEBUG P{person_id}] crops_cache keys: {list(crops_cache.keys())[:5]}")
-            print(f"[DEBUG P{person_id}] Looking for detection_idx {detection_idx}, crop found: {crop is not None}")
+        frame_idx, pos_in_frame = detection_idx_to_frame_pos[detection_idx]
+        
+        # Get crop from crops_cache using (frame_idx, position_in_frame)
+        # crops_cache structure: {frame_idx: {position_in_frame: crop_image}}
+        crop = None
+        if frame_idx in crops_cache and pos_in_frame in crops_cache[frame_idx]:
+            crop = crops_cache[frame_idx][pos_in_frame]
         
         if crop is None or (hasattr(crop, 'size') and crop.size == 0):
             frames_skipped += 1
@@ -315,12 +303,25 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
         with open(crops_cache_file, 'rb') as f:
             crops_cache = pickle.load(f)
         print(f"   ✅ Loaded crops cache")
-        print(f"   [DEBUG] crops_cache type: {type(crops_cache)}")
-        if isinstance(crops_cache, dict):
-            print(f"   [DEBUG] crops_cache keys: {list(crops_cache.keys())}")
     except Exception as e:
         print(f"❌ Error reading crops cache: {str(e)}")
         return False
+    
+    # Build mapping from global detection_idx to (frame_idx, position_in_frame)
+    # This is necessary because crops_cache is organized by {frame_idx: {position: crop}}
+    # but detections are indexed globally from 0 to num_detections-1
+    print(f"📊 Building detection index mapping...")
+    detections_frame_numbers = det_data.get('frame_numbers', np.array([]))
+    num_detections_per_frame = det_data.get('num_detections_per_frame', np.array([]))
+    
+    detection_idx_to_frame_pos = {}
+    detection_idx = 0
+    for frame_idx, num_dets_in_frame in enumerate(num_detections_per_frame):
+        for pos_in_frame in range(int(num_dets_in_frame)):
+            detection_idx_to_frame_pos[detection_idx] = (frame_idx, pos_in_frame)
+            detection_idx += 1
+    
+    print(f"   ✅ Built mapping for {len(detection_idx_to_frame_pos)} detections")
     
     # Create output directory
     webp_dir = Path(output_webp_dir) / 'webp'
@@ -341,6 +342,7 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
             person,
             crops_cache,
             det_data,
+            detection_idx_to_frame_pos,
             webp_dir,
             frame_width=frame_width,
             frame_height=frame_height,
