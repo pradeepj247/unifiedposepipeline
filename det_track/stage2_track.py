@@ -258,12 +258,18 @@ def run_tracking(config):
                         tracklets_dict[track_id] = {
                             'frame_numbers': [],
                             'bboxes': [],
-                            'confidences': []
+                            'confidences': [],
+                            'detection_indices': []
                         }
+                    
+                    # Extract detection index from ByteTrack output
+                    # tracked: (N, 8) = [x1, y1, x2, y2, track_id, conf, cls, det_ind]
+                    det_ind = int(track[7]) if len(track) > 7 else -1
                     
                     tracklets_dict[track_id]['frame_numbers'].append(int(frame_id))
                     tracklets_dict[track_id]['bboxes'].append(bbox)
                     tracklets_dict[track_id]['confidences'].append(conf)
+                    tracklets_dict[track_id]['detection_indices'].append(det_ind)
         
         except Exception as e:
             # Tracker error - skip this frame
@@ -287,7 +293,8 @@ def run_tracking(config):
             'tracklet_id': track_id,
             'frame_numbers': np.array(data['frame_numbers'], dtype=np.int64),
             'bboxes': np.array(data['bboxes'], dtype=np.float32),
-            'confidences': np.array(data['confidences'], dtype=np.float32)
+            'confidences': np.array(data['confidences'], dtype=np.float32),
+            'detection_indices': np.array(data['detection_indices'], dtype=np.int64)
         })
     
     # Sort by tracklet ID

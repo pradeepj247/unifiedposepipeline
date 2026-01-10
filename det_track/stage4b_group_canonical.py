@@ -203,29 +203,33 @@ def merge_group(tracklets, group_indices):
     member_tracklets.sort(key=lambda t: t['frame_numbers'][0])
     
     # Collect all unique frames and their data
-    frame_to_data = {}  # frame_num -> (bboxes, confs from all tracklets for that frame)
+    frame_to_data = {}  # frame_num -> (bboxes, confs, det_inds from all tracklets for that frame)
     
     for tracklet in member_tracklets:
         for frame_idx, frame_num in enumerate(tracklet['frame_numbers']):
             frame_num = int(frame_num)
             bbox = tracklet['bboxes'][frame_idx]
             conf = tracklet['confidences'][frame_idx]
+            det_ind = tracklet['detection_indices'][frame_idx] if 'detection_indices' in tracklet else -1
             
             if frame_num not in frame_to_data:
-                frame_to_data[frame_num] = {'bboxes': [], 'confs': []}
+                frame_to_data[frame_num] = {'bboxes': [], 'confs': [], 'det_inds': []}
             
             frame_to_data[frame_num]['bboxes'].append(bbox)
             frame_to_data[frame_num]['confs'].append(conf)
+            frame_to_data[frame_num]['det_inds'].append(det_ind)
     
     # Build merged sequence
     sorted_frames = sorted(frame_to_data.keys())
     merged_frames = []
     merged_bboxes = []
     merged_confs = []
+    merged_det_inds = []
     
     for frame_num in sorted_frames:
         bboxes_in_frame = frame_to_data[frame_num]['bboxes']
         confs_in_frame = frame_to_data[frame_num]['confs']
+        det_inds_in_frame = frame_to_data[frame_num]['det_inds']
         
         # Compute union bbox (encompasses all tracklets in this frame)
         bboxes_array = np.array(bboxes_in_frame)
@@ -238,14 +242,20 @@ def merge_group(tracklets, group_indices):
         # Use maximum confidence in frame
         max_conf = np.max(confs_in_frame)
         
+        # Use detection index from highest-confidence detection in frame
+        max_conf_idx = np.argmax(confs_in_frame)
+        det_ind = det_inds_in_frame[max_conf_idx]
+        
         merged_frames.append(frame_num)
         merged_bboxes.append(union_bbox)
         merged_confs.append(max_conf)
+        merged_det_inds.append(det_ind)
     
     # Convert to arrays
     merged_frames = np.array(merged_frames, dtype=np.int64)
     merged_bboxes = np.array(merged_bboxes, dtype=np.float32)
     merged_confs = np.array(merged_confs, dtype=np.float32)
+    merged_det_inds = np.array(merged_det_inds, dtype=np.int64)
     
     # Canonical ID is the first tracklet ID in the group
     canonical_id = member_tracklets[0]['tracklet_id']
@@ -256,6 +266,7 @@ def merge_group(tracklets, group_indices):
         'frame_numbers': merged_frames,
         'bboxes': merged_bboxes,
         'confidences': merged_confs,
+        'detection_indices': merged_det_inds,
         'original_tracklet_ids': original_ids,
         'num_tracklets_merged': len(original_ids)
     }

@@ -1,22 +1,21 @@
 #!/usr/bin/env python3
 """
-Stage 11: Generate Animated WebP Videos for Top 10 Persons (OPTIMIZED - No HDF5)
+Stage 11: Generate Animated WebP Videos for Top 10 Persons (OPTIMIZED - Direct Detection Indices)
 
-MAJOR OPTIMIZATION: Stage 6 (HDF5 write) is now disabled.
-This stage now:
-- Loads crops_cache directly from Stage 1 output (in-memory, no disk)
-- Uses canonical_persons metadata to locate crops for each person
-- Applies adaptive frame offset to skip intro flicker  
-- Generates WebPs directly without HDF5 intermediate
-- 60 frames @ 10 fps = 6 seconds per WebP preview
+OPTIMIZATION: Uses detection_indices from canonical persons to directly access crops.
+This approach:
+- Stores detection_indices in tracklets (from ByteTrack output)
+- Propagates detection_indices through canonical persons grouping
+- Stage 11 uses indices directly - no complex frame/position lookups needed
 
 Benefits:
-- Eliminates 50.46s HDF5 write from Stage 6
-- Eliminates 823.7 MB disk usage
-- Memory stays in-memory (440 MB → ~50 MB after filtering)
-- Same output quality, 33% faster pipeline
+- Eliminates complex frame-number-based detection matching
+- Detection selection is provably correct (from tracking stage)
+- Much simpler code, no IOU matching or spatial heuristics
+- Direct index-to-crop mapping for clean data flow
 
 Features:
+- Direct detection index lookup via crops_cache
 - Adaptive frame offset: Skips first 20% of appearance to avoid intro flicker
 - Fixed frame sizing (128x192) for consistent playback
 - Smart centering and padding of crops
@@ -111,19 +110,6 @@ def load_config(config_path):
     return resolve_path_variables(config)
 
 
-def compute_frame_size_for_person_hdf5(person, h5_person_group, target_width=256, target_height=384):
-    """
-    Use fixed frame size for all persons (optimized for faster GIF generation).
-    
-    All crops will be resized to fit within target_width x target_height
-    while maintaining aspect ratio.
-    
-    Returns: (width, height) for this person's GIF frames (always fixed size)
-    """
-    # Return fixed size for all persons - much faster than computing per-person
-    return target_width, target_height
-
-
 def resize_crop_to_frame(crop, frame_width, frame_height, padding_color=(0, 0, 0)):
     """
     Resize a crop to fit within frame_width x frame_height while maintaining aspect ratio.
@@ -157,14 +143,14 @@ def resize_crop_to_frame(crop, frame_width, frame_height, padding_color=(0, 0, 0
     return frame
 
 
-def create_webp_for_person(person, crops_cache, detections_data, detection_idx_to_frame_pos, webp_dir, frame_width=128, frame_height=192, fps=10, num_frames=60):
+def create_webp_for_person(person, crops_cache, detection_idx_to_frame_pos, webp_dir, 
+                          frame_width=128, frame_height=192, fps=10, num_frames=60):
     """
-    Create an animated WebP for a single person using in-memory crops_cache.
+    Create an animated WebP for a single person using direct detection indices.
     
     Args:
-        person: dict with 'person_id', 'frame_numbers' (video frame indices)
+        person: dict with 'person_id', 'detection_indices' (from canonical persons)
         crops_cache: dict from Stage 1 with structure {frame_idx: {position_in_frame: crop_image}}
-        detections_data: detections_raw.npz data with frame_numbers array (detection's video frame index)
         detection_idx_to_frame_pos: mapping from global detection index to (frame_idx, position_in_frame)
         webp_dir: output directory for WebPs
         frame_width: fixed frame width (128)
@@ -174,36 +160,27 @@ def create_webp_for_person(person, crops_cache, detections_data, detection_idx_t
     """
     person_id = person['person_id']
     
-    # Get frame numbers for this person (from canonical grouping)
-    person_frame_numbers = person.get('frame_numbers', np.array([]))
-    if not hasattr(person_frame_numbers, '__len__'):
-        return False, f"No frames found for person {person_id}"
+    # Get detection indices for this person (from canonical grouping)
+    # These are the DIRECT indices of detections that belong to this person
+    detection_indices = person.get('detection_indices', np.array([]))
+    if not hasattr(detection_indices, '__len__'):
+        return False, f"No detection indices found for person {person_id}"
     
-    if len(person_frame_numbers) == 0:
-        return False, f"No frames found for person {person_id}"
+    if len(detection_indices) == 0:
+        return False, f"No detection indices found for person {person_id}"
     
-    # Convert to set for O(1) lookup
-    person_frame_set = set(int(fn) for fn in person_frame_numbers)
-    
-    # Get all detections' frame numbers
-    detections_frame_numbers = detections_data.get('frame_numbers', np.array([]))
-    
-    # Find ALL detection indices that belong to this person's frames
-    detection_indices_for_person = []
-    for detection_idx, frame_num in enumerate(detections_frame_numbers):
-        if int(frame_num) in person_frame_set:
-            detection_indices_for_person.append(detection_idx)
-    
-    if len(detection_indices_for_person) == 0:
-        return False, f"No frames found for person {person_id}"
+    # Remove invalid detection indices (e.g., -1 from merging)
+    valid_indices = [int(idx) for idx in detection_indices if int(idx) >= 0]
+    if len(valid_indices) == 0:
+        return False, f"All detection indices invalid for person {person_id}"
     
     # Apply adaptive offset to skip intro flicker
     # Skip first 20% of appearance, but at most 50 frames
-    offset = min(int(len(detection_indices_for_person) * 0.2), 50)
+    offset = min(int(len(valid_indices) * 0.2), 50)
     start_idx = offset
-    end_idx = min(start_idx + num_frames, len(detection_indices_for_person))
+    end_idx = min(start_idx + num_frames, len(valid_indices))
     
-    detection_indices_to_use = detection_indices_for_person[start_idx:end_idx]
+    indices_to_use = valid_indices[start_idx:end_idx]
     
     # Prepare WebP filename
     webp_filename = webp_dir / f"person_{person_id:02d}.webp"
@@ -212,10 +189,8 @@ def create_webp_for_person(person, crops_cache, detections_data, detection_idx_t
     frames_written = 0
     frames_skipped = 0
     
-    for detection_idx in detection_indices_to_use:
-        detection_idx = int(detection_idx)
-        
-        # Convert global detection index to (frame_idx, position_in_frame) using mapping
+    for detection_idx in indices_to_use:
+        # Convert global detection index to (frame_idx, position_in_frame)
         if detection_idx not in detection_idx_to_frame_pos:
             frames_skipped += 1
             continue
@@ -249,7 +224,7 @@ def create_webp_for_person(person, crops_cache, detections_data, detection_idx_t
             continue
     
     if frames_written == 0:
-        return False, f"No frames found for person {person_id}"
+        return False, f"No valid frames found for person {person_id}"
     
     # Write animated WebP
     duration = int(1000 / fps)  # Duration per frame in milliseconds
@@ -274,7 +249,7 @@ def create_webp_for_person(person, crops_cache, detections_data, detection_idx_t
 
 def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_file, output_webp_dir, 
                                  frame_width=128, frame_height=192, fps=10, num_frames=60):
-    """Create animated WebP files for top 10 persons using in-memory crops_cache"""
+    """Create animated WebP files for top 10 persons using direct detection indices"""
     
     # Load canonical persons
     print(f"📂 Loading canonical persons...")
@@ -282,16 +257,19 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
     persons = list(data['persons'])
     persons.sort(key=lambda p: len(p['frame_numbers']), reverse=True)
     print(f"   ✅ Loaded {len(persons)} canonical persons")
-    print(f"   [DEBUG] Person 0 keys: {persons[0].keys()}")
-    print(f"   [DEBUG] Person 0 has {len(persons[0]['frame_numbers'])} frame numbers")
     
-    # Load detections for frame indexing
+    # Check if detection_indices are present in canonical persons
+    has_detection_indices = 'detection_indices' in persons[0]
+    if not has_detection_indices:
+        print(f"   ⚠️  WARNING: detection_indices not found in canonical persons!")
+        print(f"   Available keys: {persons[0].keys()}")
+        print(f"   This may indicate Stage 2/4b have not been updated to store detection indices")
+        return False
+    
+    # Load detections for mapping
     print(f"📂 Loading detections...")
     det_data = np.load(detections_file, allow_pickle=True)
     print(f"   ✅ Loaded {len(det_data['frame_numbers'])} detections")
-    print(f"   [DEBUG] Detections keys: {list(det_data.keys())}")
-    print(f"   [DEBUG] Detection frame_numbers type: {type(det_data['frame_numbers'])}")
-    print(f"   [DEBUG] Detection frame_numbers first 5: {det_data['frame_numbers'][:5]}")
     
     # Load crops cache from Stage 1 output
     print(f"📂 Loading crops cache...")
@@ -308,10 +286,7 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
         return False
     
     # Build mapping from global detection_idx to (frame_idx, position_in_frame)
-    # This is necessary because crops_cache is organized by {frame_idx: {position: crop}}
-    # but detections are indexed globally from 0 to num_detections-1
     print(f"📊 Building detection index mapping...")
-    detections_frame_numbers = det_data.get('frame_numbers', np.array([]))
     num_detections_per_frame = det_data.get('num_detections_per_frame', np.array([]))
     
     detection_idx_to_frame_pos = {}
@@ -328,7 +303,7 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
     webp_dir.mkdir(parents=True, exist_ok=True)
     print(f"📁 Output directory: {webp_dir}")
     
-    # Generate WebP files for top 10 persons using in-memory crops
+    # Generate WebP files for top 10 persons
     print(f"\n🎬 Generating animated WebP files for top 10 persons...\n")
     
     success_count = 0
@@ -336,12 +311,10 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
     
     for rank, person in enumerate(persons[:10], 1):
         person_id = person['person_id']
-        num_person_frames = len(person['frame_numbers'])
         
         success, message = create_webp_for_person(
             person,
             crops_cache,
-            det_data,
             detection_idx_to_frame_pos,
             webp_dir,
             frame_width=frame_width,
@@ -368,7 +341,7 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Stage 11: Generate Animated WebP Files for Top 10 Persons (In-Memory Optimized - No HDF5)'
+        description='Stage 11: Generate Animated WebP Files for Top 10 Persons (Using Direct Detection Indices)'
     )
     parser.add_argument('--config', type=str, required=True,
                        help='Path to pipeline configuration YAML')
@@ -376,7 +349,7 @@ def main():
     args = parser.parse_args()
     config = load_config(args.config)
     
-    # Get paths from config (use Stage 1 and Stage 5 outputs, NOT Stage 6)
+    # Get paths from config
     canonical_file = config['stage5']['output']['canonical_persons_file']
     crops_cache_file = config['stage1']['output']['crops_cache_file']  
     detections_file = config['stage1']['output']['detections_file']
@@ -389,10 +362,10 @@ def main():
     frame_width = webp_config.get('frame_width', 128)
     frame_height = webp_config.get('frame_height', 192)
     fps = webp_config.get('fps', 10)
-    num_frames = webp_config.get('max_frames', 60)  # CHANGED from 50 to 60
+    num_frames = webp_config.get('max_frames', 60)
     
     print(f"\n{'='*70}")
-    print(f"🎬 STAGE 11: GENERATE PERSON ANIMATED WEBP FILES (IN-MEMORY OPTIMIZED)")
+    print(f"🎬 STAGE 11: GENERATE PERSON ANIMATED WEBP FILES (DIRECT DETECTION INDICES)")
     print(f"{'='*70}\n")
     print(f"📊 Settings: {num_frames} frames @ {fps} fps = {num_frames/fps:.1f}s per person\n")
     
