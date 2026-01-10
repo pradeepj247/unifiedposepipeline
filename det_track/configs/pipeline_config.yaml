@@ -35,12 +35,12 @@ pipeline:
     stage3: true                           # Stage 3: Tracklet statistics & candidate analysis
     stage4: true                           # Stage 4: Load crops cache (lightweight)
     stage5: true                           # Stage 5: Group tracklets into canonical persons
-    stage6: true                           # Stage 6: Enrich crops with person IDs and metadata (HDF5)
+    stage6: false                          # Stage 6: DISABLED - In-memory optimization (skip HDF5 write)
     stage7: true                           # Stage 7: Rank persons by appearance time
     stage8: false                          # Stage 8: Optional: Show grouping tables (debug)
-    stage9: true                           # Stage 9: Create video visualization of top 10 persons
-    stage11: true                          # Stage 11: Generate animated GIFs for top 10 persons (BEFORE stage10!)
-    stage10: true                          # Stage 10: Create HTML selection report (needs GIFs from stage11)
+    stage9: false                          # Stage 9: DISABLED - Video output saves 22% time (optional)
+    stage11: true                          # Stage 11: Generate animated WebPs for top 10 persons (BEFORE stage10!)
+    stage10: true                          # Stage 10: Create HTML selection report (needs WebPs from stage11)
   
   # Global settings inherited by all stages (can be overridden per-stage if needed)
   advanced:
@@ -240,8 +240,8 @@ stage11:
   
   video_generation:
     format: webp             # Output format (webp for auto-animating in HTML, smaller than GIF)
-    fps: 10                  # Frames per second (10 fps = smooth playback at ~5 seconds)
-    max_frames: 50           # Maximum frames per WebP
+    fps: 10                  # Frames per second (10 fps = smooth playback at ~6 seconds)
+    max_frames: 60           # Maximum frames per WebP (60 frames @ 10fps = 6 seconds)
     max_persons: 10          # Generate WebPs for top 10 persons
     frame_width: 128         # Reduced width for horizontal tape (3.5x smaller area)
     frame_height: 192        # Reduced height for horizontal tape
