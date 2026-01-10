@@ -181,11 +181,19 @@ def create_webp_for_person(person, crops_cache, detections_data, webp_dir, frame
     if len(person_frame_numbers) == 0:
         return False, f"No frames found for person {person_id}"
     
+    # Debug: Show what we have
+    print(f"\n[DEBUG P{person_id}] person_frame_numbers type: {type(person_frame_numbers)}, len: {len(person_frame_numbers)}")
+    print(f"[DEBUG P{person_id}] First 5 frame_numbers: {person_frame_numbers[:5]}")
+    
     # Convert to set for O(1) lookup
     person_frame_set = set(int(fn) for fn in person_frame_numbers)
     
     # Get all detections' frame numbers
     detections_frame_numbers = detections_data.get('frame_numbers', np.array([]))
+    
+    print(f"[DEBUG P{person_id}] detections_frame_numbers type: {type(detections_frame_numbers)}, len: {len(detections_frame_numbers)}")
+    print(f"[DEBUG P{person_id}] First 5 detection frame_numbers: {detections_frame_numbers[:5]}")
+    print(f"[DEBUG P{person_id}] Person frames in detection frames? {len(person_frame_set & set(detections_frame_numbers))} matches")
     
     # Find ALL detection indices that belong to this person's frames
     # This is better than dict mapping because multiple detections can be in same frame
@@ -193,6 +201,8 @@ def create_webp_for_person(person, crops_cache, detections_data, webp_dir, frame
     for detection_idx, frame_num in enumerate(detections_frame_numbers):
         if int(frame_num) in person_frame_set:
             detection_indices_for_person.append(detection_idx)
+    
+    print(f"[DEBUG P{person_id}] Found {len(detection_indices_for_person)} detection indices")
     
     if len(detection_indices_for_person) == 0:
         return False, f"No detection indices found for person {person_id}"
@@ -223,6 +233,12 @@ def create_webp_for_person(person, crops_cache, detections_data, webp_dir, frame
         elif isinstance(crops_cache, dict):
             # Try direct indexing if 'crops' key doesn't exist
             crop = crops_cache.get(detection_idx)
+        
+        if frames_written == 0:  # Debug first crop lookup
+            print(f"[DEBUG P{person_id}] crops_cache type: {type(crops_cache)}")
+            if isinstance(crops_cache, dict):
+                print(f"[DEBUG P{person_id}] crops_cache keys: {list(crops_cache.keys())[:5]}")
+            print(f"[DEBUG P{person_id}] Looking for detection_idx {detection_idx}, crop found: {crop is not None}")
         
         if crop is None or (hasattr(crop, 'size') and crop.size == 0):
             frames_skipped += 1
@@ -278,11 +294,16 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
     persons = list(data['persons'])
     persons.sort(key=lambda p: len(p['frame_numbers']), reverse=True)
     print(f"   ✅ Loaded {len(persons)} canonical persons")
+    print(f"   [DEBUG] Person 0 keys: {persons[0].keys()}")
+    print(f"   [DEBUG] Person 0 has {len(persons[0]['frame_numbers'])} frame numbers")
     
     # Load detections for frame indexing
     print(f"📂 Loading detections...")
     det_data = np.load(detections_file, allow_pickle=True)
     print(f"   ✅ Loaded {len(det_data['frame_numbers'])} detections")
+    print(f"   [DEBUG] Detections keys: {list(det_data.keys())}")
+    print(f"   [DEBUG] Detection frame_numbers type: {type(det_data['frame_numbers'])}")
+    print(f"   [DEBUG] Detection frame_numbers first 5: {det_data['frame_numbers'][:5]}")
     
     # Load crops cache from Stage 1 output
     print(f"📂 Loading crops cache...")
@@ -294,6 +315,9 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
         with open(crops_cache_file, 'rb') as f:
             crops_cache = pickle.load(f)
         print(f"   ✅ Loaded crops cache")
+        print(f"   [DEBUG] crops_cache type: {type(crops_cache)}")
+        if isinstance(crops_cache, dict):
+            print(f"   [DEBUG] crops_cache keys: {list(crops_cache.keys())}")
     except Exception as e:
         print(f"❌ Error reading crops cache: {str(e)}")
         return False
