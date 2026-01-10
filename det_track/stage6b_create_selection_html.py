@@ -435,6 +435,10 @@ def create_selection_report(canonical_file, crops_cache_file, fps, video_duratio
         frames = person['frame_numbers']
         num_frames = len(frames)
         
+        # Get start and end frames
+        start_frame = int(frames[0])
+        end_frame = int(frames[-1])
+        
         # Calculate % of video
         percent_video = (num_frames / video_duration_frames) * 100 if video_duration_frames > 0 else 0
         
@@ -468,6 +472,10 @@ def create_selection_report(canonical_file, crops_cache_file, fps, video_duratio
                 <div class="stat-row">
                     <span class="stat-label">Frames Present:</span>
                     <span class="stat-value">{num_frames}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Frame Range:</span>
+                    <span class="stat-value">{start_frame} - {end_frame}</span>
                 </div>
                 <div class="stat-row">
                     <span class="stat-label">Video Coverage:</span>
