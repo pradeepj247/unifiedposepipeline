@@ -84,7 +84,7 @@ def load_config(config_path):
 def run_load_crops_cache(config):
     """Run Stage 4a: Load Crops Cache"""
     
-    stage_config = config['stage4a_reid_recovery']
+    stage_config = config['stage4']
     
     input_config = stage_config['input']
     crops_cache_file = input_config.get('crops_cache_file')

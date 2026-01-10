@@ -226,7 +226,7 @@ def identify_reid_candidates(tracklets, stats, criteria):
 def run_analysis(config):
     """Run Stage 3: Analysis"""
     
-    stage_config = config['stage3_analyze']
+    stage_config = config['stage3']
     verbose = stage_config.get('advanced', {}).get('verbose', False)
     
     # Extract configuration
@@ -332,7 +332,7 @@ def main():
     config = load_config(args.config)
     
     # Check if stage is enabled
-    if not config['pipeline']['stages']['stage3_analyze']:
+    if not config['pipeline']['stages']['stage3']:
         print("⏭️  Stage 3 is disabled in config")
         return
     

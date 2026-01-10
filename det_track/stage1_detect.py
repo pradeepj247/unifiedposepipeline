@@ -103,7 +103,7 @@ def load_config(config_path):
     resolved_config = resolve_path_variables(config)
     
     # Debug: Print model_path after resolution
-    model_path = resolved_config['stage1_detect']['detector']['model_path']
+    model_path = resolved_config['stage1']['detector']['model_path']
     print(f"🔍 Debug - model_path after resolution: {model_path}")
     
     return resolved_config
@@ -321,7 +321,7 @@ def extract_crop(frame, bbox):
 def run_detection(config):
     """Run Stage 1: Detection"""
     
-    stage_config = config['stage1_detect']
+    stage_config = config['stage1']
     verbose = stage_config.get('advanced', {}).get('verbose', False)
     
     # Extract configuration
@@ -513,7 +513,7 @@ def main():
     config = load_config(args.config)
     
     # Check if stage is enabled
-    if not config['pipeline']['stages']['stage1_detect']:
+    if not config['pipeline']['stages']['stage1']:
         print("⏭️  Stage 1 is disabled in config")
         return
     

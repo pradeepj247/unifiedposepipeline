@@ -153,7 +153,7 @@ def init_bytetrack_tracker(params, frame_rate, verbose=False):
 def run_tracking(config):
     """Run Stage 2: Tracking"""
     
-    stage_config = config['stage2_track']
+    stage_config = config['stage2']
     verbose = stage_config.get('advanced', {}).get('verbose', False)
     
     # Extract configuration
@@ -346,7 +346,7 @@ def main():
     config = load_config(args.config)
     
     # Check if stage is enabled
-    if not config['pipeline']['stages']['stage2_track']:
+    if not config['pipeline']['stages']['stage2']:
         print("⏭️  Stage 2 is disabled in config")
         return
     

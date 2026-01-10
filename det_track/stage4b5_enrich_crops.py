@@ -396,7 +396,7 @@ def main():
     config = resolve_path_variables(config)
     
     # Get paths from config
-    stage_config = config['stage4b5_enrich_crops']
+    stage_config = config['stage6']
     canonical_persons_file = stage_config['input']['canonical_persons_file']
     crops_cache_file = stage_config['input']['crops_cache_file']
     detections_file = stage_config['input']['detections_file']

@@ -264,7 +264,7 @@ def merge_group(tracklets, group_indices):
 def run_canonical_grouping(config):
     """Run Stage 4b: Canonical Grouping"""
     
-    stage_config = config['stage4b_group_canonical']
+    stage_config = config['stage5']
     verbose = stage_config.get('advanced', {}).get('verbose', False)
     
     # Extract configuration

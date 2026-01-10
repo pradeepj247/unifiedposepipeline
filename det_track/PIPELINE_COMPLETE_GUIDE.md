@@ -1,8 +1,24 @@
 # 🎬 Unified Detection & Tracking Pipeline - Complete Guide
 
-**Last Updated**: January 3, 2026  
+**Last Updated**: January 10, 2026  
 **Status**: ✅ Production Ready  
 **Repository**: https://github.com/pradeepj247/unifiedposepipeline
+
+---
+
+## 🚀 Quick Start
+
+**👉 To run this pipeline on Google Colab, follow the step-by-step guide:**
+
+➡️ **[COLAB_QUICKSTART.md](COLAB_QUICKSTART.md)**
+
+This guide covers:
+1. Fresh git clone
+2. Installing libraries & packages
+3. Fetching model files
+4. Installing demo data
+5. Verifying environment
+6. Running the complete pipeline
 
 ---
 
