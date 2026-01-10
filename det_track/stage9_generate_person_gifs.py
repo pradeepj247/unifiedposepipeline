@@ -162,9 +162,9 @@ def create_webp_for_person(person, crops_cache, detections_data, webp_dir, frame
     Create an animated WebP for a single person using in-memory crops_cache.
     
     Args:
-        person: dict with 'person_id', 'detection_indices' (mapping to crops_cache)
+        person: dict with 'person_id', 'frame_numbers' (video frame indices)
         crops_cache: dict from Stage 1 with crops indexed by detection_id
-        detections_data: detections_raw.npz data with frame_numbers array
+        detections_data: detections_raw.npz data with frame_numbers array (global detection frame indices)
         webp_dir: output directory for WebPs
         frame_width: fixed frame width (128)
         frame_height: fixed frame height (192)
@@ -173,10 +173,27 @@ def create_webp_for_person(person, crops_cache, detections_data, webp_dir, frame
     """
     person_id = person['person_id']
     
-    # Get detection indices for this person
-    detection_indices = person.get('detection_indices', [])
-    if not hasattr(detection_indices, '__len__'):
-        detection_indices = []
+    # Get frame numbers for this person (from canonical grouping)
+    person_frame_numbers = person.get('frame_numbers', np.array([]))
+    if not hasattr(person_frame_numbers, '__len__'):
+        return False, f"No frames found for person {person_id}"
+    
+    if len(person_frame_numbers) == 0:
+        return False, f"No frames found for person {person_id}"
+    
+    # Build mapping from global frame number to detection indices
+    detections_frame_numbers = detections_data.get('frame_numbers', np.array([]))
+    frame_to_detection_idx = {int(fn): idx for idx, fn in enumerate(detections_frame_numbers)}
+    
+    # Find detection indices for this person's frames
+    detection_indices = []
+    for frame_num in person_frame_numbers:
+        frame_num = int(frame_num)
+        if frame_num in frame_to_detection_idx:
+            detection_indices.append(frame_to_detection_idx[frame_num])
+    
+    if len(detection_indices) == 0:
+        return False, f"No detection indices found for person {person_id}"
     
     # Apply adaptive offset to skip intro flicker
     # Skip first 20% of appearance, but at most 50 frames
@@ -193,16 +210,19 @@ def create_webp_for_person(person, crops_cache, detections_data, webp_dir, frame
     frames_written = 0
     frames_skipped = 0
     
-    # Get detections frame_numbers array for indexing
-    frame_numbers = detections_data.get('frame_numbers', np.array([]))
-    
     for detection_idx in detection_indices_to_use:
         detection_idx = int(detection_idx)
         
         # Get crop from crops_cache
-        crop = crops_cache.get('crops', {}).get(detection_idx)
+        # crops_cache is a dict with 'crops' key containing detection_idx -> crop mapping
+        crop = None
+        if isinstance(crops_cache, dict) and 'crops' in crops_cache:
+            crop = crops_cache['crops'].get(detection_idx)
+        elif isinstance(crops_cache, dict):
+            # Try direct indexing if 'crops' key doesn't exist
+            crop = crops_cache.get(detection_idx)
         
-        if crop is None or crop.size == 0:
+        if crop is None or (hasattr(crop, 'size') and crop.size == 0):
             frames_skipped += 1
             continue
         
