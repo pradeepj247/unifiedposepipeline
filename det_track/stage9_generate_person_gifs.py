@@ -290,11 +290,18 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
         person_id = person['person_id']
         det_inds = person.get('detection_indices', np.array([]))
         print(f"   Person {person_id}: {len(det_inds)} detection indices")
+        print(f"      Type: {type(det_inds)}, dtype: {det_inds.dtype}")
         print(f"      First 10: {det_inds[:10]}")
         print(f"      Last 10: {det_inds[-10:]}")
         print(f"      Min: {np.min(det_inds)}, Max: {np.max(det_inds)}")
         print(f"      -1 count: {np.sum(det_inds == -1)}")
         print(f"      Valid: {np.sum(det_inds >= 0)}")
+        
+        # Check if indices are in valid range
+        valid_range = np.sum((det_inds >= 0) & (det_inds < 8782))
+        print(f"      In range [0, 8782): {valid_range}")
+        if valid_range < len(det_inds):
+            print(f"      ⚠️  WARNING: Some indices out of range!")
     
     # Load detections for mapping
     print(f"📂 Loading detections...")
@@ -319,6 +326,10 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
     print(f"📊 Building detection index mapping...")
     num_detections_per_frame = det_data.get('num_detections_per_frame', np.array([]))
     
+    print(f"   num_detections_per_frame shape: {num_detections_per_frame.shape}")
+    print(f"   First 20 values: {num_detections_per_frame[:20]}")
+    print(f"   Sum: {np.sum(num_detections_per_frame)} (should equal {len(det_data['frame_numbers'])})")
+    
     detection_idx_to_frame_pos = {}
     detection_idx = 0
     for frame_idx, num_dets_in_frame in enumerate(num_detections_per_frame):
@@ -327,6 +338,12 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
             detection_idx += 1
     
     print(f"   ✅ Built mapping for {len(detection_idx_to_frame_pos)} detections")
+    print(f"   [DEBUG] Sample mappings:")
+    print(f"      detection 0 -> {detection_idx_to_frame_pos.get(0)}")
+    print(f"      detection 1 -> {detection_idx_to_frame_pos.get(1)}")
+    print(f"      detection 2 -> {detection_idx_to_frame_pos.get(2)}")
+    print(f"      detection 100 -> {detection_idx_to_frame_pos.get(100)}")
+    print(f"      detection 1000 -> {detection_idx_to_frame_pos.get(1000)}")
     
     # Create output directory
     webp_dir = Path(output_webp_dir) / 'webp'
