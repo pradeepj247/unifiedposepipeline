@@ -164,7 +164,7 @@ def create_webp_for_person(person, crops_cache, detections_data, webp_dir, frame
     Args:
         person: dict with 'person_id', 'frame_numbers' (video frame indices)
         crops_cache: dict from Stage 1 with crops indexed by detection_id
-        detections_data: detections_raw.npz data with frame_numbers array (global detection frame indices)
+        detections_data: detections_raw.npz data with frame_numbers array (detection's video frame index)
         webp_dir: output directory for WebPs
         frame_width: fixed frame width (128)
         frame_height: fixed frame height (192)
@@ -181,27 +181,29 @@ def create_webp_for_person(person, crops_cache, detections_data, webp_dir, frame
     if len(person_frame_numbers) == 0:
         return False, f"No frames found for person {person_id}"
     
-    # Build mapping from global frame number to detection indices
+    # Convert to set for O(1) lookup
+    person_frame_set = set(int(fn) for fn in person_frame_numbers)
+    
+    # Get all detections' frame numbers
     detections_frame_numbers = detections_data.get('frame_numbers', np.array([]))
-    frame_to_detection_idx = {int(fn): idx for idx, fn in enumerate(detections_frame_numbers)}
     
-    # Find detection indices for this person's frames
-    detection_indices = []
-    for frame_num in person_frame_numbers:
-        frame_num = int(frame_num)
-        if frame_num in frame_to_detection_idx:
-            detection_indices.append(frame_to_detection_idx[frame_num])
+    # Find ALL detection indices that belong to this person's frames
+    # This is better than dict mapping because multiple detections can be in same frame
+    detection_indices_for_person = []
+    for detection_idx, frame_num in enumerate(detections_frame_numbers):
+        if int(frame_num) in person_frame_set:
+            detection_indices_for_person.append(detection_idx)
     
-    if len(detection_indices) == 0:
+    if len(detection_indices_for_person) == 0:
         return False, f"No detection indices found for person {person_id}"
     
     # Apply adaptive offset to skip intro flicker
     # Skip first 20% of appearance, but at most 50 frames
-    offset = min(int(len(detection_indices) * 0.2), 50)
+    offset = min(int(len(detection_indices_for_person) * 0.2), 50)
     start_idx = offset
-    end_idx = min(start_idx + num_frames, len(detection_indices))
+    end_idx = min(start_idx + num_frames, len(detection_indices_for_person))
     
-    detection_indices_to_use = detection_indices[start_idx:end_idx]
+    detection_indices_to_use = detection_indices_for_person[start_idx:end_idx]
     
     # Prepare WebP filename
     webp_filename = webp_dir / f"person_{person_id:02d}.webp"
