@@ -174,6 +174,13 @@ def create_webp_for_person(person, crops_cache, detection_idx_to_frame_pos, webp
     if len(valid_indices) == 0:
         return False, f"All detection indices invalid for person {person_id}"
     
+    # DEBUG
+    if person_id in [3, 65]:  # Only for top 2 persons
+        print(f"\n      [DEBUG-P{person_id}] Total detection_indices: {len(detection_indices)}")
+        print(f"      [DEBUG-P{person_id}] Valid indices: {len(valid_indices)}")
+        print(f"      [DEBUG-P{person_id}] First 20 indices: {valid_indices[:20]}")
+        print(f"      [DEBUG-P{person_id}] Last 20 indices: {valid_indices[-20:]}")
+    
     # Apply adaptive offset to skip intro flicker
     # Skip first 20% of appearance, but at most 50 frames
     offset = min(int(len(valid_indices) * 0.2), 50)
@@ -189,19 +196,30 @@ def create_webp_for_person(person, crops_cache, detection_idx_to_frame_pos, webp
     frames_written = 0
     frames_skipped = 0
     
-    for detection_idx in indices_to_use:
+    for idx_in_sequence, detection_idx in enumerate(indices_to_use):
         # Convert global detection index to (frame_idx, position_in_frame)
         if detection_idx not in detection_idx_to_frame_pos:
             frames_skipped += 1
+            # Debug first few misses
+            if frames_skipped <= 3 and person_id in [3, 65]:
+                print(f"      [DEBUG-P{person_id}] Detection {detection_idx} not in mapping!")
             continue
         
         frame_idx, pos_in_frame = detection_idx_to_frame_pos[detection_idx]
+        
+        # Debug first few fetches
+        if idx_in_sequence < 5 and person_id in [3, 65]:
+            print(f"      [DEBUG-P{person_id}] Frame {idx_in_sequence}: det_idx={detection_idx} -> frame_idx={frame_idx}, pos={pos_in_frame}")
         
         # Get crop from crops_cache using (frame_idx, position_in_frame)
         # crops_cache structure: {frame_idx: {position_in_frame: crop_image}}
         crop = None
         if frame_idx in crops_cache and pos_in_frame in crops_cache[frame_idx]:
             crop = crops_cache[frame_idx][pos_in_frame]
+        else:
+            # Debug first few misses
+            if idx_in_sequence < 5 and person_id in [3, 65]:
+                print(f"      [DEBUG-P{person_id}] Frame {idx_in_sequence}: CACHE MISS - frame_idx {frame_idx} in cache: {frame_idx in crops_cache}, pos {pos_in_frame} in frame: {pos_in_frame in crops_cache.get(frame_idx, {})}")
         
         if crop is None or (hasattr(crop, 'size') and crop.size == 0):
             frames_skipped += 1
@@ -265,6 +283,18 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
         print(f"   Available keys: {persons[0].keys()}")
         print(f"   This may indicate Stage 2/4b have not been updated to store detection indices")
         return False
+    
+    # DEBUG: Check detection_indices values
+    print(f"\n   [DEBUG] Checking detection_indices in canonical persons:")
+    for rank, person in enumerate(persons[:3], 1):
+        person_id = person['person_id']
+        det_inds = person.get('detection_indices', np.array([]))
+        print(f"   Person {person_id}: {len(det_inds)} detection indices")
+        print(f"      First 10: {det_inds[:10]}")
+        print(f"      Last 10: {det_inds[-10:]}")
+        print(f"      Min: {np.min(det_inds)}, Max: {np.max(det_inds)}")
+        print(f"      -1 count: {np.sum(det_inds == -1)}")
+        print(f"      Valid: {np.sum(det_inds >= 0)}")
     
     # Load detections for mapping
     print(f"📂 Loading detections...")
