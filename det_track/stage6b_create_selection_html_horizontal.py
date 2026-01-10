@@ -401,6 +401,10 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
         frames = person['frame_numbers']
         num_frames = len(frames)
         
+        # Get start and end frames
+        start_frame = int(frames[0])
+        end_frame = int(frames[-1])
+        
         # Calculate % of video
         percent_video = (num_frames / video_duration_frames) * 100 if video_duration_frames > 0 else 0
         
@@ -441,6 +445,7 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
                     <div class="person-id">P{person_id}</div>
                     <div class="person-stats">
                         <div class="stat"><span>Frames:</span><span>{num_frames}</span></div>
+                        <div class="stat"><span>Range:</span><span>{start_frame}-{end_frame}</span></div>
                         <div class="stat"><span>Coverage:</span><span>{percent_video:.0f}%</span></div>
                     </div>
                 </div>
@@ -460,6 +465,7 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
                     <div class="person-id">P{person_id}</div>
                     <div class="person-stats">
                         <div class="stat"><span>Frames:</span><span>{num_frames}</span></div>
+                        <div class="stat"><span>Range:</span><span>{start_frame}-{end_frame}</span></div>
                         <div class="stat"><span>Coverage:</span><span>{percent_video:.0f}%</span></div>
                     </div>
                 </div>
