@@ -315,7 +315,7 @@ def main():
     
     # Load config
     config = load_config(args.config)
-    stage_config = config['stage6_create_output_video']
+    stage_config = config['stage9']
     
     # Get paths from config
     # Video path comes from global config (single source of truth)

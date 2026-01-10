@@ -158,7 +158,7 @@ def rank_persons_auto(persons, video_width, video_height, weights):
 def run_ranking(config):
     """Run Stage 5: Ranking"""
     
-    stage_config = config['stage5_rank']
+    stage_config = config['stage7']
     verbose = stage_config.get('advanced', {}).get('verbose', False)
     
     # Extract configuration
@@ -267,8 +267,8 @@ def main():
     config = load_config(args.config)
     
     # Check if stage is enabled
-    if not config['pipeline']['stages']['stage5_rank']:
-        print("⏭️  Stage 5 is disabled in config")
+    if not config['pipeline']['stages']['stage7']:
+        print("⏭️  Stage 7 is disabled in config")
         return
     
     # Run ranking
