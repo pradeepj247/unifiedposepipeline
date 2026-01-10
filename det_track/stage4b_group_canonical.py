@@ -362,8 +362,8 @@ def main():
     config = load_config(args.config)
     
     # Check if stage is enabled
-    if not config['pipeline']['stages']['stage4b_group_canonical']:
-        print("⏭️  Stage 4b is disabled in config")
+    if not config['pipeline']['stages']['stage5']:
+        print("⏭️  Stage 5 is disabled in config")
         return
     
     # Run grouping
