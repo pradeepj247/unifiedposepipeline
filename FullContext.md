@@ -1,841 +1,349 @@
-# Unified Pose Estimation Pipeline - Project Context
+# Unified Pose Estimation Pipeline - Algorithms & Data Formats Reference
 
-**Last Updated:** December 26, 2025
-
----
-
-## 1. Core Objective
-
-Build a **unified, configurable pose estimation pipeline** that integrates multiple 2D and 3D pose estimation methods under a consistent API. The pipeline enables easy switching between different backends while maintaining similar function calls and data formats.
-
-### Key Features:
-- **Multi-stage architecture**: Detection → 2D Pose → 3D Lifting → Visualization
-- **Model flexibility**: Switch between RTMPose, ViTPose, RTMPose-Halpe26, Wholebody
-- **Consistent outputs**: Standardized NPZ format across all models
-- **Integrated visualization**: Automatic video generation with skeleton overlays
+**Last Updated:** January 11, 2026  
+**Focus:** Core algorithms, data formats, and model specifications (framework-independent)
 
 ---
 
-## 2. Pipeline Architecture
+## 1. Detection & Tracking Overview
 
-### Stage 1: Object Detection (YOLOv8)
-**Purpose:** Detect persons in video frames and extract bounding boxes
+The pipeline includes a **multi-stage detection and tracking system** (11 configurable stages) for:
+- Person detection using YOLOv8
+- Multi-person tracking with ByteTrack offline tracking
+- Tracklet analysis and canonical person grouping
+- Person ranking and selection
+
+**For detailed implementation of the 11-stage detection & tracking pipeline:**
+- See: [det_track/PIPELINE_DESIGN.md](det_track/PIPELINE_DESIGN.md)
+- See: Individual stage scripts in `det_track/` folder
+- See: Configuration in [det_track/configs/pipeline_config.yaml](det_track/configs/pipeline_config.yaml)
+
+This document focuses on the **core algorithms** and **data formats** used throughout the pipeline.
+
+---
+
+## 2. 2D Pose Estimation & 3D Lifting
+
+### 2.1 2D Pose Estimation Models
+
+The pipeline supports four model families for estimating 2D human keypoints:
+
+#### RTMPose (Real-Time Multi-Person Pose Estimation)
+- **Format:** ONNX model
+- **Keypoints:** 17 (COCO body joints) or 26 (Halpe26 with feet)
+- **Input Size:** 288×384 or 256×192 (configurable)
+- **Backend:** ONNX Runtime
+- **Device:** GPU (CUDA) or CPU
+- **Speed:** ~48 FPS on T4 GPU (384×288 input)
+- **Strengths:** Fast inference, real-time capable, good accuracy
+- **Use Case:** Real-time applications, production deployments
+
+#### ViTPose (Vision Transformer Pose)
+- **Format:** PyTorch (.pth)
+- **Keypoints:** 17 (COCO body joints)
+- **Input Size:** 384×384 (fixed)
+- **Architecture:** Vision Transformer backbone
+- **Device:** GPU (CUDA) or CPU, auto-detects
+- **Speed:** ~39 FPS on T4 GPU
+- **Strengths:** Highest accuracy among body-only models, robust to occlusions
+- **Use Case:** High-precision applications, when accuracy matters more than speed
+
+#### RTMPose-Halpe26
+- **Format:** ONNX model
+- **Keypoints:** 26 (COCO-17 + 6 foot keypoints + 3 face keypoints)
+- **Input Size:** 288×384
+- **Strengths:** Includes foot keypoints for complete lower-body coverage
+- **Use Case:** Applications requiring foot tracking (sports, dance, physical analysis)
+
+#### RTMPose3D Wholebody
+- **Format:** ONNX model
+- **Keypoints:** 133 (COCO-WholeBody: body + face + hands)
+- **Output:** Both 2D and 3D coordinates simultaneously
+- **Input Size:** 288×384
+- **Strengths:** Single-model whole-body detection, includes hand/face details
+- **Use Case:** Full-body analysis, gesture recognition, detailed interaction understanding
+
+### 2.2 Model Comparison
+
+| Aspect | RTMPose | ViTPose | RTMPose-H26 | Wholebody |
+|--------|---------|---------|-------------|-----------|
+| **Keypoints** | 17 | 17 | 26 | 133 |
+| **Speed (FPS)** | 48 | 39 | ~45 | ~25 |
+| **Accuracy** | High | Highest | High | Medium |
+| **Feet Tracking** | ❌ | ❌ | ✅ | ✅ |
+| **Hand Tracking** | ❌ | ❌ | ❌ | ✅ |
+| **Face Landmarks** | ❌ | ❌ | Limited | ✅ |
+| **Backend** | ONNX | PyTorch | ONNX | ONNX |
+| **Inference Time** | ~21ms | ~26ms | ~22ms | ~40ms |
+
+### 2.3 3D Pose Lifting (MotionAGFormer)
+
+**Model:** MotionAGFormer (Motion Attention-based Graphical Former)
+
+**Purpose:** Lift 2D keypoints to 3D using temporal context
 
 **Input:**
-- Video file (e.g., `demo_data/videos/dance.mp4`)
-
-**Output:**
-- `demo_data/outputs/detections.npz`
-  - Keys: `frame_numbers`, `bboxes`
-  - Format: `bboxes` shape `(N_frames, 4)` → `[x1, y1, x2, y2]`
-
-**Script:** `udp_video.py` → `stage1_detect_yolo()`
-
----
-
-### Stage 2: 2D Pose Estimation
-
-**Purpose:** Estimate 2D keypoints from detected person crops
-
-#### Model Options (Configurable via `configs/udp_video.yaml`):
-
-| Model Name | Keypoints | Output File Pattern | Description |
-|------------|-----------|---------------------|-------------|
-| `rtmpose` | 17 (COCO) | `kps_2d_rtm.npz` | Standard COCO body joints |
-| `rtmpose_h26` | 26 (Halpe26) | `kps_2d_halpe26.npz` | COCO + foot keypoints |
-| `vitpose` | 17 (COCO) | `kps_2d_vit.npz` | ViTPose detector |
-| `wholebody` | 133 (COCO-WholeBody) | `kps_2d_wholebody.npz` + `kps_3d_wholebody.npz` | Body + face + hands + 3D |
-
-**Input:**
-- Video file
-- `detections.npz` (from Stage 1)
-
-**Output (2D):**
-- NPZ file with keys:
-  - `frame_numbers`: `(N_frames,)` array
-  - `keypoints`: `(N_frames, N_joints, 2)` array (x, y coordinates)
-  - `scores`: `(N_frames, N_joints)` confidence scores
-  - `joint_format`: JSON filename describing keypoint semantics
-  - `model_type`: String identifier (e.g., `"rtmpose"`, `"wholebody"`)
-
-**Output (3D - Wholebody only):**
-- `kps_3d_wholebody.npz`
-  - `keypoints_3d`: `(N_frames, 133, 3)` array (x, y, z coordinates)
-  - Same metadata structure as 2D
-
-**Script:** `udp_video.py` → `stage2_estimate_poses_*()`
-
----
-
-### Stage 3: 3D Pose Lifting (MotionAGFormer)
-
-**Purpose:** Lift 2D keypoints to 3D using temporal model
-
-**Model:** MotionAGFormer (MAGF)
+- 2D keypoints in H36M-17 format (17 joints, 2D coordinates)
 - Temporal window: 243 frames
-- Uses past/future context for smoothing
-- Trained on Human3.6M dataset
-
-**Input:**
-- 2D keypoints NPZ (17 joints in H36M format after conversion)
-- Video metadata (width, height)
 
 **Output:**
-- `kps_3d_magf.npz`
-  - `poses_3d`: `(N_frames, 17, 3)` array in H36M-17 format
-  - Normalized coordinates (root-centered)
+- 3D keypoints in H36M-17 format (17 joints, 3D coordinates)
+- Root-centered normalization (pelvis at origin)
 
-**Script:** `udp_3d_lifting.py` or integrated in `udp_video.py`
+**Algorithm Details:**
+- **Temporal Processing:** Uses 243-frame window with past/future context
+- **Architecture:** Graph-based attention mechanism with motion modeling
+- **Training:** Human3.6M dataset
+- **Test-Time Augmentation:** Horizontal flip averaging for robustness
 
-**Conversion Pipeline:**
-1. COCO-17 → H36M-17 format conversion
-2. Screen coordinate normalization
-3. Temporal resampling (to 243 frames if needed)
-4. Model inference with test-time augmentation (horizontal flip)
-5. Camera rotation applied for proper orientation
+**Processing Pipeline:**
+1. **Format Conversion:** COCO-17 → H36M-17 format mapping
+2. **Screen Normalization:** Convert pixel coordinates to normalized space
+3. **Temporal Resampling:** Interpolate/extrapolate to 243-frame window if needed
+4. **Model Inference:** Graph-based temporal lifting with attention
+5. **Post-Processing:** Apply camera rotation matrix for proper orientation
+
+**Key Features:**
+- Smooth temporal consistency (exploits motion patterns)
+- Handles occlusions via temporal interpolation
+- Normalizes output to unit scale (root-centered at pelvis)
+- Bidirectional temporal modeling (uses future frames)
 
 ---
 
 ## 3. Joint Format Specifications
 
-### 3.1 COCO-17 Format
-**Used by:** `rtmpose`, `vitpose`
+### 3.1 COCO-17 (OpenPose Convention)
 
-**JSON:** `demo_data/joint_formats/coco17_2d.json`
+**Structure:** 17 joints, hierarchical skeleton
 
+| ID | Joint Name | Parent | Description |
+|:--:|-----------|--------|-------------|
+| 0 | Nose | - | Face center |
+| 1 | Left Eye | Nose | Eye region |
+| 2 | Right Eye | Nose | Eye region |
+| 3 | Left Ear | Left Eye | Ear region |
+| 4 | Right Ear | Right Eye | Ear region |
+| 5 | Left Shoulder | - | Upper limb |
+| 6 | Right Shoulder | - | Upper limb |
+| 7 | Left Elbow | Left Shoulder | Arm joint |
+| 8 | Right Elbow | Right Shoulder | Arm joint |
+| 9 | Left Wrist | Left Elbow | Hand joint |
+| 10 | Right Wrist | Right Elbow | Hand joint |
+| 11 | Left Hip | - | Torso-leg junction |
+| 12 | Right Hip | - | Torso-leg junction |
+| 13 | Left Knee | Left Hip | Leg joint |
+| 14 | Right Knee | Right Hip | Leg joint |
+| 15 | Left Ankle | Left Knee | Foot joint |
+| 16 | Right Ankle | Right Knee | Foot joint |
+
+**Skeleton Edges (16 connections):**
 ```
-0: nose, 1: left_eye, 2: right_eye, 3: left_ear, 4: right_ear,
-5: left_shoulder, 6: right_shoulder, 7: left_elbow, 8: right_elbow,
-9: left_wrist, 10: right_wrist, 11: left_hip, 12: right_hip,
-13: left_knee, 14: right_knee, 15: left_ankle, 16: right_ankle
+COCO_EDGES = [
+    (0, 1), (0, 2), (1, 3), (2, 4),           # Head
+    (5, 6), (5, 7), (7, 9), (6, 8), (8, 10), # Arms
+    (5, 11), (6, 12), (11, 12),               # Torso
+    (11, 13), (13, 15), (12, 14), (14, 16)    # Legs
+]
 ```
+
+**Usage:** RTMPose (17-kpt variant), ViTPose standard output
+
+---
 
 ### 3.2 Halpe26 Format
-**Used by:** `rtmpose_h26`
 
-**JSON:** `demo_data/joint_formats/halpe26_2d.json`
+**Structure:** COCO-17 + 9 additional keypoints (including feet)
 
-COCO-17 + 6 foot keypoints + 3 face keypoints = 26 total
+| ID | Joint Name | Parent | Notes |
+|:--:|-----------|--------|-------|
+| 0-16 | COCO joints | - | Same as COCO-17 |
+| 17 | Neck | - | Midpoint between shoulders |
+| 18-19 | Head top, Head bottom | - | Additional head landmarks |
+| 20-22 | Left foot (3 points) | Left Ankle | Foot structure |
+| 23-25 | Right foot (3 points) | Right Ankle | Foot structure |
 
-### 3.3 COCO-WholeBody-133 Format
-**Used by:** `wholebody`
+**Skeleton Edges (32 connections):** Extends COCO edges with foot tracking
 
-**JSON:** `demo_data/joint_formats/dwpose133_2d.json`, `dwpose133_3d.json`
+**Usage:** RTMPose-Halpe26 model
 
-```
-Joints 0-16:   COCO-17 body (17 keypoints)
-Joints 17-22:  Foot (6 keypoints)
-Joints 23-90:  Face landmarks (68 keypoints)
-Joints 91-111: Left hand (21 keypoints)
-Joints 112-132: Right hand (21 keypoints)
-Total: 133 keypoints
-```
+---
 
-### 3.4 H36M-17 Format
-**Used by:** MotionAGFormer 3D output
+### 3.3 H36M-17 Format
 
-**JSON:** `demo_data/joint_formats/h36m17_3d.json`
+**Structure:** 17 joints, different naming convention (Human3.6M protocol)
 
-```
-0: Hip (pelvis center), 1: RHip, 2: RKnee, 3: RAnkle,
-4: LHip, 5: LKnee, 6: LAnkle, 7: Spine, 8: Thorax,
-9: Nose, 10: Head, 11: LShoulder, 12: LElbow, 13: LWrist,
-14: RShoulder, 15: RElbow, 16: RWrist
-```
+| ID | Joint Name | H36M ID |
+|:--:|-----------|---------|
+| 0 | Pelvis (root) | Hip/Pelvis center |
+| 1 | Right Hip | 1 |
+| 2 | Right Knee | 2 |
+| 3 | Right Ankle | 3 |
+| 4 | Left Hip | 4 |
+| 5 | Left Knee | 5 |
+| 6 | Left Ankle | 6 |
+| 7 | Spine | 7 (mid-body) |
+| 8 | Thorax | 8 (chest) |
+| 9 | Neck/Nose | 9 |
+| 10 | Head | 10 |
+| 11 | Left Shoulder | 11 |
+| 12 | Left Elbow | 12 |
+| 13 | Left Wrist | 13 |
+| 14 | Right Shoulder | 14 |
+| 15 | Right Elbow | 15 |
+| 16 | Right Wrist | 16 |
 
 **Key Differences from COCO:**
-- Joint 0 (Hip): Computed as midpoint of left/right hips
-- Joint 7 (Spine): Computed between hips and shoulders
-- Joint 8 (Thorax): Computed from shoulder center
-- Joint 10 (Head): Approximated from nose + upward offset
+- Pelvis-centered (ID 0)
+- More torso joints (7, 8, 9 represent spine/chest/neck)
+- No separate eyes/ears
+- Standard for 3D lifting models (MotionAGFormer)
+
+**Conversion:** COCO → H36M requires joint remapping (ID transformation)
+
+---
+
+### 3.4 COCO-WholeBody-133
+
+**Structure:** 17 body + 68 face + 21 left hand + 21 right hand + 6 foot = 133 total
+
+| Region | Count | IDs | Description |
+|--------|-------|-----|-------------|
+| Body | 17 | 0-16 | COCO-17 joints |
+| Left Hand | 21 | 17-37 | Finger keypoints |
+| Right Hand | 21 | 38-58 | Finger keypoints |
+| Face | 68 | 59-126 | Dense face landmarks |
+| Feet | 6 | 127-132 | Extended foot coverage |
+
+**Usage:** RTMPose3D Wholebody model (simultaneous 2D + 3D output)
 
 ---
 
 ## 4. Visualization System
 
-### 4.1 2D Visualization
-**Script:** `udp_video.py` → `stage3_visualize()`
+### 4.1 2D Skeleton Rendering
 
-**Logic:**
-- Loads video + 2D keypoints NPZ
-- Draws skeleton connections based on joint format JSON
-- Color coding: Green for left side, blue for right side
-- Outputs annotated video: `demo_data/outputs/result_2D.mp4`
+**Color Scheme:** Rainbow HSV gradient applied to skeleton edges
+- Automatic color assignment: `get_edge_colors(num_edges)` function
+- HSV space → RGB conversion ensures perceptual uniformity
+- Different color palettes for different skeleton types:
+  - COCO-17: 16 edge colors
+  - Halpe26: 32 edge colors
+  - WholeBody: 50+ edge colors
 
-**Auto-detection:** Determines COCO-17 vs Halpe26 vs Wholebody based on keypoint count
+**Rendering Pipeline:**
+1. Extract bounding box region from frame
+2. Draw pose skeleton (line segments between joints)
+3. Draw joint circles (configurable radius based on confidence)
+4. Apply alpha blending for semi-transparency
+5. Overlay on original frame
 
-### 4.2 3D Visualization (Wholebody)
-**Script:** `udp_video.py` → `stage3_visualize_3d()`
+**Frame Types:**
+- **Single-person mode:** One skeleton per frame
+- **Multi-person mode:** Multiple skeletons (person_id → unique color)
+- **2D+3D overlay:** 2D skeleton + projected 3D pose
 
-**Layout:** Side-by-side 2-panel video
-- **Left panel:** Original frame + 2D keypoints overlay
-- **Right panel:** 3D matplotlib skeleton (rotating view)
+### 4.2 3D Rendering
 
-**Output:** `demo_data/outputs/result_wb_2D3D.mp4`
+**Output:** GIF or MP4 with rotating 3D skeleton
+- Matplotlib 3D plotting with rotation animation
+- Automatic axis scaling to frame dimensions
+- View angle: Gradually rotates 0° → 360°
+- Frame rate: 30 FPS (configurable)
 
-**Technical Details:**
-- Uses matplotlib 3D projection
-- Camera rotation: Quaternion `[0.1407, -0.1500, -0.7552, 0.6223]`
-- Root-centered at pelvis (joint 0)
-- Normalized to unit scale
-
-### 4.3 Standalone 3D Visualization Tool
-**Script:** `vis_wb3d.py`
-
-**Purpose:** Visualize pre-computed 3D keypoints with frame-by-frame inspection
-
-**Usage:**
-```bash
-python vis_wb3d.py \
-    --video demo_data/videos/dance.mp4 \
-    --kps2d demo_data/outputs/kps_2d_wholebody.npz \
-    --kps3d demo_data/outputs/kps_3d_wholebody.npz \
-    --output demo_data/outputs/debug_wb3d.mp4 \
-    --max-frames 120
-```
-
-**Features:**
-- 2-panel layout: 2D skeleton (left) + 3D skeleton (right)
-- No PNG debug output (removed)
-- Minimal logging
-- Fixed keypoint loading: Uses correct keys (`keypoints` for 2D, `keypoints_3d` for 3D)
+**Coordinate System:**
+- X: Left-right
+- Y: Up-down
+- Z: Depth (forward-backward)
+- Origin: Pelvis (root joint)
 
 ---
 
-## 5. Configuration System
+## 5. NPZ File Format Reference
 
-### Main Config: `configs/udp_video.yaml`
+### 5.1 Detections NPZ (`detections_raw.npz`)
 
-**Structure:**
-```yaml
-video:
-  input_path: demo_data/videos/dance.mp4
-  max_frames: 120
+**Keys:**
+- `frame_numbers`: `int64 (N,)` — frame index for each detection
+- `bboxes`: `int64 (N, 4)` — bounding boxes `[x1, y1, x2, y2]`
+- `confidences`: `float32 (N,)` — detection confidence scores
+- `classes`: `int64 (N,)` — class IDs (0 = person)
 
-detection:
-  model_path: models/yolo/yolov8x.pt
-  confidence: 0.3
-  device: cuda
+**Guarantee:** One row per detection, multiple detections per frame possible
 
-pose_estimation:
-  method: rtmpose  # Options: rtmpose, vitpose, rtmpose_h26, wholebody
-  
-  rtmpose:
-    pose_model_path: models/rtmlib/rtmpose-l-coco-384x288.onnx
-    pose_input_size: [288, 384]
-    backend: onnxruntime
-    device: cuda
-  
-  rtmpose_h26:
-    pose_model_path: models/rtmlib/rtmpose-l-halpe26-384x288.onnx
-    pose_input_size: [288, 384]
-    backend: onnxruntime
-    device: cuda
-  
-  vitpose:
-    model_path: models/vitpose/vitpose-b.pth
-    model_name: b
-    dataset: coco
-    device: cuda
-  
-  wholebody:
-    pose_model_path: models/wb3d/rtmw3d-l.onnx
-    pose_input_size: [288, 384]
-    backend: onnxruntime
-    device: cuda
-
-output:
-  stage1_detections: demo_data/outputs/detections.npz
-  stage2_keypoints_2d: demo_data/outputs/keypoints_2D.npz
-  stage2_keypoints_3d: demo_data/outputs/keypoints_3D.npz  # Only for wholebody
-  video_output_2d: demo_data/outputs/result_2D.mp4
-  video_output_3d: demo_data/outputs/result_3D.mp4  # Only for wholebody
-  plot: true  # Set to false to skip visualization stage
-```
-
----
-
-## 6. Key Scripts and Their Roles
-
-### 6.1 Main Pipeline Scripts
-
-| Script | Purpose | Key Functions |
-|--------|---------|---------------|
-| `udp_video.py` | Main unified pipeline | `stage1_detect_yolo()`, `stage2_estimate_poses_*()`, `stage3_visualize()` |
-| `udp_3d_lifting.py` | Standalone 3D lifting | Converts 2D keypoints → 3D using MAGF |
-| `vis_wb3d.py` | Wholebody visualization tool | 2-panel video with 2D+3D skeletons |
-| `run_detector.py` | Standalone detector/tracker | Detection with YOLO/RTMDet, optional tracking |
-
-### 6.1.1 Standalone Detector (`run_detector.py`)
-
-**Purpose:** Modular detection and tracking script that can be used independently or as part of the pipeline.
-
-**Configuration:** `configs/detector.yaml`
-
-**Key Features:**
-- **Detector Support:** YOLOv8, RTMDet (planned)
-- **Tracking Support:** BoT-SORT, DeepOCSORT, ByteTrack, StrongSORT, OCSORT (planned)
-- **ReID Support:** OSNet-based re-identification (planned)
-- **Modes:**
-  - Detection only (default): Selects largest bbox per frame
-  - Tracking: Multi-object tracking across frames (future)
-
-**Usage:**
-```bash
-python run_detector.py --config configs/detector.yaml
-```
-
-**Output:** Same format as `udp_video.py` Stage 1 (`detections.npz`)
-
-### 6.2 Recent Bug Fixes
-
-**Issue 1: vis_wb3d.py KeyError** ✅ Fixed (Dec 24)
-- **Problem:** Loading 3D keypoints with wrong key name
-- **Fix:** Changed from `keypoints` → `keypoints_3d` on line 311
-- **Commit:** c197c63
-
-**Issue 2: Output Clutter in vis_wb3d.py** ✅ Fixed (Dec 24)
-- **Changes:**
-  - Removed PNG debug output (`debug_wb3d_001.png`)
-  - Simplified title: "3D Skeleton" (removed frame number from 3D panel)
-  - Reduced verbose logging (debug=False)
-- **Commit:** c197c63
-
-**Issue 3: Model Naming Inconsistency** ✅ Fixed (Dec 24)
-- **Problem:** Inconsistent naming (`rtmpose_halpe26`, `wb3d`)
-- **Solution:** Renamed throughout codebase:
-  - `rtmpose_halpe26` → `rtmpose_h26`
-  - `wb3d` → `wholebody`
-- **Impact:** Output files now named `kps_2d_wholebody.npz`, `kps_3d_wholebody.npz`
-- **Commit:** a60b59b
-
----
-
-## 7. Directory Structure
-
-```
-unifiedposepipeline/
-├── configs/
-│   └── udp_video.yaml           # Main configuration
-├── demo_data/
-│   ├── videos/
-│   │   └── dance.mp4            # Input video
-│   ├── images/
-│   │   └── sample.jpg           # Input image (for testing)
-│   ├── outputs/                 # All generated outputs
-│   │   ├── detections.npz
-│   │   ├── kps_2d_rtm.npz
-│   │   ├── kps_2d_wholebody.npz
-│   │   ├── kps_3d_wholebody.npz
-│   │   ├── kps_3d_magf.npz
-│   │   ├── result_2D.mp4
-│   │   └── result_wb_2D3D.mp4
-│   └── joint_formats/           # Joint semantic definitions
-│       ├── coco17_2d.json
-│       ├── halpe26_2d.json
-│       ├── dwpose133_2d.json
-│       ├── dwpose133_3d.json
-│       └── h36m17_3d.json
-├── models/                      # Downloaded model weights
-│   ├── yolo/
-│   ├── rtmlib/
-│   ├── vitpose/
-│   ├── wb3d/
-│   └── motionagformer/
-├── lib/                         # Library code
-│   └── motionagformer/          # MotionAGFormer model code
-├── snippets/                    # Debug/analysis scripts (not in repo)
-├── udp_video.py                 # Main pipeline
-├── udp_3d_lifting.py            # 3D lifting script
-├── vis_wb3d.py                  # Wholebody visualization
-└── README.md
-```
-
----
-
-## 8. Google Colab Environment
-
-**Paths:**
-- Root: `/content/`
-- Models: `/content/models/`
-- Code: `/content/unifiedposepipeline/`
-- Demo data: `/content/unifiedposepipeline/demo_data/`
-
-**Input Defaults:**
-- Video: `/content/unifiedposepipeline/demo_data/videos/dance.mp4`
-- Image: `/content/unifiedposepipeline/demo_data/images/sample.jpg`
-
-**Output Location:**
-- `/content/unifiedposepipeline/demo_data/outputs/`
-
----
-
-## 9. NPZ File Key Reference
-
-### Detection Output (`detections.npz`)
+**Example:**
 ```python
-{
-    'frame_numbers': np.array(shape=(N,), dtype=int64),
-    'bboxes': np.array(shape=(N, 4), dtype=int64)  # [x1, y1, x2, y2]
-}
+import numpy as np
+data = np.load('detections_raw.npz')
+frame_0_detections = data['bboxes'][data['frame_numbers'] == 0]  # All detections in frame 0
 ```
 
-### 2D Keypoints Output
+### 5.2 Keypoints NPZ (2D/3D Pose)
+
+**Keys:**
+- `keypoints`: `float32 (N_frames, N_persons, N_joints, 2)` or `(N, N, N, 3)` for 3D
+- `scores`: `float32 (N_frames, N_persons, N_joints)` — confidence per joint
+- `frame_numbers`: `int64 (N_frames,)` — frame indices
+- `joint_format`: `str` — joint naming convention (COCO, Halpe26, H36M, etc.)
+- `model_type`: `str` — model identifier (rtmpose, vitpose, wholebody, etc.)
+
+**Guarantee:** One row per frame (no repeated frames)
+
+**Access Pattern:**
 ```python
-{
-    'frame_numbers': np.array(shape=(N,), dtype=int),
-    'keypoints': np.array(shape=(N, J, 2), dtype=float),  # J = 17/26/133
-    'scores': np.array(shape=(N, J), dtype=float),
-    'joint_format': str,  # e.g., "coco17_2d.json"
-    'model_type': str     # e.g., "rtmpose", "wholebody"
-}
+kps = np.load('keypoints.npz')
+frame_5_pose = kps['keypoints'][5]  # Shape: (N_persons, N_joints, 2)
+frame_5_confidence = kps['scores'][5]  # Shape: (N_persons, N_joints)
 ```
 
-### 3D Keypoints Output (Wholebody)
+### 5.3 Tracklets NPZ (`tracklets_raw.npz`)
+
+**Structure:** List of tracklet dictionaries
+
+**Keys (per tracklet):**
+- `tracklet_id`: `int` — unique identifier
+- `frame_numbers`: `int64 (M,)` — frames this tracklet appears in
+- `bboxes`: `int64 (M, 4)` — bounding boxes for each frame
+- `confidences`: `float32 (M,)` — detection confidences
+
+**Format:**
 ```python
-{
-    'frame_numbers': np.array(shape=(N,), dtype=int),
-    'keypoints_3d': np.array(shape=(N, 133, 3), dtype=float),  # Note: keypoints_3d!
-    'scores': np.array(shape=(N, 133), dtype=float),
-    'joint_format': str,  # "dwpose133_3d.json"
-    'model_type': str     # "wholebody"
-}
+tracklets_data = np.load('tracklets_raw.npz')
+tracklets_list = tracklets_data['tracklets'].tolist()  # Decode object array
+for tracklet in tracklets_list:
+    print(f"ID {tracklet['tracklet_id']}: frames {tracklet['frame_numbers']}")
 ```
 
-### 3D Lifted Output (MotionAGFormer)
-```python
-{
-    'poses_3d': np.array(shape=(N, 17, 3), dtype=float),  # H36M-17 format
-    # Additional metadata may be present
-}
-```
+### 5.4 Canonical Persons NPZ (`canonical_persons.npz`)
+
+**Structure:** Aggregated persons from merged tracklets
+
+**Keys (per person):**
+- `person_id`: `int` — canonical person identifier
+- `tracklet_ids`: `list[int]` — which tracklets were merged
+- `frame_numbers`: `int64 (M,)` — all frames this person appears in
+- `bboxes`: `int64 (M, 4)` — continuous trajectory
+- `confidences`: `float32 (M,)` — confidence scores
+
+**Guarantee:** Person appears continuously across merged tracklets
 
 ---
 
-## 10. Recent Work Summary (Last 200 Messages)
+## 6. Data Flow & Integration
 
-### Phase 1: WB3D Skeleton Visualization Issues
-- **Problem:** MotionAGFormer normalization caused head clipping
-- **Solution:** Changed from `np.max(np.abs())` → `np.max()` and implemented adaptive Z-limits
-- **Files Modified:** Normalization logic in 3D visualization
+### Overall Pipeline Sequence:
 
-### Phase 2: vis_wb3d.py Runtime Error
-- **Problem:** `KeyError: 'keypoints is not a file in the archive'`
-- **Root Cause:** 2D file uses key `keypoints`, 3D file uses `keypoints_3d`
-- **Solution:** Fixed line 311 in `vis_wb3d.py`
+1. **Detection (Stage 1):** Video → YOLOv8 → `detections_raw.npz`
+2. **Pose Estimation (Stage 2):** Detections → RTMPose/ViTPose/Wholebody → `keypoints_*.npz`
+3. **3D Lifting (Stage 3):** 2D Keypoints → MotionAGFormer → `keypoints_3d.npz`
+4. **Visualization:** Keypoints → Skeleton rendering → Video/GIF output
 
-### Phase 3: Output Cleanup
-- **User Request:** Remove PNG output, simplify title, reduce logging
-- **Changes Applied:**
-  1. Removed PNG save logic (debug_wb3d_001.png)
-  2. Changed title from "WB3D Skeleton (Frame X)" → "3D Skeleton"
-  3. Set debug=False for all frames
-  4. Simplified success messages
+### Cross-Format Compatibility:
 
-### Phase 4: Model Naming Refactor (Current)
-- **Motivation:** Improve naming clarity and consistency
-- **Changes:**
-  - `rtmpose_halpe26` → `rtmpose_h26` (shorter, consistent)
-  - `wb3d` → `wholebody` (descriptive, clear)
-- **Scope:** Updated both `configs/udp_video.yaml` and `udp_video.py`
-- **Impact:** Output file names changed, config files need updating
-
-### All Changes Committed to GitHub ✅
-- Commit c197c63: vis_wb3d.py fixes
-- Commit a60b59b: Model naming refactor
+- **COCO ↔ H36M conversion:** Required for MotionAGFormer (expects H36M-17 input)
+- **Multiple backends:** Select via config, output format standardized
+- **Frame indexing:** All stages use consistent frame numbering for frame-by-frame alignment
 
 ---
 
-## 11. Development Workflow
-
-### Running the Pipeline (Colab)
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run standalone detector (new modular approach)
-python run_detector.py --config configs/detector.yaml
-
-# Run full pipeline
-python udp_video.py --config configs/udp_video.yaml
-
-# Run 3D lifting only (after Stage 2)
-python udp_3d_lifting.py \
-    --keypoints demo_data/outputs/kps_2d_rtm.npz \
-    --video demo_data/videos/dance.mp4 \
-    --output demo_data/outputs/kps_3d_magf.npz \
-    --max-frames 360
-
-# Visualize wholebody 3D
-python vis_wb3d.py \
-    --video demo_data/videos/dance.mp4 \
-    --kps2d demo_data/outputs/kps_2d_wholebody.npz \
-    --kps3d demo_data/outputs/kps_3d_wholebody.npz \
-    --output demo_data/outputs/debug_wb3d.mp4 \
-    --max-frames 120
-```
-
-### Switching Models
-Edit `configs/udp_video.yaml`:
-```yaml
-pose_estimation:
-  method: wholebody  # Change to: rtmpose, vitpose, rtmpose_h26, or wholebody
-```
-
----
-
-## 12. Major Refactoring (December 2025)
-
-### 12.1 Setup Script Modularization
-
-**Problem:** `setup_unified.py` was a monolithic 602-line script that was difficult to maintain, debug, and iterate on.
-
-**Solution:** Split into 6 modular scripts with clear separation of concerns:
-
-| Script | Lines | Purpose |
-|--------|-------|---------|
-| `setup_utils.py` | 161 | Shared utility functions (environment detection, logging, command execution) |
-| `step1_install_libs_deps.py` | 187 | Steps 0-7: Install all Python packages, create directories |
-| `step2_install_models.py` | 225 | Step 8: Download all model weights with Drive backup support |
-| `step3_pull_demodata.py` | 96 | Step 9: Copy demo videos and images from Google Drive |
-| `step4_verify_envt.py` | 248 | Step 10: Comprehensive environment verification with optional tests |
-| `setup_all.py` | 160 | Master orchestrator with CLI flags (`--skip-models`, `--skip-data`, etc.) |
-| `setup_unified.py` | 142 | Legacy wrapper with deprecation notice (backward compatibility) |
-
-**Key Improvements:**
-- Each script is self-contained and can be run independently
-- Clearer error messages and progress tracking
-- Easier to debug individual setup stages
-- Command-line flags for flexible execution
-- Backward compatibility maintained via wrapper
-
-**Demo Data Updates:**
-- Changed source: `/content/drive/MyDrive/` → `/content/drive/MyDrive/samplevideos/`
-- Expanded from 2 to 5 videos: `campus_walk.mp4`, `dance.mp4`, `kohli_nets.mp4`, `practice1.mp4`, `practice2.mp4`
-- Improved error handling (single warning instead of repetitive messages)
-
-**Commit:** f505ecd (December 26, 2025)
-
----
-
-### 12.2 Pipeline Modularization: Detection & Tracking
-
-**Original Design:**
-- `udp_video.py`: Monolithic script handling detection → 2D pose → visualization in one run
-- Tight coupling between stages made debugging difficult
-- No support for multi-person scenarios or person selection
-
-**New Modular Design:**
-
-#### Stage 1A: Detection with Tracking (`run_detector_tracking.py`)
-
-**Purpose:** Detect and track multiple people across video frames
-
-**Configuration:** `configs/detector_tracking.yaml` or `configs/detector_tracking_benchmark.yaml`
-
-**Key Features:**
-- **Detector Options:** YOLOv8 (small/medium/large/x)
-- **Tracker Options:** BoT-SORT, DeepOCSORT, ByteTrack, StrongSORT, OCSORT (5 trackers available)
-- **ReID Integration:** OSNet x1.0 MSMT17 model for person re-identification
-- **Output Modes:**
-  - `raw_detections.npz`: All tracked persons with IDs (multi-person data)
-  - `detections.npz`: Single-person detections (after manual selection)
-
-**Performance:** Achieved 67.5 FPS on dance.mp4 (yolov8s + BoT-SORT + ReID)
-
-**Output Format (raw_detections.npz):**
-```python
-{
-    'frame_numbers': np.array(shape=(N,), dtype=int),
-    'all_detections': list of dicts [
-        {
-            'bbox': [x1, y1, x2, y2],
-            'track_id': int,
-            'confidence': float,
-            'class_id': int
-        },
-        ...
-    ]
-}
-```
-
-#### Stage 1B: Person Selection (`select_person.py`)
-
-**Purpose:** Interactive tool to select which person to track from multi-person detections
-
-**Usage:**
-```bash
-python select_person.py \
-    --input demo_data/outputs/raw_detections.npz \
-    --video demo_data/videos/dance.mp4 \
-    --output demo_data/outputs/detections.npz
-```
-
-**Features:**
-- Displays first frame with all tracked persons labeled by ID
-- User selects person ID interactively
-- Extracts single-person trajectory for downstream processing
-- Handles occlusions and track ID consistency
-
-**Two-Step Workflow:**
-1. **Run detection/tracking:** Generate `raw_detections.npz` with all persons
-2. **Select person:** Use `select_person.py` to create `detections.npz` for target person
-
-**Benefits:**
-- Supports multi-person videos
-- User control over which person to analyze
-- Maintains tracking consistency across frames
-- Enables re-processing without re-running detection
-
----
-
-#### Stage 2: Modular 2D Pose Estimation
-
-**Changes:**
-- Separated 2D pose estimation from visualization
-- Now produces NPZ output only (no automatic video generation)
-- Visualization moved to separate scripts
-- Reads `detections.npz` from Stage 1 (single-person trajectory)
-
-**Decoupled Scripts:**
-- `udp_video.py`: Stage 1 (detection) + Stage 2 (2D pose) only
-- `vis_wb3d.py`: Standalone visualization for wholebody 3D results
-- Future: Separate visualization scripts for each model type
-
-**Benefits:**
-- Faster iteration (skip visualization when testing models)
-- Easier debugging of pose estimation quality
-- Flexible visualization options
-- Reduced memory usage during inference
-
----
-
-### 12.3 Tracking Integration Details
-
-**New Models Downloaded:**
-- **ReID Model:** `osnet_x1_0_msmt17.pt` (~25 MB)
-  - Appearance-based person re-identification
-  - Used by BoT-SORT, DeepOCSORT, StrongSORT trackers
-  - Improves tracking across occlusions
-
-**BoxMOT Integration:**
-- Installed via `pip install boxmot`
-- Added to `step1_install_libs_deps.py`
-- ReID model download automated in `step2_install_models.py`
-- Model stored in `/content/models/reid/` (Colab) or `models/reid/` (local)
-
-**Tracker Configuration:**
-```yaml
-tracking:
-  enabled: true
-  tracker_type: botsort  # Options: botsort, deepocsort, bytetrack, strongsort, ocsort
-  reid_model: models/reid/osnet_x1_0_msmt17.pt
-  confidence_threshold: 0.3
-  iou_threshold: 0.7
-  max_age: 30  # Frames to keep lost tracks
-```
-
-**Case Sensitivity Fixes:**
-- Fixed tracker name matching: `botsort` → `BoTSORT`, `deepocsort` → `DeepOCSORT`
-- Fixed ReID model path resolution on case-sensitive filesystems
-- Added validation for model paths
-
----
-
-### 12.4 Pipeline Workflow Evolution
-
-**Before (Monolithic):**
-```
-udp_video.py [video.mp4]
-  ↓
-  Stage 1: YOLO detection (single person, largest bbox)
-  ↓
-  Stage 2: 2D pose estimation
-  ↓
-  Stage 3: Visualization (always runs)
-  ↓
-Output: detections.npz, kps_2d_*.npz, result_2D.mp4
-```
-
-**After (Modular, Multi-Person):**
-```
-run_detector_tracking.py [video.mp4]
-  ↓
-  Stage 1A: YOLO detection + BoxMOT tracking (multi-person)
-  ↓
-Output: raw_detections.npz (all persons with track IDs)
-
-select_person.py [raw_detections.npz] [video.mp4]
-  ↓
-  Stage 1B: User selects person ID
-  ↓
-Output: detections.npz (single person trajectory)
-
-udp_video.py [detections.npz] [video.mp4]
-  ↓
-  Stage 2: 2D pose estimation (reads detections.npz)
-  ↓
-Output: kps_2d_*.npz (no visualization)
-
-vis_wb3d.py [kps_2d_*.npz] [kps_3d_*.npz] [video.mp4]  # Optional
-  ↓
-  Stage 3: Visualization (standalone)
-  ↓
-Output: result_wb_2D3D.mp4
-```
-
-**Key Advantages:**
-1. **Multi-person support:** Track all people, select target person
-2. **Modular stages:** Run detection once, test multiple pose models
-3. **Skip visualization:** Faster iteration during development
-4. **Reusable detections:** Process same detections with different models
-5. **Parallel experimentation:** Compare trackers, pose models, visualizations independently
-
----
-
-### 12.5 Configuration Updates
-
-**New Config Files:**
-- `configs/detector_tracking.yaml`: Standard tracking setup
-- `configs/detector_tracking_benchmark.yaml`: Performance benchmarking with 5 trackers
-
-**Updated Configs:**
-- `configs/udp_video.yaml`: Now expects `detections.npz` input (optional stage 1 skip)
-
-**Example Multi-Person Workflow Config:**
-```yaml
-# Step 1: Detection + Tracking
-video:
-  input_path: demo_data/videos/dance.mp4
-  max_frames: 360
-
-detection:
-  model_path: models/yolo/yolov8s.pt
-  confidence: 0.3
-
-tracking:
-  enabled: true
-  tracker_type: botsort
-  reid_model: models/reid/osnet_x1_0_msmt17.pt
-
-output:
-  raw_detections: demo_data/outputs/raw_detections.npz
-  benchmark_csv: demo_data/outputs/tracking_benchmark.csv
-```
-
----
-
-## 13. Known Issues & Future Work
-
-### Current Limitations
-1. **Backward Compatibility:** Old config files with `rtmpose_halpe26` or `wb3d` need manual updating
-2. **File Naming:** Existing output files with old names (`kps_2d_wb3d.npz`) won't be auto-detected
-3. **Visualization:** Not yet separated for all model types (only wholebody has standalone viz)
-4. **Person Selection:** Currently manual via `select_person.py` (could be automated based on criteria)
-
-### Potential Improvements
-1. Add deprecation warnings for old model names
-2. Implement file name migration tool
-3. Add config validation with schema
-4. Support batch video processing (multiple videos at once)
-5. Add more 3D lifting models (beyond MotionAGFormer)
-6. Automate person selection based on:
-   - Most visible person (fewest occlusions)
-   - Person in center of frame
-   - Largest person (closest to camera)
-   - Person ID consistency across frames
-7. Create visualization scripts for rtmpose and vitpose models
-8. Add tracking visualization overlay showing all person IDs
-9. Support multi-person 3D lifting (currently single-person only)
-
----
-
-## 14. Git Repository
-
-- **GitHub:** `pradeepj247/unifiedposepipeline`
-- **Branch:** `main`
-- **Recent Commits:**
-  - 568c529: Improve silent mode to show critical progress information (Dec 26, 2025)
-  - f505ecd: Modularize setup scripts and update demo data source (Dec 26, 2025)
-  - aeff192: Add multi-person tracking with BoxMOT and person selection (Dec 26, 2025)
-  - a60b59b: Model naming refactor (Dec 24, 2025)
-  - c197c63: vis_wb3d.py fixes (Dec 24, 2025)
-- **Working Directory (Local):** `D:\trials\unifiedpipeline\newrepo\`
-
----
-
-## 15. Recent Development Summary (Last 100 Messages)
-
-### Phase 1: Initial Tracking Integration
-- Integrated BoxMOT library for multi-object tracking
-- Added support for 5 trackers: BoT-SORT, DeepOCSORT, ByteTrack, StrongSORT, OCSORT
-- Implemented ReID-based person re-identification using OSNet model
-- Created `run_detector_tracking.py` as standalone detection+tracking script
-
-### Phase 2: Path Resolution & Case Sensitivity Fixes
-- Fixed tracker name case sensitivity issues (botsort → BoTSORT)
-- Resolved ReID model path issues on case-sensitive filesystems
-- Fixed YOLO model path resolution in configs
-- Fixed video input path handling (absolute paths in Colab)
-
-### Phase 3: Performance Benchmarking
-- Created `detector_tracking_benchmark.yaml` to test all 5 trackers
-- Measured performance: 67.5 FPS average (yolov8s + BoT-SORT)
-- Generated benchmark CSV with per-tracker timing
-
-### Phase 4: Multi-Person Workflow Implementation
-- Designed two-stage detection workflow:
-  - Stage 1A: Generate `raw_detections.npz` with all tracked persons
-  - Stage 1B: User selects person ID via `select_person.py`
-- Implemented `select_person.py` for interactive person selection
-- Modified output format to store per-frame multi-person detections
-
-### Phase 5: Setup Script Modularization
-- Split 602-line `setup_unified.py` into 6 modular scripts
-- Created utility module `setup_utils.py` with shared functions
-- Added `setup_all.py` master orchestrator with CLI flags
-- Converted original `setup_unified.py` to legacy wrapper
-- Updated demo data source and expanded video collection (2→5 videos)
-
-### Phase 6: Pipeline Decoupling
-- Separated 2D pose estimation from visualization
-- Modified `udp_video.py` to produce NPZ-only output
-- Moved wholebody visualization to standalone `vis_wb3d.py`
-- Removed automatic video generation from pose estimation stage
-- Enabled flexible visualization workflows
-
-### Phase 7: Verbose Mode Output Control (Dec 26, 2025)
-- **User Issue:** Verbose output showing in silent mode, progress/FPS info hidden
-- **Root Cause:** Config file had `verbose: true`, but also missing critical info in silent mode
-- **Changes Made:**
-  1. **Always show in both modes:**
-     - Processing progress bar (with real-time FPS counter)
-     - Video writing progress bar
-     - Frames processed count
-     - Overall FPS and time taken
-     - Unique track IDs count
-     - File save confirmations with detection counts
-  2. **Verbose mode only:**
-     - Model loading details and paths
-     - Detailed FPS breakdown (detection/tracking/combined)
-     - Success rate and valid detections percentage
-     - Full track ID table with frame ranges per person
-     - File format specifications
-  3. **Config updates:**
-     - Changed default to `verbose: false` for production
-     - Added comprehensive documentation of output modes
-     - Documented BoxMOT SUCCESS message (unavoidable library output)
-- **Files Modified:**
-  - `run_detector_tracking.py`: Restructured output logic
-  - `configs/detector_tracking_benchmark.yaml`: Set verbose=false with docs
-  - `configs/detector.yaml`: Added verbose mode documentation
-- **Result:** Silent mode now shows all critical progress information while keeping output clean
-
-### All Changes Committed ✅
-- **Commit 568c529:** Verbose mode improvements (Dec 26, 2025)
-- **Commit aeff192:** Multi-person tracking with BoxMOT integration
-- **Commit f505ecd:** Setup script modularization and demo data updates
-
----
-
-**Document generated from conversation history spanning pipeline development, bug fixes, and refactoring efforts through December 26, 2025.**
+**This document serves as a timeless reference for core algorithms and data formats, independent of implementation details. For the current 11-stage detection/tracking pipeline architecture and implementation specifics, see [det_track/PIPELINE_DESIGN.md](det_track/PIPELINE_DESIGN.md).**

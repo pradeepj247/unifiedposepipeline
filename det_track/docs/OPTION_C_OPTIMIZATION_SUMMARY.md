@@ -19,7 +19,7 @@ Successfully implemented **Option C** architectural optimization to eliminate un
 - ✅ Previously wrote 823.7 MB HDF5 file in 50.46 seconds
 - ✅ Crops now **kept in-memory** for Stage 11
 
-### 3. **Stage 11** (`stage9_generate_person_gifs.py`) - MAJOR REFACTORING
+### 3. **Stage 10** (`stage10_generate_person_webps.py`) - MAJOR REFACTORING
 - ✅ Removed HDF5 dependency (`import h5py` deleted)
 - ✅ Added pickle import for crops_cache loading
 - ✅ **New function**: `create_webp_for_top_persons()` using in-memory crops
@@ -224,7 +224,7 @@ Total:  ~71.71s (52% faster!)
 - **Fix**: resize_crop_to_frame() handles padding automatically; check frame_width/frame_height in config
 
 **Issue**: WebP shows intro flicker
-- **Fix**: Adaptive offset logic may need tuning; reduce multiplier from 0.2 to 0.1 in stage9_generate_person_gifs.py:178
+- **Fix**: Adaptive offset logic may need tuning; reduce multiplier from 0.2 to 0.1 in stage10_generate_person_webps.py:178
 
 ---
 

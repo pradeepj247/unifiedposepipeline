@@ -13,13 +13,13 @@ STAGE NUMBERING (Simple & Clear):
   Stage 8:  Visualize Grouping (Debug only)
   Stage 9:  Output Video Visualization
   Stage 10: HTML Selection Report
-  Stage 11: Generate Person GIFs
+  Stage 11: Generate Person WebPs
 
 USAGE EXAMPLES:
   # Run all enabled stages
   python run_pipeline.py --config configs/pipeline_config.yaml
   
-  # Run specific stages (e.g., HTML + GIFs)
+  # Run specific stages (e.g., HTML + WebPs)
   python run_pipeline.py --config configs/pipeline_config.yaml --stages 10,11
   
   # Run specific stages with --force (skip cache check)
@@ -176,7 +176,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     
     # Pipeline stages - SIMPLE NUMERIC IDs FOR CLEAR REFERENCING
     # Usage: --stages 1,2,3  or  --stages 10,11
-    # NOTE: Stage 11 must run BEFORE Stage 10 (generate GIFs before embedding in HTML)
+    # NOTE: Stage 10 must run AFTER Stage 11 (generate WebPs before embedding in HTML)
     all_stages = [
         ('Stage 1: YOLO Detection', 'stage1_detect.py', 'stage1'),
         ('Stage 2: ByteTrack Tracking', 'stage2_track.py', 'stage2'),
@@ -187,8 +187,8 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         ('Stage 7: Rank Persons', 'stage5_rank_persons.py', 'stage7'),
         ('Stage 8: Visualize Grouping (Debug)', 'stage5b_visualize_grouping.py', 'stage8'),
         ('Stage 9: Output Video Visualization', 'stage6_create_output_video.py', 'stage9'),
-        ('Stage 11: Generate Person Animated WebPs', 'stage9_generate_person_gifs.py', 'stage11'),
-        ('Stage 10: HTML Selection Report (Horizontal Tape)', 'stage6b_create_selection_html_horizontal.py', 'stage10')
+        ('Stage 10: Generate Person Animated WebPs', 'stage10_generate_person_webps.py', 'stage10'),
+        ('Stage 11: HTML Selection Report (Horizontal Tape)', 'stage11_create_selection_html_horizontal.py', 'stage11')
     ]
     
     # Print header

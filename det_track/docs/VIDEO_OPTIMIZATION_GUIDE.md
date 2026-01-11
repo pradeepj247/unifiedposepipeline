@@ -8,9 +8,8 @@ We've already implemented several optimizations:
 
 ## Video Encoding Bottlenecks
 
-### 1. **Frame Seeking** (Biggest Bottleneck)
-- **Problem**: `cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)` is **extremely slow** for non-keyframe seeks
-- **Impact**: Stage 6b: 32s for 9 frames (avg 3.5s per frame!) due to seeks
+### 1. **Frame Seeking** (Potential Bottleneck)
+- **Problem**: `cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)` can be slow for non-keyframe seeks
 - **Cause**: Video codec has to decode from last keyframe to reach target frame
 
 **Current Optimization:**
@@ -67,55 +66,7 @@ frame_plan_sorted = sorted(frame_plan, key=lambda x: x[0])
    - ffmpeg/libav with direct memory access (faster than OpenCV)
    - Skip for now (complexity)
 
-## Recommended Action
 
-### **Immediate: Fix Video Codec** (No code changes needed)
-```bash
-# Re-encode your video with keyframe every frame
-ffmpeg -i kohli_nets.mp4 -g 1 -c:v libx264 -preset medium kohli_nets_fast.mp4
-```
-
-This **alone could give 5-10x speedup** in Stage 6b because seeks won't trigger full decoding.
-
-### **Short Term: Add Frame Caching** (2 hours work)
-Implement pre-loading next frame while processing current:
-```python
-# Thread-safe frame queue
-frame_queue = deque(maxlen=5)
-
-# Background thread fills queue
-def load_frames():
-    for frame_num in frame_numbers:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
-        ret, frame = cap.read()
-        frame_queue.append((frame_num, frame))
-
-# Main thread consumes
-while frame_queue:
-    frame_num, frame = frame_queue.popleft()
-    process(frame)
-```
-
-### **Long Term: Hardware Decoding** (3 hours work)
-Use NVIDIA GPU for H.264 decoding:
-```python
-# Check available backends
-cap = cv2.VideoCapture(video_path)
-cap.set(cv2.CAP_PROP_HW_ACCELERATION, cv2.CAP_HW_ACCELERATION_CUDA)
-# ~5x speedup if GPU available
-```
-
-## Current Performance Baseline
-
-**Stage 6b (Create Person Selection Grid):**
-- Frames processed: 9
-- Time: 32 seconds
-- Per-frame: 3.5 seconds
-- Per-seek: ~2-3 seconds (due to H.264 decoding from keyframes)
-
-**After codec fix (estimated):**
-- Per-seek: ~0.1-0.2 seconds
-- Total time: ~4 seconds (8x improvement!)
 
 ## Files to Monitor
 - `det_track/stage1_detect.py`: Uses sequential reads (already optimal)

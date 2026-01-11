@@ -476,7 +476,7 @@ python run_pipeline.py --config configs/pipeline_config.yaml --stages 1,4,5,6,7,
 
 #### 3. WebP Generation Fails
 **Symptom**: `ModuleNotFoundError: No module named 'PIL'`
-**Fix**: PIL is installed as fallback in `stage9_generate_person_gifs.py`, but manually:
+**Fix**: PIL is installed as fallback in `stage9_generate_person_webps.py`, but manually:
 ```bash
 pip install Pillow
 ```
@@ -698,7 +698,7 @@ stage11:
 - `stage5_rank_persons.py` - Ranking (Stage 7)
 - `stage5b_visualize_grouping.py` - Debug visualization (Stage 8)
 - `stage6_create_output_video.py` - Output video (Stage 9)
-- `stage9_generate_person_gifs.py` - WebP generation (Stage 11, was GIF)
+- `stage10_generate_person_webps.py` - WebP generation (Stage 10, was GIF)
 - `stage6b_create_selection_html_horizontal.py` - HTML report (Stage 10)
 
 **Configuration**
