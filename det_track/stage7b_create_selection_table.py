@@ -16,8 +16,8 @@ Output:
 This table helps users visually compare persons before selecting one with --person-id.
 
 Usage:
-    python stage7_create_selection_table.py --config configs/pipeline_config.yaml
-    python stage7_create_selection_table.py --config configs/pipeline_config.yaml --verbose
+    python stage7b_create_selection_table.py --config configs/pipeline_config.yaml
+    python stage7b_create_selection_table.py --config configs/pipeline_config.yaml --verbose
 """
 
 import argparse
@@ -334,10 +334,10 @@ def main():
         epilog="""
 Examples:
   # Create selection table with default settings
-  python stage7_create_selection_table.py --config configs/pipeline_config.yaml
+  python stage7b_create_selection_table.py --config configs/pipeline_config.yaml
   
   # Create table with detailed output
-  python stage7_create_selection_table.py --config configs/pipeline_config.yaml --verbose
+  python stage7b_create_selection_table.py --config configs/pipeline_config.yaml --verbose
         """
     )
     

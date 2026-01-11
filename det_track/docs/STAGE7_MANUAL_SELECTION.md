@@ -1,7 +1,7 @@
 # Stage 7: Manual Person Selection
 
 ## Overview
-`stage7_select_person.py` allows you to manually select a specific person from the canonical persons data, creating the `primary_person.npz` file needed for pose estimation.
+`debug/stage7_select_person.py` allows you to manually select a specific person from the canonical persons data, creating the `primary_person.npz` file needed for pose estimation.
 
 ## Purpose
 - **Alternative to Stage 5**: Instead of auto-ranking, manually choose which person to analyze
@@ -25,12 +25,12 @@ Continue → Pose estimation on selected person
 
 ### Basic Usage
 ```bash
-python stage7_select_person.py --config configs/pipeline_config.yaml --person-id 3
+python debug/stage7_select_person.py --config configs/pipeline_config.yaml --person-id 3
 ```
 
 ### With Verbose Output
 ```bash
-python stage7_select_person.py --config configs/pipeline_config.yaml --person-id 7 --verbose
+python debug/stage7_select_person.py --config configs/pipeline_config.yaml --person-id 7 --verbose
 ```
 
 ### List Available Persons
@@ -147,7 +147,7 @@ python stage6_create_output_video.py --config configs/pipeline_config.yaml
 ### 4. Select Person Manually (Stage 7)
 ```bash
 # After watching video, choose Person 7
-python stage7_select_person.py --config configs/pipeline_config.yaml --person-id 7
+python debug/stage7_select_person.py --config configs/pipeline_config.yaml --person-id 7
 ```
 
 ### 5. Continue with Pose Estimation
