@@ -14,7 +14,7 @@ Successfully implemented **Option C** architectural optimization to eliminate un
 - ✅ Increased **Stage 11 WebP frames**: `max_frames: 50` → `60`
 - ✅ Updated Stage 11 comments: fps=10, 60 frames = 6 seconds per person
 
-### 2. **Stage 6** (`stage4b5_enrich_crops.py`) - DISABLED
+### 2. **Stage 6** (`stage6_enrich_crops.py`) - DISABLED
 - ✅ Converted to **no-op** (prints message and exits cleanly)
 - ✅ Previously wrote 823.7 MB HDF5 file in 50.46 seconds
 - ✅ Crops now **kept in-memory** for Stage 11

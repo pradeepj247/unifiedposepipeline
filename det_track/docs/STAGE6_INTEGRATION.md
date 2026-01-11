@@ -7,17 +7,17 @@ Stage 6 creates a visualization video showing the top 10 canonical persons (thos
 
 ### Files Modified
 
-1. **`stage6_create_output_video.py`** (previously `create_visualization_video.py`)
+1. **`stage9_create_output_video.py`** (previously `create_visualization_video.py`)
    - Updated to use config file instead of CLI args
    - Added top 10 person limit (was showing all qualifying persons)
    - Added config resolution logic
    - Now accepts `--config` parameter like other stages
 
 2. **`configs/pipeline_config.yaml`**
-   - Added `stage6_create_output_video: true` to pipeline stages
+   - Added `stage9_create_output_video: true` to pipeline stages
    - Added complete Stage 6 configuration section:
      ```yaml
-     stage6_create_output_video:
+     stage9_create_output_video:
        enabled: true
        visualization:
          min_duration_seconds: 5
@@ -152,7 +152,7 @@ top_n = min(10, len(persons_with_duration))  # Limit to 10
 After integration, verify:
 ```bash
 # 1. Check Stage 6 is enabled
-grep -A2 "stage6_create_output_video" configs/pipeline_config.yaml
+grep -A2 "stage9_create_output_video" configs/pipeline_config.yaml
 
 # 2. Run pipeline
 python run_pipeline.py --config configs/pipeline_config.yaml

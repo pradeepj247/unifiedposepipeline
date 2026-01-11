@@ -160,8 +160,8 @@ unifiedpipeline/newrepo/
     ├── stage2_track.py                # Stage 2: Tracking
     ├── stage3_analyze_tracklets.py    # Stage 3: Analysis
     ├── stage4a_reid_recovery.py       # Stage 4a: ReID recovery
-    ├── stage4b_group_canonical.py     # Stage 4b: Canonical grouping
-    ├── stage5_rank_persons.py         # Stage 5: Ranking
+    ├── stage5_group_canonical.py     # Stage 5: Canonical grouping
+    ├── stage7_rank_persons.py         # Stage 7: Ranking
     │
     ├── run_pipeline.py                # Master orchestrator
     ├── benchmark_pipeline.py          # Benchmarking tool
@@ -666,12 +666,12 @@ stage4b_group_canonical: true
 
 ### Phase 2: Optional Stages (4a, 4b)
 - [ ] Create `stage4a_reid_recovery.py`
-- [ ] Create `stage4b_group_canonical.py`
+- [ ] Create `stage5_group_canonical.py`
 - [ ] Implement toggleable logic
 - [ ] Test all 4 benchmark scenarios
 
 ### Phase 3: Ranking & Orchestration
-- [ ] Create `stage5_rank_persons.py`
+- [ ] Create `stage7_rank_persons.py`
 - [ ] Create `run_pipeline.py` (master)
 - [ ] Create `benchmark_pipeline.py`
 - [ ] Create preset configs (fast/accurate/hybrid)

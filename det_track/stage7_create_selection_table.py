@@ -147,9 +147,9 @@ def create_selection_table(config, verbose=False):
         return False
     
     # Get file paths
-    canonical_file = config['stage4b_group_canonical']['output']['canonical_persons_file']
+    canonical_file = config['stage5_group_canonical']['output']['canonical_persons_file']
     stats_file = config['stage3_analyze']['output']['tracklet_stats_file']
-    crops_cache_file = config['stage4a_reid_recovery']['input']['crops_cache_file']
+    crops_cache_file = config['stage4']['input']['crops_cache_file']
     
     output_dir = Path(canonical_file).parent
     output_file = output_dir / 'selection_table.png'

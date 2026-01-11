@@ -6,7 +6,7 @@ Groups tracklets into canonical persons using geometric heuristics.
 Alternative to ReID recovery for faster processing.
 
 Usage:
-    python stage4b_group_canonical.py --config configs/pipeline_config.yaml
+    python stage5_group_canonical.py --config configs/pipeline_config.yaml
 """
 
 import argparse
@@ -284,7 +284,7 @@ def run_canonical_grouping(config):
     grouping_config = stage_config['grouping']
     
     # Determine input source
-    # NOTE: New lightweight stage4a (crops cache loader) doesn't produce tracklets_recovered.npz
+    # NOTE: New lightweight stage4 (crops cache loader) doesn't produce tracklets_recovered.npz
     # Always use tracklets_raw.npz (from Stage 2) as input
     input_file = input_config['tracklets_raw_file']
     print(f"📂 Using raw tracklets from Stage 2")

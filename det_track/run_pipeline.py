@@ -181,12 +181,12 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         ('Stage 1: YOLO Detection', 'stage1_detect.py', 'stage1'),
         ('Stage 2: ByteTrack Tracking', 'stage2_track.py', 'stage2'),
         ('Stage 3: Tracklet Analysis', 'stage3_analyze_tracklets.py', 'stage3'),
-        ('Stage 4: Load Crops Cache', 'stage4a_load_crops_cache.py', 'stage4'),
-        ('Stage 5: Canonical Person Grouping', 'stage4b_group_canonical.py', 'stage5'),
-        ('Stage 6: Enrich Crops with HDF5', 'stage4b5_enrich_crops.py', 'stage6'),
-        ('Stage 7: Rank Persons', 'stage5_rank_persons.py', 'stage7'),
-        ('Stage 8: Visualize Grouping (Debug)', 'stage5b_visualize_grouping.py', 'stage8'),
-        ('Stage 9: Output Video Visualization', 'stage6_create_output_video.py', 'stage9'),
+        ('Stage 4: Load Crops Cache', 'stage4_load_crops_cache.py', 'stage4'),
+        ('Stage 5: Canonical Person Grouping', 'stage5_group_canonical.py', 'stage5'),
+        ('Stage 6: Enrich Crops with HDF5', 'stage6_enrich_crops.py', 'stage6'),
+        ('Stage 7: Rank Persons', 'stage7_rank_persons.py', 'stage7'),
+        ('Stage 8: Visualize Grouping (Debug)', 'stage8_visualize_grouping.py', 'stage8'),
+        ('Stage 9: Output Video Visualization', 'stage9_create_output_video.py', 'stage9'),
         ('Stage 10: Generate Person Animated WebPs', 'stage10_generate_person_webps.py', 'stage10'),
         ('Stage 11: HTML Selection Report (Horizontal Tape)', 'stage11_create_selection_html_horizontal.py', 'stage11')
     ]

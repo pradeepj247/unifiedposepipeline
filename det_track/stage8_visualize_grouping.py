@@ -342,8 +342,8 @@ def main():
     # File paths from config
     tracklets_file = Path(config['stage2_track']['output']['tracklets_file'])
     reid_candidates_file = Path(config['stage3_analyze']['output']['candidates_file'])
-    canonical_persons_file = Path(config['stage4b_group_canonical']['output']['canonical_persons_file'])
-    grouping_log_file = Path(config['stage4b_group_canonical']['output']['grouping_log_file'])
+    canonical_persons_file = Path(config['stage5_group_canonical']['output']['canonical_persons_file'])
+    grouping_log_file = Path(config['stage5_group_canonical']['output']['grouping_log_file'])
     ranking_report_file = Path(config['stage5_rank']['output']['ranking_report_file'])
     
     # Check files exist

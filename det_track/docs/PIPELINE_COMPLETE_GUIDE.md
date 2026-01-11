@@ -693,11 +693,12 @@ stage11:
 - `stage2_track.py` - ByteTrack tracking
 - `stage3_analyze.py` - Tracklet statistics
 - `stage4_load_crops.py` - Load crops cache (stub, no output)
-- `stage4b_group_canonical.py` - Canonical person grouping (Stage 5)
-- `stage4b5_enrich_crops.py` - HDF5 enrichment (Stage 6)
-- `stage5_rank_persons.py` - Ranking (Stage 7)
-- `stage5b_visualize_grouping.py` - Debug visualization (Stage 8)
-- `stage6_create_output_video.py` - Output video (Stage 9)
+- `stage4_load_crops_cache.py` - Load crops cache (Stage 4)
+- `stage5_group_canonical.py` - Canonical person grouping (Stage 5)
+- `stage6_enrich_crops.py` - HDF5 enrichment (Stage 6)
+- `stage7_rank_persons.py` - Ranking (Stage 7)
+- `stage8_visualize_grouping.py` - Debug visualization (Stage 8)
+- `stage9_create_output_video.py` - Output video (Stage 9)
 - `stage10_generate_person_webps.py` - WebP generation (Stage 10, was GIF)
 - `stage6b_create_selection_html_horizontal.py` - HTML report (Stage 10)
 

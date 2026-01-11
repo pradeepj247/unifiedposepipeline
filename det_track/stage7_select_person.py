@@ -96,7 +96,7 @@ def select_person(config, person_id, verbose=False):
     """Select a specific person and create primary_person.npz"""
     
     # Get file paths from config
-    canonical_file = config['stage4b_group_canonical']['output']['canonical_persons_file']
+    canonical_file = config['stage5_group_canonical']['output']['canonical_persons_file']
     primary_file = config['stage5_rank']['output']['primary_person_file']
     
     print(f"\n{'='*70}")

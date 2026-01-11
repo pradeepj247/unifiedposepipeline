@@ -6,7 +6,7 @@ Simply loads the crops cache from disk for use in Stage 7.
 No ReID processing - just cache management.
 
 Usage:
-    python stage4a_load_crops_cache.py --config configs/pipeline_config.yaml
+    python stage4_load_crops_cache.py --config configs/pipeline_config.yaml
 """
 
 import argparse
