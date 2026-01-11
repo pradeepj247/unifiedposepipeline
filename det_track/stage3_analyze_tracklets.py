@@ -15,7 +15,12 @@ import numpy as np
 import json
 import time
 import re
+import sys
 from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from utils.logger import PipelineLogger
 
 
 def resolve_path_variables(config):
@@ -227,7 +232,11 @@ def run_analysis(config):
     """Run Stage 3: Analysis"""
     
     stage_config = config['stage3']
-    verbose = stage_config.get('advanced', {}).get('verbose', False)
+    verbose = stage_config.get('advanced', {}).get('verbose', False) or config.get('global', {}).get('verbose', False)
+    
+    # Initialize logger
+    logger = PipelineLogger("Stage 3: Tracklet Analysis", verbose=verbose)
+    logger.header()
     
     # Extract configuration
     analysis_config = stage_config['analysis']
@@ -242,20 +251,15 @@ def run_analysis(config):
     compute_statistics = analysis_config['compute_statistics']
     identify_candidates = analysis_config['identify_candidates']
     
-    # Print header
-    print(f"\n{'='*70}")
-    print(f"📍 STAGE 3: TRACKLET ANALYSIS")
-    print(f"{'='*70}\n")
-    
     # Load tracklets
-    print(f"📂 Loading tracklets: {tracklets_file}")
+    logger.step(f"Loading tracklets: {tracklets_file}")
     tracklets = load_tracklets(tracklets_file)
     num_tracklets = len(tracklets)
-    print(f"  ✅ Loaded {num_tracklets} tracklets")
+    logger.info(f"Loaded {num_tracklets} tracklets")
     
     # Compute statistics
     if compute_statistics:
-        print(f"\n📊 Computing tracklet statistics...")
+        logger.step("Computing tracklet statistics...")
         t_start = time.time()
         
         stats = []
@@ -264,7 +268,8 @@ def run_analysis(config):
             stats.append(stat)
         
         t_end = time.time()
-        print(f"  ✅ Computed stats for {num_tracklets} tracklets ({t_end - t_start:.2f}s)")
+        logger.timing("Tracklet statistics", t_end - t_start)
+        logger.info(f"Computed stats for {num_tracklets} tracklets")
         
         # Save statistics
         output_path = Path(tracklet_stats_file)
@@ -275,29 +280,31 @@ def run_analysis(config):
             tracklets=tracklets,
             statistics=np.array(stats, dtype=object)
         )
-        print(f"  ✅ Saved: {output_path}")
+        file_size_mb = output_path.stat().st_size / (1024 * 1024)
+        logger.file_size(output_path.name, file_size_mb)
     else:
         stats = None
     
     # Identify ReID candidates
     if identify_candidates and stats is not None:
-        print(f"\n🔍 Identifying ReID recovery candidates...")
+        logger.step("Identifying ReID recovery candidates...")
         t_start = time.time()
         
         candidates = identify_reid_candidates(tracklets, stats, candidate_criteria)
         
         t_end = time.time()
         num_candidates = len(candidates)
-        print(f"  ✅ Found {num_candidates} candidate pairs ({t_end - t_start:.2f}s)")
+        logger.timing("ReID candidate identification", t_end - t_start)
+        logger.info(f"Found {num_candidates} candidate pairs")
         
         if verbose and num_candidates > 0:
-            print(f"\n  Sample candidates:")
+            logger.verbose_info("Sample candidates:")
             for cand in candidates[:5]:
-                print(f"    T{cand['tracklet_1']} → T{cand['tracklet_2']}: "
+                logger.verbose_info(f"  T{cand['tracklet_1']} → T{cand['tracklet_2']}: "
                       f"gap={cand['gap']}f, dist={cand['distance']:.1f}px, "
                       f"area_ratio={cand['area_ratio']:.2f}")
             if num_candidates > 5:
-                print(f"    ... and {num_candidates - 5} more")
+                logger.verbose_info(f"  ... and {num_candidates - 5} more")
         
         # Save candidates
         output_path = Path(candidates_file)
@@ -306,13 +313,14 @@ def run_analysis(config):
         with open(output_path, 'w') as f:
             json.dump(candidates, f, indent=2)
         
-        print(f"  ✅ Saved: {output_path}")
+        file_size_mb = output_path.stat().st_size / (1024 * 1024)
+        logger.file_size(output_path.name, file_size_mb)
     else:
         candidates = []
     
-    print(f"\n✅ Analysis complete!")
-    print(f"  Tracklets analyzed: {num_tracklets}")
-    print(f"  ReID candidates: {len(candidates)}")
+    logger.stat("Tracklets analyzed", num_tracklets)
+    logger.stat("ReID candidates found", len(candidates))
+    logger.success()
     
     return {
         'tracklet_stats_file': tracklet_stats_file,
@@ -333,13 +341,12 @@ def main():
     
     # Check if stage is enabled
     if not config['pipeline']['stages']['stage3']:
-        print("⏭️  Stage 3 is disabled in config")
+        logger = PipelineLogger("Stage 3: Tracklet Analysis", verbose=False)
+        logger.step("Stage 3 is disabled in config")
         return
     
     # Run analysis
     run_analysis(config)
-    
-    print(f"\n{'='*70}\n")
 
 
 if __name__ == '__main__':
