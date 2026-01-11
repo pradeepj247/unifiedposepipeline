@@ -14,7 +14,10 @@ import yaml
 import pickle
 import time
 import re
+import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from utils.logger import PipelineLogger
 
 
 def resolve_path_variables(config):
@@ -85,27 +88,28 @@ def run_load_crops_cache(config):
     """Run Stage 4a: Load Crops Cache"""
     
     stage_config = config['stage4']
+    verbose = stage_config.get('advanced', {}).get('verbose', False) or config.get('global', {}).get('verbose', False)
+    
+    logger = PipelineLogger("Stage 4: Load Crops Cache", verbose=verbose)
     
     input_config = stage_config['input']
     crops_cache_file = input_config.get('crops_cache_file')
     
-    print(f"\n{'='*80}")
-    print(f"📊 STAGE 4a: LOAD CROPS CACHE")
-    print(f"{'='*80}\n")
+    logger.header()
     
     if not crops_cache_file:
-        print(f"⚠️  No crops_cache_file specified in config")
-        print(f"    This is OK if Stage 1 just ran and created it.")
+        logger.warning("No crops_cache_file specified in config")
+        logger.info("This is OK if Stage 1 just ran and created it.")
         return {
             'crops_cache_file': None,
             'cache_size_mb': 0,
             'num_frames': 0
         }
-    
-    print(f"📂 Loading crops cache: {crops_cache_file}")
+    logger.step(f"Loading crops cache: {crops_cache_file}")
     
     if not Path(crops_cache_file).exists():
-        print(f"❌ Crops cache file not found: {crops_cache_file}")
+        logger.error(f"Crops cache file not found: {crops_cache_file}")
+        logger.info("rops cache file not found: {crops_cache_file}")
         print(f"   Please run Stage 1 first to generate crops_cache.pkl")
         return {
             'crops_cache_file': None,
@@ -124,15 +128,13 @@ def run_load_crops_cache(config):
     total_crops = sum(len(frame_crops) for frame_crops in crops_cache.values())
     cache_size_mb = Path(crops_cache_file).stat().st_size / (1024 * 1024)
     
-    print(f"\n✅ Crops cache loaded!")
-    print(f"  Frames: {num_frames}")
-    print(f"  Total crops: {total_crops}")
-    print(f"  Cache size: {cache_size_mb:.1f} MB")
-    print(f"  Load time: {t_load:.3f}s")
+    logger.info(f"Crops cache loaded!")
+    logger.stat("Frames", num_frames)
+    logger.stat("Total crops", total_crops)
+    logger.file_size("Cache size", cache_size_mb)
+    logger.timing("Load time", t_load)
     
-    print(f"\n{'='*80}")
-    print(f"✅ STAGE 4a: COMPLETE")
-    print(f"{'='*80}\n")
+    logger.success()
     
     return {
         'crops_cache_file': crops_cache_file,

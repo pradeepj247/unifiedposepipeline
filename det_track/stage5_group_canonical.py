@@ -15,7 +15,10 @@ import numpy as np
 import json
 import time
 import re
+import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from utils.logger import PipelineLogger
 
 
 def resolve_path_variables(config):
@@ -276,7 +279,9 @@ def run_canonical_grouping(config):
     """Run Stage 4b: Canonical Grouping"""
     
     stage_config = config['stage5']
-    verbose = stage_config.get('advanced', {}).get('verbose', False)
+    verbose = stage_config.get('advanced', {}).get('verbose', False) or config.get('global', {}).get('verbose', False)
+    
+    logger = PipelineLogger("Stage 5: Canonical Person Grouping", verbose=verbose)
     
     # Extract configuration
     input_config = stage_config['input']
@@ -287,24 +292,21 @@ def run_canonical_grouping(config):
     # NOTE: New lightweight stage4 (crops cache loader) doesn't produce tracklets_recovered.npz
     # Always use tracklets_raw.npz (from Stage 2) as input
     input_file = input_config['tracklets_raw_file']
-    print(f"📂 Using raw tracklets from Stage 2")
+    logger.info("Using raw tracklets from Stage 2")
     
     canonical_file = output_config['canonical_persons_file']
     grouping_log_file = output_config['grouping_log_file']
     
-    # Print header
-    print(f"\n{'='*70}")
-    print(f"📍 STAGE 4b: CANONICAL GROUPING")
-    print(f"{'='*70}\n")
+    logger.header()
     
     # Load tracklets
-    print(f"📂 Loading tracklets: {input_file}")
+    logger.step(f"Loading tracklets: {input_file}")
     data = np.load(input_file, allow_pickle=True)
     tracklets = list(data['tracklets'])
-    print(f"  ✅ Loaded {len(tracklets)} tracklets")
+    logger.info(f"Loaded {len(tracklets)} tracklets")
     
     # Group tracklets
-    print(f"\n🔗 Grouping tracklets (method: {grouping_config['method']})...")
+    logger.step(f"Grouping tracklets (method: {grouping_config['method']})...")
     t_start = time.time()
     
     if grouping_config['method'] == 'heuristic':
@@ -315,9 +317,11 @@ def run_canonical_grouping(config):
     
     t_end = time.time()
     print(f"  ✅ Created {len(groups)} canonical persons ({t_end - t_start:.2f}s)")
+    logger.timing("Grouping", t_end - t_start)
+    logger.info(f"Created {len(groups)} canonical persons")
     
     # Merge groups into canonical persons
-    print(f"\n🔀 Merging tracklets into canonical persons...")
+    logger.step(f"Merging tracklets into canonical persons...")
     canonical_persons = []
     grouping_log = []
     
@@ -334,33 +338,33 @@ def run_canonical_grouping(config):
             'total_frames': len(canonical['frame_numbers'])
         })
     
-    print(f"  ✅ Created {len(canonical_persons)} canonical persons")
+    logger.info(f"Created {len(canonical_persons)} canonical persons")
     
     if verbose:
-        print(f"\n  Sample canonical persons:")
+        logger.verbose_info(f"Sample canonical persons:")
         for log in grouping_log[:5]:
-            print(f"    Person {log['canonical_id']}: "
+            logger.verbose_info(f"  Person {log['canonical_id']}: "
                   f"{log['num_merged']} tracklets, "
                   f"{log['total_frames']} frames, "
                   f"range [{log['start_frame']}, {log['end_frame']}]")
         if len(grouping_log) > 5:
-            print(f"    ... and {len(grouping_log) - 5} more")
+            logger.verbose_info(f"  ... and {len(grouping_log) - 5} more")
     
     # Save canonical persons
     output_path = Path(canonical_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(output_path, persons=np.array(canonical_persons, dtype=object))
-    print(f"  ✅ Saved: {output_path}")
+    logger.file_size(f"Saved canonical persons", output_path.stat().st_size / (1024 * 1024))
     
     # Save log
     log_path = Path(grouping_log_file)
     with open(log_path, 'w') as f:
         json.dump(grouping_log, f, indent=2)
-    print(f"  ✅ Saved grouping log: {log_path}")
+    logger.file_size(f"Saved grouping log", log_path.stat().st_size / (1024 * 1024))
     
-    print(f"\n✅ Canonical grouping complete!")
-    print(f"  Input tracklets: {len(tracklets)}")
-    print(f"  Canonical persons: {len(canonical_persons)}")
+    logger.stat("Input tracklets", len(tracklets))
+    logger.stat("Output canonical persons", len(canonical_persons))
+    logger.success()
 
 
 def main():
@@ -374,13 +378,12 @@ def main():
     
     # Check if stage is enabled
     if not config['pipeline']['stages']['stage5']:
-        print("⏭️  Stage 5 is disabled in config")
+        logger = PipelineLogger("Stage 5: Canonical Person Grouping", verbose=False)
+        logger.info("Stage 5 is disabled in config")
         return
     
     # Run grouping
     run_canonical_grouping(config)
-    
-    print(f"\n{'='*70}\n")
 
 
 if __name__ == '__main__':

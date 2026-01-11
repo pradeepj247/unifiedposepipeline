@@ -14,7 +14,10 @@ import numpy as np
 import json
 import time
 import re
+import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from utils.logger import PipelineLogger
 
 
 def resolve_path_variables(config):
@@ -159,7 +162,9 @@ def run_ranking(config):
     """Run Stage 5: Ranking"""
     
     stage_config = config['stage7']
-    verbose = stage_config.get('advanced', {}).get('verbose', False)
+    verbose = stage_config.get('advanced', {}).get('verbose', False) or config.get('global', {}).get('verbose', False)
+    
+    logger = PipelineLogger("Stage 7: Rank Persons", verbose=verbose)
     
     # Extract configuration
     input_config = stage_config['input']
@@ -174,23 +179,20 @@ def run_ranking(config):
     video_width = config.get('global', {}).get('video_width', 1920)
     video_height = config.get('global', {}).get('video_height', 1080)
     
-    # Print header
-    print(f"\n{'='*70}")
-    print(f"📍 STAGE 5: PRIMARY PERSON RANKING")
-    print(f"{'='*70}\n")
+    logger.header()
     
     # Load canonical persons
-    print(f"📂 Loading canonical persons: {canonical_file}")
+    logger.step(f"Loading canonical persons: {canonical_file}")
     data = np.load(canonical_file, allow_pickle=True)
     persons = list(data['persons'])
-    print(f"  ✅ Loaded {len(persons)} persons")
+    logger.info(f"Loaded {len(persons)} persons")
     
     if len(persons) == 0:
-        print(f"  ❌ No persons to rank")
+        logger.error(f"No persons to rank")
         return
     
     # Rank persons
-    print(f"\n🏆 Ranking persons (method: {ranking_config['method']})...")
+    logger.step(f"Ranking persons (method: {ranking_config['method']})...")
     t_start = time.time()
     
     if ranking_config['method'] == 'auto':
@@ -200,27 +202,28 @@ def run_ranking(config):
         raise ValueError(f"Unknown ranking method: {ranking_config['method']}")
     
     t_end = time.time()
-    print(f"  ✅ Ranked {len(persons)} persons ({t_end - t_start:.2f}s)")
+    logger.timing("Ranking", t_end - t_start)
+    logger.info(f"Ranked {len(persons)} persons")
     
     # Select primary
     primary_idx = ranked_indices[0]
     primary_person = persons[primary_idx]
     
-    print(f"\n🎯 Primary person selected: Person {primary_person['person_id']}")
-    print(f"  Duration: {len(primary_person['frame_numbers'])} frames")
-    print(f"  Score: {scores[primary_idx]['final_score']:.4f}")
+    logger.found(f"Primary person selected: Person {primary_person['person_id']}")
+    logger.stat("Duration (frames)", len(primary_person['frame_numbers']))
+    logger.stat("Primary score", f"{scores[primary_idx]['final_score']:.4f}")
     
     if verbose:
-        print(f"\n  Top 5 persons:")
+        logger.verbose_info(f"Top 5 persons:")
         for rank, idx in enumerate(ranked_indices[:5], 1):
             person = persons[idx]
             score = scores[idx]
-            print(f"    {rank}. Person {person['person_id']}: "
+            logger.verbose_info(f"  {rank}. Person {person['person_id']}: "
                   f"score={score['final_score']:.4f}, "
                   f"duration={score['duration']}, "
                   f"coverage={score['coverage']:.2f}")
         if len(ranked_indices) > 5:
-            print(f"    ... and {len(ranked_indices) - 5} more")
+            logger.verbose_info(f"  ... and {len(ranked_indices) - 5} more")
     
     # Save primary person
     output_path = Path(primary_file)
@@ -233,7 +236,7 @@ def run_ranking(config):
         bboxes=primary_person['bboxes'],
         confidences=primary_person['confidences']
     )
-    print(f"  ✅ Saved: {output_path}")
+    logger.file_size(f"Primary person file", output_path.stat().st_size / (1024 * 1024))
     
     # Save ranking report
     ranking_report = []
@@ -250,11 +253,11 @@ def run_ranking(config):
     report_path = Path(ranking_report_file)
     with open(report_path, 'w') as f:
         json.dump(ranking_report, f, indent=2)
-    print(f"  ✅ Saved ranking report: {report_path}")
+    logger.file_size(f"Ranking report", report_path.stat().st_size / (1024 * 1024))
     
-    print(f"\n✅ Ranking complete!")
-    print(f"  Primary person: {primary_person['person_id']}")
-    print(f"  Total candidates: {len(persons)}")
+    logger.stat("Primary person ID", primary_person['person_id'])
+    logger.stat("Total candidates", len(persons))
+    logger.success()
 
 
 def main():
@@ -268,13 +271,12 @@ def main():
     
     # Check if stage is enabled
     if not config['pipeline']['stages']['stage7']:
-        print("⏭️  Stage 7 is disabled in config")
+        logger = PipelineLogger("Stage 7: Rank Persons", verbose=False)
+        logger.info("Stage 7 is disabled in config")
         return
     
     # Run ranking
     run_ranking(config)
-    
-    print(f"\n{'='*70}\n")
 
 
 if __name__ == '__main__':

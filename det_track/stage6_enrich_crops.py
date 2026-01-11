@@ -36,14 +36,26 @@ import os
 import pickle
 import numpy as np
 import h5py
+import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 from collections import defaultdict
-import logging
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from utils.logger import PipelineLogger
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(message)s')
-logger = logging.getLogger(__name__)
+# Initialize logger
+_logger = None
+
+
+def get_logger(name="Stage 6: Enrich Crops", verbose=False):
+    """Get or create the centralized logger"""
+    global _logger
+    if _logger is None:
+        _logger = PipelineLogger(name, verbose=verbose)
+    return _logger
+
+
+logger = get_logger()
 
 
 def load_canonical_persons(canonical_persons_file: str) -> List[Dict]:
@@ -325,7 +337,6 @@ def main():
     """
     import argparse
     import yaml
-    import os
     
     parser = argparse.ArgumentParser(
         description='Stage 6: DISABLED - In-Memory Crops Optimization'
@@ -339,14 +350,19 @@ def main():
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
     
-    print(f"\n{'='*70}")
-    print(f"⏭️  STAGE 6: DISABLED (In-Memory Optimization Active)")
-    print(f"{'='*70}\n")
-    print(f"ℹ️  Why disabled:")
-    print(f"  • HDF5 write eliminated (50.46s saved)")
-    print(f"  • Crops kept in-memory for Stage 11")
-    print(f"  • Stage 11 reorganizes on-demand (<1s)")
-    print(f"  • Total savings: 50+ seconds (33% faster pipeline)\n")
+    verbose = config.get('global', {}).get('verbose', False)
+    logger_instance = PipelineLogger("Stage 6: Enrich Crops", verbose=verbose)
+    logger_instance.header()
+    
+    logger_instance.info("DISABLED - In-Memory Crops Optimization Active")
+    logger_instance.info("")
+    logger_instance.verbose_info("Why disabled:")
+    logger_instance.verbose_info("  • HDF5 write eliminated (50.46s saved)")
+    logger_instance.verbose_info("  • Crops kept in-memory for Stage 11")
+    logger_instance.verbose_info("  • Stage 11 reorganizes on-demand (<1s)")
+    logger_instance.verbose_info("  • Total savings: 50+ seconds (33% faster pipeline)")
+    
+    logger_instance.success()
     
     return 0
 

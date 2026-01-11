@@ -17,8 +17,11 @@ import json
 import numpy as np
 import yaml
 import re
+import sys
 from pathlib import Path
 from tabulate import tabulate
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from utils.logger import PipelineLogger
 
 
 def resolve_path_variables(config):
@@ -166,12 +169,11 @@ def load_canonical_persons(persons_file, grouping_log_file):
     return sorted(results, key=lambda x: x['person_id'])
 
 
-def print_table1_raw_tracklets(tracklets):
+def print_table1_raw_tracklets(tracklets, logger):
     """Print Table 1: All raw tracklets (numbered sequentially)"""
-    print("\n" + "="*80)
-    print("📊 TABLE 1: RAW TRACKLETS (Before Grouping)")
-    print("="*80)
-    print(f"Total: {len(tracklets)} tracklets\n")
+    logger.header()
+    logger.info(f"TABLE 1: RAW TRACKLETS (Before Grouping)")
+    logger.info(f"Total: {len(tracklets)} tracklets")
     
     table_data = []
     for idx, t in enumerate(tracklets, 1):
@@ -188,15 +190,13 @@ def print_table1_raw_tracklets(tracklets):
     print(tabulate(table_data, headers=headers, tablefmt='simple'))
 
 
-def print_table2_reid_candidates(candidates, tracklets_dict):
+def print_table2_reid_candidates(candidates, tracklets_dict, logger):
     """Print Table 2: ReID merge candidates"""
-    print("\n" + "="*80)
-    print("📊 TABLE 2: MERGE CANDIDATES (Temporally Disconnected)")
-    print("="*80)
-    print(f"Total: {len(candidates)} candidate pairs\n")
+    logger.info(f"TABLE 2: MERGE CANDIDATES (Temporally Disconnected)")
+    logger.info(f"Total: {len(candidates)} candidate pairs")
     
     if len(candidates) == 0:
-        print("No merge candidates identified.")
+        logger.info("No merge candidates identified.")
         return
     
     table_data = []
@@ -218,11 +218,9 @@ def print_table2_reid_candidates(candidates, tracklets_dict):
     print(tabulate(table_data, headers=headers, tablefmt='simple'))
 
 
-def print_table3_merge_results(canonical_persons, candidates):
+def print_table3_merge_results(canonical_persons, candidates, logger):
     """Print Table 3: Merge results (accepted vs rejected)"""
-    print("\n" + "="*80)
-    print("📊 TABLE 3: MERGE RESULTS")
-    print("="*80)
+    logger.info(f"TABLE 3: MERGE RESULTS")
     
     # Find which candidates were merged
     merged_persons = [p for p in canonical_persons if p['num_tracklets'] > 1]
@@ -249,11 +247,11 @@ def print_table3_merge_results(canonical_persons, candidates):
         if not merged_together:
             rejected.append(c)
     
-    print(f"✅ Accepted: {len(accepted)} merges")
-    print(f"❌ Rejected: {len(rejected)} candidates\n")
+    logger.info(f"Accepted: {len(accepted)} merges")
+    logger.info(f"Rejected: {len(rejected)} candidates")
     
     if accepted:
-        print("ACCEPTED MERGES:")
+        logger.info(f"ACCEPTED MERGES:")
         table_data = []
         for c, person_id in accepted:
             table_data.append([
@@ -267,7 +265,7 @@ def print_table3_merge_results(canonical_persons, candidates):
         print(tabulate(table_data, headers=headers, tablefmt='simple'))
     
     if rejected:
-        print("\n\nREJECTED CANDIDATES:")
+        logger.info(f"REJECTED CANDIDATES:")
         table_data = []
         for c in rejected:
             # Determine likely rejection reason
@@ -291,12 +289,11 @@ def print_table3_merge_results(canonical_persons, candidates):
         print(tabulate(table_data, headers=headers, tablefmt='simple'))
 
 
-def print_table4_top_persons(canonical_persons, top_n=5):
+def print_table4_top_persons(canonical_persons, top_n=5, logger=None):
     """Print Table 4: Top N persons by duration"""
-    print("\n" + "="*80)
-    print(f"📊 TABLE 4: TOP {top_n} PERSONS (Ranked by Duration)")
-    print("="*80)
-    print(f"Total canonical persons: {len(canonical_persons)}\n")
+    if logger:
+        logger.info(f"TABLE 4: TOP {top_n} PERSONS (Ranked by Duration)")
+        logger.info(f"Total canonical persons: {len(canonical_persons)}")
     
     # Sort by duration descending
     sorted_persons = sorted(canonical_persons, key=lambda x: x['duration'], reverse=True)
@@ -323,7 +320,10 @@ def print_table4_top_persons(canonical_persons, top_n=5):
     # Highlight primary person
     if top_persons:
         primary = top_persons[0]
-        print(f"\n🎯 Primary Person: {primary['person_id']} (Duration: {primary['duration']} frames)")
+        if logger:
+            logger.found(f"Primary Person: {primary['person_id']} (Duration: {primary['duration']} frames)")
+        else:
+            print(f"\n🎯 Primary Person: {primary['person_id']} (Duration: {primary['duration']} frames)")
 
 
 def main():
@@ -332,12 +332,10 @@ def main():
                         help='Path to pipeline configuration YAML')
     args = parser.parse_args()
     
-    # Load config
-    config = load_config(args.config)
+    verbose = config.get('global', {}).get('verbose', False)
+    logger = PipelineLogger("Stage 8: Visualize Grouping", verbose=verbose)
     
-    print(f"\n{'='*70}")
-    print(f"📊 STAGE 5b: VISUALIZE GROUPING RESULTS")
-    print(f"{'='*70}\n")
+    logger.header()
     
     # File paths from config
     tracklets_file = Path(config['stage2_track']['output']['tracklets_file'])
@@ -348,16 +346,16 @@ def main():
     
     # Check files exist
     if not tracklets_file.exists():
-        print(f"❌ Error: {tracklets_file.name} not found")
+        logger.error(f"{tracklets_file.name} not found")
         return
     if not canonical_persons_file.exists():
-        print(f"❌ Error: {canonical_persons_file.name} not found")
+        logger.error(f"{canonical_persons_file.name} not found")
         return
     if not grouping_log_file.exists():
-        print(f"❌ Error: {grouping_log_file.name} not found")
+        logger.error(f"{grouping_log_file.name} not found")
         return
     
-    print(f"📂 Loading grouping data...")
+    logger.step(f"Loading grouping data...")
     
     # Load data
     tracklets = load_tracklets(tracklets_file)
@@ -368,12 +366,12 @@ def main():
     canonical_persons = load_canonical_persons(canonical_persons_file, grouping_log_file)
     
     # Print tables
-    print_table1_raw_tracklets(tracklets)
-    print_table2_reid_candidates(reid_candidates, tracklets_dict)
-    print_table3_merge_results(canonical_persons, reid_candidates)
-    print_table4_top_persons(canonical_persons, top_n=5)
+    print_table1_raw_tracklets(tracklets, logger)
+    print_table2_reid_candidates(reid_candidates, tracklets_dict, logger)
+    print_table3_merge_results(canonical_persons, reid_candidates, logger)
+    print_table4_top_persons(canonical_persons, top_n=5, logger=logger)
     
-    print(f"\n{'='*70}")
+    logger.success()
     print(f"✅ VISUALIZATION COMPLETE!")
     print(f"{'='*70}\n")
 
