@@ -17,6 +17,9 @@ global:
   # Video input settings - change video_file to process different videos
   video_dir: ${demo_data_dir}/videos/
   video_file: kohli_nets.mp4
+  
+  # Logging and output control
+  verbose: false                             # Set to true for detailed debug output across all stages
 
 # ============================================================================
 # Pipeline Stage Control - SINGLE SOURCE OF TRUTH
