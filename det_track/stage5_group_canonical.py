@@ -294,7 +294,6 @@ def run_canonical_grouping(config):
     # NOTE: New lightweight stage4 (crops cache loader) doesn't produce tracklets_recovered.npz
     # Always use tracklets_raw.npz (from Stage 2) as input
     input_file = input_config['tracklets_raw_file']
-    logger.info("Using raw tracklets from Stage 2")
     
     canonical_file = output_config['canonical_persons_file']
     grouping_log_file = output_config['grouping_log_file']
@@ -302,13 +301,12 @@ def run_canonical_grouping(config):
     logger.header()
     
     # Load tracklets
-    logger.step(f"Loading tracklets: {input_file}")
+    logger.info(f"Loading tracklets: {Path(input_file).name}")
     data = np.load(input_file, allow_pickle=True)
     tracklets = list(data['tracklets'])
-    logger.info(f"Loaded {len(tracklets)} tracklets")
     
     # Group tracklets
-    logger.step(f"Grouping tracklets (method: {grouping_config['method']})...")
+    logger.info(f"Grouping tracklets (method: {grouping_config['method']})...")
     t_start = time.time()
     
     if grouping_config['method'] == 'heuristic':
@@ -319,12 +317,9 @@ def run_canonical_grouping(config):
     
     t_end = time.time()
     grouping_time = t_end - t_start
-    print(f"  ✅ Created {len(groups)} canonical persons ({grouping_time:.2f}s)")
-    logger.timing("Grouping", grouping_time)
-    logger.info(f"Created {len(groups)} canonical persons")
+    logger.info(f"Created {len(groups)} canonical persons by merging tracklets")
     
     # Merge groups into canonical persons
-    logger.step(f"Merging tracklets into canonical persons...")
     canonical_persons = []
     grouping_log = []
     
@@ -340,8 +335,6 @@ def run_canonical_grouping(config):
             'end_frame': int(canonical['frame_numbers'][-1]),
             'total_frames': len(canonical['frame_numbers'])
         })
-    
-    logger.info(f"Created {len(canonical_persons)} canonical persons")
     
     if verbose:
         logger.verbose_info(f"Sample canonical persons:")
@@ -359,7 +352,6 @@ def run_canonical_grouping(config):
     t_save_start = time.time()
     np.savez_compressed(output_path, persons=np.array(canonical_persons, dtype=object))
     npz_save_time = time.time() - t_save_start
-    logger.file_size(f"Saved canonical persons", output_path.stat().st_size / (1024 * 1024))
     
     # Save log
     log_path = Path(grouping_log_file)
@@ -367,10 +359,6 @@ def run_canonical_grouping(config):
     with open(log_path, 'w') as f:
         json.dump(grouping_log, f, indent=2)
     log_save_time = time.time() - t_log_save_start
-    logger.file_size(f"Saved grouping log", log_path.stat().st_size / (1024 * 1024))
-    
-    logger.stat("Input tracklets", len(tracklets))
-    logger.stat("Output canonical persons", len(canonical_persons))
 
     # Write timings sidecar
     try:
