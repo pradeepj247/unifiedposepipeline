@@ -17,8 +17,13 @@ import json
 import yaml
 import re
 import os
+import sys
 from pathlib import Path
 from tqdm import tqdm
+
+# Add parent directory to path for logger import
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from utils.logger import PipelineLogger
 
 # Suppress OpenCV/FFmpeg h264 warnings
 os.environ['OPENCV_FFMPEG_LOGLEVEL'] = '-8'
@@ -317,6 +322,12 @@ def main():
     config = load_config(args.config)
     stage_config = config['stage9']
     
+    # Initialize logger
+    verbose = config.get('global', {}).get('verbose', False)
+    logger = PipelineLogger(verbose=verbose)
+    
+    logger.header('Stage 9: Create Visualization Video')
+    
     # Get paths from config
     # Video path comes from global config (single source of truth)
     video_path = Path(config['global']['video_dir'] + config['global']['video_file'])
@@ -328,11 +339,11 @@ def main():
     
     # Check files exist
     if not video_path.exists():
-        print(f"❌ Video not found: {video_path}")
+        logger.error(f"Video not found: {video_path}")
         return
     
     if not canonical_persons_file.exists():
-        print(f"❌ Canonical persons file not found: {canonical_persons_file}")
+        logger.error(f"Canonical persons file not found: {canonical_persons_file}")
         return
     
     # Get video fps for frame threshold calculation
@@ -340,32 +351,26 @@ def main():
     video_fps = cap.get(cv2.CAP_PROP_FPS)
     cap.release()
     
-    print(f"\n{'='*70}")
-    print(f"📹 STAGE 6: CREATE VISUALIZATION VIDEO")
-    print(f"{'='*70}\n")
-    print(f"📂 Video: {video_path.name}")
-    print(f"📊 Canonical Persons: {canonical_persons_file.name}")
-    print(f"🎬 Output: {output_video_path.name}")
+    logger.step(f"📂 Video: {video_path.name}")
+    logger.step(f"📊 Canonical Persons: {canonical_persons_file.name}")
+    logger.step(f"🎬 Output: {output_video_path.name}")
     
     # Load persons with min duration filter
     persons_dict = load_top_persons(canonical_persons_file, 
                                      min_duration_seconds=min_seconds,
                                      video_fps=video_fps)
     
-    print(f"\n📊 Top {len(persons_dict)} Persons:")
+    logger.verbose_info(f"Top {len(persons_dict)} Persons:")
     for person_id, data in sorted(persons_dict.items(), key=lambda x: x[1]['rank']):
-        print(f"  Rank {data['rank']}: Person {person_id} "
-              f"(Tracklets: {data['tracklet_ids']}, "
-              f"Duration: {data['duration']} frames)")
+        logger.verbose_info(f"  Rank {data['rank']}: Person {person_id} "
+                          f"(Tracklets: {data['tracklet_ids']}, "
+                          f"Duration: {data['duration']} frames)")
     
     # Create visualization
-    print(f"\n🎨 Creating visualization video...")
+    logger.step(f"Creating visualization video...")
     create_visualization_video(video_path, persons_dict, output_video_path)
     
-    print(f"\n{'='*70}")
-    print(f"✅ Visualization complete!")
-    print(f"   Output: {output_video_path}")
-    print(f"{'='*70}\n")
+    logger.success()
 
 
 if __name__ == '__main__':
