@@ -135,7 +135,7 @@ def run_stage(stage_name, stage_script, config_path, verbose=False):
     # the stage script prints a compact, reconciled breakdown itself.
     elif 'ByteTrack' in stage_name or 'TRACKING' in stage_name.upper():
         print(f"  ✅ {stage_name} completed")
-    # For Stage 3, 4, 5, and 6, completion message will be printed after reading sidecar or by orchestrator
+    # For Stage 3, 4, 5, 6, and 7, completion message will be printed by orchestrator
     elif 'Stage 3' in stage_name or 'Tracklet Analysis' in stage_name:
         pass  # Will print completion with breakdown below
     elif 'Stage 4' in stage_name or 'Load Crops Cache' in stage_name:
@@ -143,6 +143,8 @@ def run_stage(stage_name, stage_script, config_path, verbose=False):
     elif 'Stage 5' in stage_name or 'Canonical Person Grouping' in stage_name:
         pass  # Will print completion with breakdown below
     elif 'Stage 6' in stage_name or 'Enrich Crops' in stage_name:
+        pass  # Will print completion below
+    elif 'Stage 7' in stage_name or 'Rank Persons' in stage_name:
         pass  # Will print completion below
     else:
         print(f"✅ {stage_name} completed in {t_end - t_start:.2f}s")
@@ -413,6 +415,10 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             # Stage 6: Enrich crops (DISABLED - in-memory optimization)
             if stage_key == 'stage6':
                 print(f"   ✅ Stage 6: Enrich Crops with HDF5 completed in {stage_duration:.2f}s")
+
+            # Stage 7: Rank persons
+            if stage_key == 'stage7':
+                print(f"   ✅ Stage 7: Rank Persons completed in {stage_duration:.2f}s")
         except Exception:
             if verbose:
                 print("     ⚠️  Failed to read timings sidecar")

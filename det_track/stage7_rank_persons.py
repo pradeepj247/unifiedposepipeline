@@ -182,17 +182,16 @@ def run_ranking(config):
     logger.header()
     
     # Load canonical persons
-    logger.step(f"Loading canonical persons: {canonical_file}")
+    logger.info(f"Loading canonical persons: {Path(canonical_file).name}")
     data = np.load(canonical_file, allow_pickle=True)
     persons = list(data['persons'])
-    logger.info(f"Loaded {len(persons)} persons")
     
     if len(persons) == 0:
         logger.error(f"No persons to rank")
         return
     
     # Rank persons
-    logger.step(f"Ranking persons (method: {ranking_config['method']})...")
+    logger.info(f"Ranking persons (method: {ranking_config['method']})...")
     t_start = time.time()
     
     if ranking_config['method'] == 'auto':
@@ -202,8 +201,6 @@ def run_ranking(config):
         raise ValueError(f"Unknown ranking method: {ranking_config['method']}")
     
     t_end = time.time()
-    logger.timing("Ranking", t_end - t_start)
-    logger.info(f"Ranked {len(persons)} persons")
     
     # Select primary
     primary_idx = ranked_indices[0]
