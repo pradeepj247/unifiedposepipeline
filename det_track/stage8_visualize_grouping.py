@@ -371,7 +371,6 @@ def main():
     print_table3_merge_results(canonical_persons, reid_candidates, logger)
     print_table4_top_persons(canonical_persons, top_n=5, logger=logger)
     
-    logger.success()
     print(f"✅ VISUALIZATION COMPLETE!")
     print(f"{'='*70}\n")
 

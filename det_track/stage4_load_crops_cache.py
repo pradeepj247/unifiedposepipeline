@@ -136,8 +136,6 @@ def run_load_crops_cache(config):
     logger.file_size("Cache size", cache_size_mb)
     logger.timing("Load time", t_load)
     
-    logger.success()
-    
     # Write timings sidecar
     try:
         sidecar_path = Path(crops_cache_file).parent / (Path(crops_cache_file).name + '.timings.json')

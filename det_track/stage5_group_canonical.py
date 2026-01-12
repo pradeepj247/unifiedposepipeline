@@ -371,7 +371,6 @@ def run_canonical_grouping(config):
     
     logger.stat("Input tracklets", len(tracklets))
     logger.stat("Output canonical persons", len(canonical_persons))
-    logger.success()
 
     # Write timings sidecar
     try:

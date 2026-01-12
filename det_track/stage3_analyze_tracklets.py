@@ -327,7 +327,6 @@ def run_analysis(config):
     
     logger.stat("Tracklets analyzed", num_tracklets)
     logger.stat("ReID candidates found", len(candidates))
-    logger.success()
     
     # Write timings sidecar
     try:

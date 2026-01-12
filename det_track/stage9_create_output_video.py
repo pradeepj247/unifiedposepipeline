@@ -369,8 +369,6 @@ def main():
     # Create visualization
     logger.step(f"Creating visualization video...")
     create_visualization_video(video_path, persons_dict, output_video_path)
-    
-    logger.success()
 
 
 if __name__ == '__main__':

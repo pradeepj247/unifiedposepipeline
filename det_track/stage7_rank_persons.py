@@ -257,7 +257,6 @@ def run_ranking(config):
     
     logger.stat("Primary person ID", primary_person['person_id'])
     logger.stat("Total candidates", len(persons))
-    logger.success()
 
 
 def main():
