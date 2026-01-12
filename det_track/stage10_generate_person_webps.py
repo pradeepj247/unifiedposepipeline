@@ -228,11 +228,9 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
     """Create animated WebP files for top 10 persons"""
     
     # Load canonical persons
-    print(f"📂 Loading canonical persons...")
     data = np.load(canonical_file, allow_pickle=True)
     persons = list(data['persons'])
     persons.sort(key=lambda p: len(p['frame_numbers']), reverse=True)
-    print(f"   ✅ Loaded {len(persons)} canonical persons")
     
     # Check detection_indices
     if 'detection_indices' not in persons[0]:
@@ -240,12 +238,9 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
         return False
     
     # Load detections
-    print(f"📂 Loading detections...")
     det_data = np.load(detections_file, allow_pickle=True)
-    print(f"   ✅ Loaded {len(det_data['frame_numbers'])} detections")
     
     # Load crops cache
-    print(f"📂 Loading crops cache...")
     if not Path(crops_cache_file).exists():
         print(f"❌ Crops cache not found: {crops_cache_file}")
         return False
@@ -253,13 +248,11 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
     try:
         with open(crops_cache_file, 'rb') as f:
             crops_cache = pickle.load(f)
-        print(f"   ✅ Loaded crops cache")
     except Exception as e:
         print(f"❌ Error reading crops cache: {str(e)}")
         return False
     
     # Build detection index mapping
-    print(f"📊 Building detection index mapping...")
     num_detections_per_frame = det_data.get('num_detections_per_frame', np.array([]))
     
     detection_idx_to_frame_pos = {}
@@ -269,12 +262,9 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
             detection_idx_to_frame_pos[detection_idx] = (frame_idx, pos_in_frame)
             detection_idx += 1
     
-    print(f"   ✅ Built mapping for {len(detection_idx_to_frame_pos)} detections")
-    
     # Create output directory
     webp_dir = Path(output_webp_dir) / 'webp'
     webp_dir.mkdir(parents=True, exist_ok=True)
-    print(f"📁 Output directory: {webp_dir}")
     
     # Generate WebPs
     print(f"\n🎬 Generating animated WebP files for top 10 persons...\n")
@@ -335,7 +325,6 @@ def main():
     print(f"\n{'='*70}")
     print(f"🎬 STAGE 11: GENERATE PERSON ANIMATED WEBP FILES (POSITION→GLOBAL CONVERSION)")
     print(f"{'='*70}\n")
-    print(f"📊 Settings: {num_frames} frames @ {fps} fps = {num_frames/fps:.1f}s per person\n")
     
     t_start = time.time()
     
