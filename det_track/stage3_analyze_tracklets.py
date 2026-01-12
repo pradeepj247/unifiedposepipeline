@@ -253,14 +253,12 @@ def run_analysis(config):
     identify_candidates = analysis_config['identify_candidates']
     
     # Load tracklets
-    logger.step(f"Loading tracklets: {tracklets_file}")
     tracklets = load_tracklets(tracklets_file)
     num_tracklets = len(tracklets)
-    logger.info(f"Loaded {num_tracklets} tracklets")
+    logger.info(f"Loading tracklets: {Path(tracklets_file).name}")
     
     # Compute statistics
     if compute_statistics:
-        logger.step("Computing tracklet statistics...")
         t_start = time.time()
         
         stats = []
@@ -270,8 +268,7 @@ def run_analysis(config):
         
         t_end = time.time()
         stats_time = t_end - t_start
-        logger.timing("Tracklet statistics", stats_time)
-        logger.info(f"Computed stats for {num_tracklets} tracklets")
+        logger.info(f"Computing stats for {num_tracklets} tracklets")
         
         # Save statistics
         output_path = Path(tracklet_stats_file)
@@ -284,14 +281,13 @@ def run_analysis(config):
             statistics=np.array(stats, dtype=object)
         )
         npz_save_time = time.time() - t_save_start
-        file_size_mb = output_path.stat().st_size / (1024 * 1024)
-        logger.file_size(output_path.name, file_size_mb)
     else:
         stats = None
+        stats_time = 0.0
+        npz_save_time = 0.0
     
     # Identify ReID candidates
     if identify_candidates and stats is not None:
-        logger.step("Identifying ReID recovery candidates...")
         t_start = time.time()
         
         candidates = identify_reid_candidates(tracklets, stats, candidate_criteria)
@@ -299,7 +295,6 @@ def run_analysis(config):
         t_end = time.time()
         candidate_id_time = t_end - t_start
         num_candidates = len(candidates)
-        logger.timing("ReID candidate identification", candidate_id_time)
         logger.info(f"Found {num_candidates} candidate pairs")
         
         if verbose and num_candidates > 0:
@@ -319,14 +314,10 @@ def run_analysis(config):
         with open(output_path, 'w') as f:
             json.dump(candidates, f, indent=2)
         candidate_save_time = time.time() - t_cand_save_start
-        
-        file_size_mb = output_path.stat().st_size / (1024 * 1024)
-        logger.file_size(output_path.name, file_size_mb)
     else:
         candidates = []
-    
-    logger.stat("Tracklets analyzed", num_tracklets)
-    logger.stat("ReID candidates found", len(candidates))
+        candidate_id_time = 0.0
+        candidate_save_time = 0.0
     
     # Write timings sidecar
     try:
