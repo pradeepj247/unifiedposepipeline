@@ -130,7 +130,7 @@ def run_stage(stage_name, stage_script, config_path, verbose=False):
     # For YOLO detection stage, print a streamlined completion line with an extra leading space
     if 'YOLO' in stage_name:
         base = stage_name.split(':')[0]
-        print(f" ✅ {base}:  Detection completed in {t_end - t_start:.2f}s")
+        print(f"  ✅ {base}:  Detection completed in {t_end - t_start:.2f}s")
     else:
         print(f"✅ {stage_name} completed in {t_end - t_start:.2f}s")
     return True

@@ -454,6 +454,7 @@ def run_detection(config):
     output_path = Path(detections_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
+    t_npz_start = time.time()
     np.savez_compressed(
         output_path,
         frame_numbers=frame_numbers,
@@ -462,7 +463,9 @@ def run_detection(config):
         classes=classes_array,
         num_detections_per_frame=num_detections_per_frame
     )
-    
+    t_npz_end = time.time()
+    npz_save_time = t_npz_end - t_npz_start
+
     file_size_mb = output_path.stat().st_size / (1024 * 1024)
     print(f"     Saved: {output_path.name}")
     if verbose:
@@ -482,12 +485,13 @@ def run_detection(config):
     
     t_save_end = time.time()
     crops_size_mb = crops_path.stat().st_size / (1024 * 1024)
-    total_save_time = t_save_end - t_save_start
-    
+    crops_save_time = t_save_end - t_save_start
+    total_save_time = npz_save_time + crops_save_time
+
     print(f"     Saved: {crops_path.name}")
     if verbose:
         print(f"     Cache size: {crops_size_mb:.1f} MB")
-    print(f"     Files saving took: {total_save_time:.2f}s")
+    print(f"     Files saving took: {total_save_time:.2f}s (npz: {npz_save_time:.2f}s, crops: {crops_save_time:.2f}s)")
     print()
     
     return {
