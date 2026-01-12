@@ -539,7 +539,7 @@ def main():
     
     if success:
         print(f"    Time taken: {t_end - t_start:.2f}s")
-        print(f"\n✅ Stage 11: HTML Selection Report (Horizontal Tape) completed in {t_end - t_start:.2f}s")
+        print(f"\n✅ Stage 11: HTML Selection Report (Horizontal Tape) completed.")
         print(f"{'='*70}\n")
         return 0
     else:
