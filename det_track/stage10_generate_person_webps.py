@@ -323,7 +323,7 @@ def main():
     num_frames = webp_config.get('max_frames', 60)
     
     print(f"\n{'='*70}")
-    print(f"🎬 STAGE 11: GENERATE PERSON ANIMATED WEBP FILES (POSITION→GLOBAL CONVERSION)")
+    print(f"🎬 STAGE 10: GENERATE PERSON ANIMATED WEBP FILES (POSITION→GLOBAL CONVERSION)")
     print(f"{'='*70}\n")
     
     t_start = time.time()
@@ -342,10 +342,10 @@ def main():
     t_end = time.time()
     
     if success:
-        print(f"✅ Stage 11 completed in {t_end - t_start:.2f}s\n")
+        print(f"✅ Stage 10 completed in {t_end - t_start:.2f}s\n")
         return 0
     else:
-        print(f"❌ Stage 11 failed\n")
+        print(f"❌ Stage 10 failed\n")
         return 1
 
 

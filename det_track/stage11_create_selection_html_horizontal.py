@@ -523,7 +523,7 @@ def main():
     video_duration_frames = config.get('global', {}).get('video_duration_frames', 0)
     
     print(f"\n{'='*70}")
-    print(f"📄 STAGE 10: CREATE HORIZONTAL TAPE LAYOUT SELECTION REPORT")
+    print(f"📄 STAGE 11: CREATE HORIZONTAL TAPE LAYOUT SELECTION REPORT")
     print(f"{'='*70}\n")
     
     t_start = time.time()
@@ -539,13 +539,13 @@ def main():
     t_end = time.time()
     
     if success:
-        print(f"\n✅ Stage 10 completed in {t_end - t_start:.2f}s")
+        print(f"\n✅ Stage 11 completed in {t_end - t_start:.2f}s")
         print(f"   HTML: {output_html.name}")
         print(f"   Open: file://{output_html.absolute()}")
         print(f"{'='*70}\n")
         return 0
     else:
-        print(f"\n❌ Stage 10 failed")
+        print(f"\n❌ Stage 11 failed")
         print(f"{'='*70}\n")
         return 1
 
