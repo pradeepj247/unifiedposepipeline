@@ -126,8 +126,13 @@ def run_stage(stage_name, stage_script, config_path, verbose=False):
     if result.returncode != 0:
         print(f"❌ {stage_name} failed!")
         return False
-    
-    print(f"✅ {stage_name} completed in {t_end - t_start:.2f}s")
+
+    # For YOLO detection stage, print a streamlined completion line with an extra leading space
+    if 'YOLO' in stage_name:
+        base = stage_name.split(':')[0]
+        print(f" ✅ {base}:  Detection completed in {t_end - t_start:.2f}s")
+    else:
+        print(f"✅ {stage_name} completed in {t_end - t_start:.2f}s")
     return True
 
 

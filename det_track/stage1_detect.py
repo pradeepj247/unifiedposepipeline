@@ -351,7 +351,7 @@ def run_detection(config):
     if verbose:
         print(f"🛠️  Loading detector...")
     detector = load_yolo_detector(model_path, device, verbose)
-    print(f"  ✅ YOLO model loaded\n")
+    print(f"  ✅ Detection model loaded\n")
     
     # Open video
     cap = cv2.VideoCapture(video_path)
@@ -488,6 +488,7 @@ def run_detection(config):
     if verbose:
         print(f"     Cache size: {crops_size_mb:.1f} MB")
     print(f"     Files saving took: {total_save_time:.2f}s")
+    print()
     
     return {
         'detections_file': str(output_path),
