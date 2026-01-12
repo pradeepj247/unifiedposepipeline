@@ -34,6 +34,7 @@ import io
 from pathlib import Path
 import time
 from datetime import timedelta
+from tqdm import tqdm
 
 
 def resolve_path_variables(config):
@@ -396,7 +397,7 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
     print(f"🎬 Encoding WebP files and generating HTML...\n")
     
     # Process top 10 persons
-    for rank, person in enumerate(persons[:10], 1):
+    for rank, person in tqdm(enumerate(persons[:10], 1), total=min(10, len(persons)), desc="Encoding WebP files"):
         person_id = person['person_id']
         frames = person['frame_numbers']
         num_frames = len(frames)

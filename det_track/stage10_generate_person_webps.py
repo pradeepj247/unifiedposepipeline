@@ -28,6 +28,7 @@ import yaml
 import re
 import os
 import cv2
+from tqdm import tqdm
 try:
     from PIL import Image
 except ImportError:
@@ -280,7 +281,7 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
     
     success_count = 0
     
-    for rank, person in enumerate(persons[:10], 1):
+    for rank, person in tqdm(enumerate(persons[:10], 1), total=min(10, len(persons)), desc="Generating WebP files"):
         person_id = person['person_id']
         
         success, message = create_webp_for_person(
