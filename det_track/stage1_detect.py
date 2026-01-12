@@ -349,12 +349,12 @@ def run_detection(config):
     print(f"{'='*70}\n")
     
     # Load detector
-    print(f"🛠️  Loading detector...")
+    if verbose:
+        print(f"🛠️  Loading detector...")
     detector = load_yolo_detector(model_path, device, verbose)
-    print(f"  ✅ YOLO model loaded")
+    print(f"  ✅ YOLO model loaded\n")
     
     # Open video
-    print(f"\n📹 Opening video: {video_path}")
     cap = cv2.VideoCapture(video_path)
     
     if not cap.isOpened():
@@ -369,9 +369,9 @@ def run_detection(config):
     proc_width, proc_height = width, height
     num_frames = min(max_frames, total_frames) if max_frames > 0 else total_frames
     
-    print(f"  Resolution: {width}x{height} @ {fps:.2f} fps")
-    print(f"  Total frames: {total_frames}")
-    print(f"  Processing: {num_frames} frames")
+    print(f"     Opening video: {video_path}")
+    print(f"     Resolution: {width}x{height} @ {fps:.2f} fps")
+    print(f"     Total frames: {total_frames}\n")
     
     # Storage
     all_frame_numbers = []
@@ -382,7 +382,8 @@ def run_detection(config):
     crops_cache = {}  # {frame_idx: {det_idx: crop_image}}
     
     # Process frames
-    print(f"\n⚡ Running detection...")
+    if verbose:
+        print(f"⚡ Running detection...")
     t_detection_start = time.time()
     t_crop_start = None
     t_crop_total = 0.0
@@ -452,14 +453,14 @@ def run_detection(config):
     total_detections = len(frame_numbers)
     avg_detections_per_frame = total_detections / num_frames if num_frames > 0 else 0
     
-    print(f"\n✅ Detection complete!")
-    print(f"  Frames processed: {num_frames}")
-    print(f"  Total detections: {total_detections}")
-    print(f"  Avg detections/frame: {avg_detections_per_frame:.1f}")
-    print(f"  Processing FPS: {processing_fps:.1f}")
-    print(f"  Detection time: {t_detection_total:.2f}s")
-    print(f"  Crop extraction time: {t_crop_total:.2f}s")
-    print(f"  Total time: {t_detection_total + t_crop_total:.2f}s")
+    print(f"  ✅ Detection complete!")
+    print(f"     Frames processed: {num_frames}")
+    print(f"     Total detections: {total_detections}")
+    print(f"     Avg detections/frame: {avg_detections_per_frame:.1f}")
+    print(f"     Processing FPS: {processing_fps:.1f}")
+    print(f"     Detection time: {t_detection_total:.2f}s")
+    print(f"     Crop extraction time: {t_crop_total:.2f}s")
+    print(f"     Total time: {t_detection_total + t_crop_total:.2f}s\n")
     
     # Save NPZ
     print(f"\n💾 Saving detections...")
@@ -475,11 +476,15 @@ def run_detection(config):
         num_detections_per_frame=num_detections_per_frame
     )
     
-    print(f"  ✅ Saved: {output_path}")
-    print(f"  Shape: {total_detections} detections across {num_frames} frames")
+    file_size_mb = output_path.stat().st_size / (1024 * 1024)
+    print(f"  ✅ Saved: {output_path.name}")
+    if verbose:
+        print(f"     Size: {file_size_mb:.1f} MB")
+        print(f"     Shape: {total_detections} detections across {num_frames} frames")
     
     # Save crops cache
-    print(f"\n💾 Saving crops cache...")
+    if verbose:
+        print(f"\n  💾 Saving crops cache...")
     t_save_start = time.time()
     
     crops_path = Path(crops_cache_file)
@@ -491,9 +496,17 @@ def run_detection(config):
     t_save_end = time.time()
     crops_size_mb = crops_path.stat().st_size / (1024 * 1024)
     
-    print(f"  ✅ Saved: {crops_path}")
-    print(f"  Cache size: {crops_size_mb:.1f} MB")
-    print(f"  Save time: {t_save_end - t_save_start:.2f}s")
+    print(f"  ✅ Saved: {crops_path.name}")
+    if verbose:
+        print(f"     Cache size: {crops_size_mb:.1f} MB")
+        print(f"     Save time: {t_save_end - t_save_start:.2f}s")
+    
+    return {
+        'detections_file': str(output_path),
+        'crops_cache_file': str(crops_path),
+        'num_frames': num_frames,
+        'total_detections': total_detections
+    }
     
     return {
         'detections_file': str(output_path),
