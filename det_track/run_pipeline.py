@@ -207,8 +207,8 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         ('Stage 7: Rank Persons', 'stage7_rank_persons.py', 'stage7'),
         ('Stage 8: Visualize Grouping (Debug)', 'stage8_visualize_grouping.py', 'stage8'),
         ('Stage 9: Output Video Visualization', 'stage9_create_output_video.py', 'stage9'),
-        ('Stage 11: Generate Person Animated WebPs', 'stage10_generate_person_webps.py', 'stage11'),
-        ('Stage 10: HTML Selection Report (Horizontal Tape)', 'stage11_create_selection_html_horizontal.py', 'stage10')
+        ('Stage 10: Generate Person Animated WebPs', 'stage10_generate_person_webps.py', 'stage10'),
+        ('Stage 11: HTML Selection Report (Horizontal Tape)', 'stage11_create_selection_html_horizontal.py', 'stage11')
     ]
     
     print(f"\n{'='*70}")
