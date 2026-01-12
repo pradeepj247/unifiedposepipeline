@@ -169,9 +169,10 @@ def run_tracking(config):
     tracklets_file = output_config['tracklets_file']
     video_path = input_config.get('video_path', None)
     
-    # Print header (single separator line to reduce noise)
+    # Print header with full separator box
     print(f"\n{'='*70}")
     print(f"📍 STAGE 2: TRACKING (BYTETRACK OFFLINE)")
+    print(f"{'='*70}\n")
     
     # ByteTrack uses Kalman filters (motion-only), doesn't need actual frame pixels
     # Skip video loading for performance (frame is only placeholder for BoxMOT API)
