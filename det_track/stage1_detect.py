@@ -385,7 +385,7 @@ def run_detection(config):
         print(f"⚡ Running detection...")
     t_loop_start = time.time()
     
-    pbar = tqdm(total=num_frames, desc="     🔍 Detecting", mininterval=1.0)
+    pbar = tqdm(total=num_frames, desc="  🔍 Detecting", mininterval=1.0)
     
     frame_idx = 0
     while frame_idx < num_frames:
@@ -464,7 +464,7 @@ def run_detection(config):
     )
     
     file_size_mb = output_path.stat().st_size / (1024 * 1024)
-    print(f"  ✅ Saved: {output_path.name}")
+    print(f"     Saved: {output_path.name}")
     if verbose:
         print(f"     Size: {file_size_mb:.1f} MB")
         print(f"     Shape: {total_detections} detections across {num_frames} frames")
@@ -484,7 +484,7 @@ def run_detection(config):
     crops_size_mb = crops_path.stat().st_size / (1024 * 1024)
     total_save_time = t_save_end - t_save_start
     
-    print(f"  ✅ Saved: {crops_path.name}")
+    print(f"     Saved: {crops_path.name}")
     if verbose:
         print(f"     Cache size: {crops_size_mb:.1f} MB")
     print(f"     Files saving took: {total_save_time:.2f}s")
@@ -513,8 +513,11 @@ def main():
     
     # Run detection
     run_detection(config)
-    
-    print(f"\n{'='*70}\n")
+
+    # Print trailing separator only in verbose mode to avoid extra delimiter
+    verbose = config.get('stage1', {}).get('advanced', {}).get('verbose', False)
+    if verbose:
+        print(f"\n{'='*70}\n")
 
 
 if __name__ == '__main__':
