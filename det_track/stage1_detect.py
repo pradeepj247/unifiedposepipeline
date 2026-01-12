@@ -385,7 +385,7 @@ def run_detection(config):
         print(f"⚡ Running detection...")
     t_loop_start = time.time()
     
-    pbar = tqdm(total=num_frames, desc="     Detecting", mininterval=1.0)
+    pbar = tqdm(total=num_frames, desc="     🔍 Detecting", mininterval=1.0)
     
     frame_idx = 0
     while frame_idx < num_frames:
@@ -444,8 +444,7 @@ def run_detection(config):
     total_detections = len(frame_numbers)
     avg_detections_per_frame = total_detections / num_frames if num_frames > 0 else 0
     
-    print(f"  ✅ Detection complete!")
-    print(f"     Frames processed: {num_frames}")
+    print(f"     Detection complete!")
     print(f"     Total detections: {total_detections}")
     print(f"     Avg detections/frame: {avg_detections_per_frame:.1f}")
     print(f"     Processing FPS: {processing_fps:.1f}")
@@ -483,18 +482,12 @@ def run_detection(config):
     
     t_save_end = time.time()
     crops_size_mb = crops_path.stat().st_size / (1024 * 1024)
+    total_save_time = t_save_end - t_save_start
     
     print(f"  ✅ Saved: {crops_path.name}")
     if verbose:
         print(f"     Cache size: {crops_size_mb:.1f} MB")
-        print(f"     Save time: {t_save_end - t_save_start:.2f}s")
-    
-    return {
-        'detections_file': str(output_path),
-        'crops_cache_file': str(crops_path),
-        'num_frames': num_frames,
-        'total_detections': total_detections
-    }
+    print(f"     Files saving took: {total_save_time:.2f}s")
     
     return {
         'detections_file': str(output_path),
