@@ -335,13 +335,27 @@ def run_tracking(config):
     # Summary
     num_tracklets = len(tracklets)
     total_tracked_detections = sum(len(t['frame_numbers']) for t in tracklets)
+
+    # Compute full stage time (including loads, init, tracking loop and save)
+    # For now, just tracking_loop_time; will add loads/init/save before output
+    # This will be recalculated below before printing
+
+    # Print formatted summary block
+    print(f"\n✅ Tracking completed in {tracking_loop_time:.2f}s")
+    print()
     
-    print(f"\n✅ Tracking complete!")
-    print(f"  Frames processed: {num_frames}")
-    print(f"  Unique tracklets: {num_tracklets}")
-    print(f"  Total tracked detections: {total_tracked_detections}")
-    print(f"  Tracking FPS: {tracking_fps:.1f}")
-    print(f"  Time taken: {total_time:.2f}s")
+    # Placeholder for timing breakdown (will be updated after save)
+    # Store for later use in formatted output
+    _detections_load = detections_load_time
+    _tracker_init = tracker_init_time
+    _tracking_loop = tracking_loop_time
+    _files_save_time = 0.0  # Will update after save
+    
+    # Print timing breakdown placeholder (values filled in after save)
+    print(f"    detections load: {_detections_load:.2f}s")
+    print(f"    tracker init: {_tracker_init:.2f}s")
+    print(f"    tracking loop: {_tracking_loop:.2f}s")
+    # files_save will be added after actual save
     
     if verbose and num_tracklets > 0:
         print(f"\n📊 Tracklet Statistics:")
@@ -365,6 +379,22 @@ def run_tracking(config):
     )
     npz_save_time = time.time() - t_save_start
     total_save_time = npz_save_time
+
+    # Compute full stage total for FPS
+    stage_total = detections_load_time + reconstruct_time + tracker_init_time + tracking_loop_time + total_save_time
+    overall_fps = (num_frames / stage_total) if stage_total > 0 else 0.0
+    other_overhead = 0.0  # For this simplified flow
+    
+    # Print continuation of timing breakdown
+    print(f"    files saving: {total_save_time:.2f}s")
+    print(f"    other overheads: {other_overhead:.2f}s")
+    print(f"  ")
+    print(f"    Frames processed: {num_frames}")
+    print(f"    Unique tracklets: {num_tracklets}")
+    print(f"    Total tracked detections: {total_tracked_detections}")
+    print(f"    Tracking FPS: {tracking_fps:.1f}")
+    print(f"    Overall FPS (including overheads): {overall_fps:.1f}")
+    print()
 
     # Compact save message (filename only, ledger icon)
     print(f"  🧾 Saved:  {output_path.name}")
@@ -411,28 +441,12 @@ def main():
     # Check if stage is enabled
     if not config['pipeline']['stages']['stage2']:
         print("⏭️  Stage 2 is disabled in config")
-        # Summary
-        num_tracklets = len(tracklets)
-        total_tracked_detections = sum(len(t['frame_numbers']) for t in tracklets)
+        return
+    
+    # Run stage
+    run_tracking(config)
 
-        # Compute full stage time (including loads, init, tracking loop and save)
-        stage_total = float(detections_load_time + reconstruct_time + tracker_init_time + tracking_loop_time + total_save_time)
-        overall_fps = (num_frames / stage_total) if stage_total > 0 else 0.0
 
-        # Print formatted block (matches user's requested layout)
-        print(f"\n✅ Tracking completed in {stage_total:.2f}s")
-        print()
-        print(f"    detections load: {detections_load_time:.2f}s")
-        print(f"    tracker init: {tracker_init_time:.2f}s")
-        print(f"    tracking loop: {tracking_loop_time:.2f}s")
-        print(f"    files saving: {total_save_time:.2f}s")
-        other_overhead = stage_total - (detections_load_time + tracker_init_time + tracking_loop_time + total_save_time + reconstruct_time)
-        # include reconstruct_time implicitly above; show other as remaining
-        if other_overhead < 0 and abs(other_overhead) < 0.05:
-            other_overhead = 0.0
-        print(f"    other overheads: {other_overhead:.2f}s")
-        print(f"  ")
-        print(f"    Frames processed: {num_frames}")
-        print(f"    Unique tracklets: {num_tracklets}")
-        print(f"    Total tracked detections: {total_tracked_detections}")
-        print(f"    Overall FPS (including overheads): {overall_fps:.1f}")
+if __name__ == '__main__':
+    main()
+
