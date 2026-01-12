@@ -144,7 +144,7 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
             if len(person['frame_numbers']) > 0:
                 max_frame = max(max_frame, int(person['frame_numbers'][-1]))
         video_duration_frames = max_frame + 1
-        print(f"   Calculated video_duration_frames from data: {video_duration_frames}")
+        print(f"🛠️  Calculated video_duration_frames from data: {video_duration_frames}")
     
     # Locate WebP directory
     if webp_dir is None:
@@ -397,7 +397,8 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
     print(f"🎬 Encoding WebP files and generating HTML...\n")
     
     # Process top 10 persons
-    for rank, person in tqdm(enumerate(persons[:10], 1), total=min(10, len(persons)), desc="Encoding WebP files"):
+    verbose = False  # Get from config if needed
+    for rank, person in tqdm(enumerate(persons[:10], 1), total=min(10, len(persons)), desc="Encoding WebP files", disable=not verbose):
         person_id = person['person_id']
         frames = person['frame_numbers']
         num_frames = len(frames)
@@ -432,11 +433,9 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
             continue
         
         # Encode WebP to base64
-        print(f"  🎬 Rank {rank}: P{person_id} - Encoding WebP...", end='', flush=True)
         webp_data = encode_webp_to_base64(webp_path)
         
         if not webp_data:
-            print(f" ⚠️  Failed")
             html_content += f"""            <div class="person-card" onclick="selectPerson(this, {person_id})">
                 <div class="rank-badge">#{rank}</div>
                 <div class="video-thumb">
@@ -453,8 +452,6 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
             </div>
 """
             continue
-        
-        print(f" ✅")
         
         # Create person card with animated WebP (no video tag needed)
         html_content += f"""            <div class="person-card" onclick="selectPerson(this, {person_id})">
