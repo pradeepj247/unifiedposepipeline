@@ -347,22 +347,28 @@ def run_detection(config):
     print(f"📍 STAGE 1: DETECTION")
     print(f"{'='*70}\n")
     
-    # Load detector
+    # Load detector (measure model load time)
+    t_model_load_start = time.time()
     if verbose:
         print(f"🛠️  Loading detector...")
     detector = load_yolo_detector(model_path, device, verbose)
+    t_model_load_end = time.time()
+    model_load_time = t_model_load_end - t_model_load_start
     print(f"  ✅ Detection model loaded\n")
     
-    # Open video
+    # Open video (measure open time)
+    t_video_open_start = time.time()
     cap = cv2.VideoCapture(video_path)
-    
+
     if not cap.isOpened():
         raise ValueError(f"Could not open video: {video_path}")
-    
+
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = cap.get(cv2.CAP_PROP_FPS)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    t_video_open_end = time.time()
+    video_open_time = t_video_open_end - t_video_open_start
     
     # Use original resolution (downscaling adds 19% overhead with no benefit)
     proc_width, proc_height = width, height
@@ -492,6 +498,23 @@ def run_detection(config):
     if verbose:
         print(f"     Cache size: {crops_size_mb:.1f} MB")
     print(f"     Files saving took: {total_save_time:.2f}s (npz: {npz_save_time:.2f}s, crops: {crops_save_time:.2f}s)")
+
+    # Print full timing breakdown so users can reconcile sums with orchestrator time
+    try:
+        sum_parts = model_load_time + video_open_time + t_loop_total + total_save_time
+    except NameError:
+        # Fallback if any timer wasn't set for some reason
+        model_load_time = locals().get('model_load_time', 0.0)
+        video_open_time = locals().get('video_open_time', 0.0)
+        sum_parts = model_load_time + video_open_time + t_loop_total + total_save_time
+
+    print(f"     Breakdown:")
+    print(f"       model load: {model_load_time:.2f}s")
+    print(f"       video open: {video_open_time:.2f}s")
+    print(f"       detect+crop loop: {t_loop_total:.2f}s")
+    print(f"       saves: {total_save_time:.2f}s (npz: {npz_save_time:.2f}s, crops: {crops_save_time:.2f}s)")
+    print(f"     Sum of parts: {sum_parts:.2f}s")
+    print(f"     (Orchestrator stage time is printed by run_pipeline)")
     print()
     
     return {
