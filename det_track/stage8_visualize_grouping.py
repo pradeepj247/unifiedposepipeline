@@ -332,6 +332,10 @@ def main():
                         help='Path to pipeline configuration YAML')
     args = parser.parse_args()
     
+    # Load config
+    with open(args.config, 'r') as f:
+        config = yaml.safe_load(f)
+    
     verbose = config.get('global', {}).get('verbose', False)
     logger = PipelineLogger("Stage 8: Visualize Grouping", verbose=verbose)
     
