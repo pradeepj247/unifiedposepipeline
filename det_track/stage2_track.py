@@ -19,6 +19,8 @@ from datetime import datetime, timezone
 import re
 import sys
 from pathlib import Path
+import os
+import contextlib
 from tqdm import tqdm
 
 
@@ -183,26 +185,37 @@ def run_tracking(config):
         print(f"   Frame rate: {frame_rate} fps, Resolution: {video_width}x{video_height}")
     
     # Load detections
-    print(f"📂 Loading detections: {detections_file}")
+    if verbose:
+        print(f"📂 Loading detections: {detections_file}")
     t_dl_start = time.time()
     detections_data = load_detections(detections_file)
     detections_load_time = time.time() - t_dl_start
     
     total_detections = len(detections_data['frame_numbers'])
-    print(f"  ✅ Loaded {total_detections} detections")
+    if verbose:
+        print(f"  ✅ Loaded {total_detections} detections")
     
     # Reconstruct per-frame detections
-    print(f"\n🔄 Reconstructing per-frame detections...")
+    if verbose:
+        print(f"\n🔄 Reconstructing per-frame detections...")
     t_rec_start = time.time()
     detections_by_frame, unique_frames = reconstruct_detections_per_frame(detections_data)
     reconstruct_time = time.time() - t_rec_start
     num_frames = len(unique_frames)
-    print(f"  ✅ {num_frames} frames with detections")
+    if verbose:
+        print(f"  ✅ {num_frames} frames with detections")
     
     # Initialize tracker
-    print(f"\n🛠️  Initializing ByteTrack tracker...")
+    if verbose:
+        print(f"\n🛠️  Initializing ByteTrack tracker...")
     t_init_start = time.time()
-    tracker = init_bytetrack_tracker(params, frame_rate, verbose)
+    # Suppress third-party stdout/stderr during tracker init when not verbose
+    if verbose:
+        tracker = init_bytetrack_tracker(params, frame_rate, verbose)
+    else:
+        with open(os.devnull, 'w') as devnull:
+            with contextlib.redirect_stdout(devnull), contextlib.redirect_stderr(devnull):
+                tracker = init_bytetrack_tracker(params, frame_rate, verbose)
     tracker_init_time = time.time() - t_init_start
     
     # Track
@@ -213,8 +226,8 @@ def run_tracking(config):
     
     pbar = tqdm(total=num_frames, desc="Tracking", mininterval=1.0)
     
-    debug_first_frame = True
-    debug_first_tracking = True
+    debug_first_frame = bool(verbose)
+    debug_first_tracking = bool(verbose)
     frame_count = 0
     for frame_id in sorted(unique_frames):
         frame_data = detections_by_frame[frame_id]
@@ -233,7 +246,7 @@ def run_tracking(config):
         else:
             dets_for_tracker = np.empty((0, 6))
         
-        # Debug first frame
+        # Debug first frame (verbose only)
         if debug_first_frame and len(dets_for_tracker) > 0:
             print(f"\n🔍 DEBUG - First frame with detections (frame {frame_id}):")
             print(f"   Shape: {dets_for_tracker.shape}")
@@ -245,7 +258,7 @@ def run_tracking(config):
         try:
             tracked = tracker.update(dets_for_tracker, frame)
             
-            # Debug first tracking result
+            # Debug first tracking result (verbose only)
             if debug_first_tracking and len(dets_for_tracker) > 0:
                 print(f"   Tracker returned: shape={tracked.shape if len(tracked) > 0 else 'empty'}, count={len(tracked)}")
                 if len(tracked) > 0:
@@ -331,11 +344,9 @@ def run_tracking(config):
         if num_tracklets > 10:
             print(f"  ... and {num_tracklets - 10} more")
     
-    # Save NPZ
-    print(f"\n💾 Saving tracklets...")
     output_path = Path(tracklets_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # Save as structured array
     t_save_start = time.time()
     np.savez_compressed(
@@ -344,11 +355,11 @@ def run_tracking(config):
     )
     npz_save_time = time.time() - t_save_start
     total_save_time = npz_save_time
-    
-    print(f"  ✅ Saved: {output_path}")
-    print(f"  Format: {num_tracklets} tracklets")
 
-    # Write timings sidecar
+    # Compact save message (filename only)
+    print(f"  ✅ Saved:  {output_path.name}")
+
+    # Write timings sidecar silently
     try:
         sidecar_path = output_path.parent / (output_path.name + '.timings.json')
         sidecar = {
@@ -367,10 +378,9 @@ def run_tracking(config):
         }
         with open(sidecar_path, 'w', encoding='utf-8') as sf:
             json.dump(sidecar, sf, indent=2)
-        print(f"  ℹ️  Wrote timings sidecar: {sidecar_path.name}")
-    except Exception as e:
+    except Exception:
         if verbose:
-            print(f"  ⚠️  Failed to write timings sidecar: {e}")
+            print(f"  ⚠️  Failed to write timings sidecar")
     
     return {
         'tracklets_file': str(output_path),
