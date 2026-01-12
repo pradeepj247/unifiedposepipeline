@@ -492,7 +492,9 @@ def create_selection_report_horizontal(canonical_file, crops_cache_file, output_
         f.write(html_content)
     
     html_size_mb = output_html.stat().st_size / (1024 * 1024) if output_html.exists() else 0
-    print(f"\n✅ Report created: {html_size_mb:.2f} MB")
+    print(f"\n✅ HTML Selection Report Created")
+    print(f"    Filename: {output_html.name}")
+    print(f"    Size: {html_size_mb:.2f} MB")
     
     return True
 
@@ -536,9 +538,8 @@ def main():
     t_end = time.time()
     
     if success:
-        print(f"\n✅ Stage 11 completed in {t_end - t_start:.2f}s")
-        print(f"   HTML: {output_html.name}")
-        print(f"   Open: file://{output_html.absolute()}")
+        print(f"    Time taken: {t_end - t_start:.2f}s")
+        print(f"\n✅ Stage 11: HTML Selection Report (Horizontal Tape) completed in {t_end - t_start:.2f}s")
         print(f"{'='*70}\n")
         return 0
     else:
