@@ -355,14 +355,11 @@ def main():
     logger_instance.header()
     
     logger_instance.info("DISABLED - In-Memory Crops Optimization Active")
-    logger_instance.info("")
     logger_instance.verbose_info("Why disabled:")
     logger_instance.verbose_info("  • HDF5 write eliminated (50.46s saved)")
     logger_instance.verbose_info("  • Crops kept in-memory for Stage 11")
     logger_instance.verbose_info("  • Stage 11 reorganizes on-demand (<1s)")
     logger_instance.verbose_info("  • Total savings: 50+ seconds (33% faster pipeline)")
-    
-    logger_instance.success()
     
     return 0
 
