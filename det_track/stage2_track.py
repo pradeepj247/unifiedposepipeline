@@ -209,13 +209,23 @@ def run_tracking(config):
     if verbose:
         print(f"\n🛠️  Initializing ByteTrack tracker...")
     t_init_start = time.time()
-    # Suppress third-party stdout/stderr during tracker init when not verbose
+    # Suppress boxmot/loguru output during tracker init when not verbose
     if verbose:
         tracker = init_bytetrack_tracker(params, frame_rate, verbose)
     else:
-        with open(os.devnull, 'w') as devnull:
-            with contextlib.redirect_stdout(devnull), contextlib.redirect_stderr(devnull):
-                tracker = init_bytetrack_tracker(params, frame_rate, verbose)
+        try:
+            from loguru import logger as _loguru_logger
+            _loguru_logger.disable("boxmot")
+        except Exception:
+            _loguru_logger = None
+
+        tracker = init_bytetrack_tracker(params, frame_rate, verbose)
+
+        try:
+            if _loguru_logger is not None:
+                _loguru_logger.enable("boxmot")
+        except Exception:
+            pass
     tracker_init_time = time.time() - t_init_start
     
     # Track
