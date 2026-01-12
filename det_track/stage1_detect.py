@@ -19,7 +19,7 @@ import os
 import sys
 import pickle
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from tqdm import tqdm
 
@@ -521,7 +521,7 @@ def run_detection(config):
     # Write a sidecar JSON with fine-grained timings for the orchestrator to read
     try:
         sidecar = {
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'model_load_time': float(model_load_time),
             'video_open_time': float(video_open_time),
             'detect_loop_time': float(t_loop_total),

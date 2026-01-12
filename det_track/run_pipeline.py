@@ -273,11 +273,30 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                         import json
                         with open(sidecar_path, 'r', encoding='utf-8') as sf:
                             data = json.load(sf)
-                        sum_parts = float(data.get('sum_parts', 0.0))
-                        overhead = stage_duration - sum_parts
-                        if overhead < 0 and abs(overhead) < 0.05:
-                            overhead = 0.0
-                        print(f"     Overhead (subprocess/startup): {overhead:.2f}s")
+
+                        model_load_time = float(data.get('model_load_time', 0.0))
+                        detect_loop_time = float(data.get('detect_loop_time', data.get('detect_loop', 0.0)))
+                        total_save_time = float(data.get('total_save_time', data.get('npz_save_time', 0.0) + data.get('crops_save_time', 0.0)))
+                        num_frames_sidecar = int(data.get('num_frames', 0))
+
+                        # Other overheads = orchestrator stage duration - (model + detect + save)
+                        other_overhead = stage_duration - (model_load_time + detect_loop_time + total_save_time)
+                        if other_overhead < 0 and abs(other_overhead) < 0.05:
+                            other_overhead = 0.0
+
+                        print(f"     Breakdown (stage parts):")
+                        print(f"       model load: {model_load_time:.2f}s")
+                        print(f"       detection processing: {detect_loop_time:.2f}s")
+                        print(f"       files saving: {total_save_time:.2f}s")
+                        print(f"       other overheads: {other_overhead:.2f}s")
+
+                        # FPS metrics: detection-only, and active-FPS excluding model load
+                        fps_detection_only = (num_frames_sidecar / detect_loop_time) if detect_loop_time > 0 else 0.0
+                        active_time = stage_duration - model_load_time
+                        fps_active = (num_frames_sidecar / active_time) if active_time > 0 else 0.0
+                        print(f"     FPS (detection-only): {fps_detection_only:.1f}")
+                        print(f"     FPS (detection+save+overhead): {fps_active:.1f}")
+                        print(f"     Sum of parts (model+detect+save): {(model_load_time + detect_loop_time + total_save_time):.2f}s")
                     else:
                         if verbose:
                             print(f"     (No timings sidecar found at {sidecar_path.name})")
