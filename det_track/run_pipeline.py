@@ -146,6 +146,10 @@ def run_stage(stage_name, stage_script, config_path, verbose=False):
         pass  # Will print completion below
     elif 'Stage 7' in stage_name or 'Rank Persons' in stage_name:
         pass  # Will print completion below
+    elif 'Stage 10' in stage_name or 'Generate Person Animated WebPs' in stage_name:
+        pass  # Will print completion below
+    elif 'Stage 11' in stage_name or 'HTML Selection Report' in stage_name:
+        pass  # Will print completion below
     else:
         print(f"✅ {stage_name} completed in {t_end - t_start:.2f}s")
     
@@ -419,6 +423,15 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             # Stage 7: Rank persons
             if stage_key == 'stage7':
                 print(f"   ✅ Stage 7: Rank Persons completed in {stage_duration:.2f}s")
+
+            # Stage 10: Generate Person Animated WebPs
+            if stage_key == 'stage10':
+                print(f"  ✅ Stage 10: Generate Person Animated WebPs completed in {stage_duration:.2f}s")
+                print(f"{'='*70}")
+
+            # Stage 11: HTML Selection Report
+            if stage_key == 'stage11':
+                print(f"  ✅ Stage 11: HTML Selection Report (Horizontal Tape) completed in {stage_duration:.2f}s")
         except Exception:
             if verbose:
                 print("     ⚠️  Failed to read timings sidecar")

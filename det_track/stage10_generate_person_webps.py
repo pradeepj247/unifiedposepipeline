@@ -224,7 +224,7 @@ def create_webp_for_person(person, crops_cache, detection_idx_to_frame_pos, num_
 
 
 def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_file, output_webp_dir,
-                                 frame_width=128, frame_height=192, fps=10, num_frames=60):
+                                 frame_width=128, frame_height=192, fps=10, num_frames=60, verbose=False):
     """Create animated WebP files for top 10 persons"""
     
     # Load canonical persons
@@ -267,11 +267,9 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
     webp_dir.mkdir(parents=True, exist_ok=True)
     
     # Generate WebPs
-    print(f"\n🎬 Generating animated WebP files for top 10 persons...\n")
-    
     success_count = 0
     
-    for rank, person in tqdm(enumerate(persons[:10], 1), total=min(10, len(persons)), desc="Generating WebP files"):
+    for rank, person in tqdm(enumerate(persons[:10], 1), total=min(10, len(persons)), desc="Generating WebP files", disable=not verbose):
         person_id = person['person_id']
         
         success, message = create_webp_for_person(
@@ -287,16 +285,12 @@ def create_webp_for_top_persons(canonical_file, crops_cache_file, detections_fil
         )
         
         if success:
-            print(f"  ✅ Rank {rank}: P{person_id} - {message}")
+            if verbose:
+                print(f"  ✅ Rank {rank}: P{person_id} - {message}")
             success_count += 1
         else:
-            print(f"  ❌ Rank {rank}: P{person_id} - {message}")
-    
-    print(f"\n{'='*70}")
-    print(f"📊 WebP Generation Summary:")
-    print(f"  ✅ Successful: {success_count}/10")
-    print(f"  📁 Output: {webp_dir}")
-    print(f"{'='*70}\n")
+            if verbose:
+                print(f"  ❌ Rank {rank}: P{person_id} - {message}")
     
     return success_count > 0
 
@@ -321,6 +315,7 @@ def main():
     frame_height = webp_config.get('frame_height', 192)
     fps = webp_config.get('fps', 10)
     num_frames = webp_config.get('max_frames', 60)
+    verbose = config.get('global', {}).get('verbose', False)
     
     print(f"\n{'='*70}")
     print(f"🎬 STAGE 10: GENERATE PERSON ANIMATED WEBP FILES (POSITION→GLOBAL CONVERSION)")
@@ -336,13 +331,15 @@ def main():
         frame_width=frame_width,
         frame_height=frame_height,
         fps=fps,
-        num_frames=num_frames
+        num_frames=num_frames,
+        verbose=verbose
     )
     
     t_end = time.time()
     
     if success:
-        print(f"✅ Stage 10 completed in {t_end - t_start:.2f}s\n")
+        print(f"  ✅ Stage 10 completed in {t_end - t_start:.2f}s")
+        print(f"{'='*70}\n")
         return 0
     else:
         print(f"❌ Stage 10 failed\n")
