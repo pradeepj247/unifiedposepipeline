@@ -485,9 +485,6 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     else:
         print(f"Total time: {total_time:.2f}s (all stages skipped)")
     
-    print(f"\nStages executed: {len(executed_times)}")
-    print(f"Stages skipped: {len([stage for stage, _, skipped in stage_times if skipped])}")
-    
     # Show output files
     print(f"\n📦 Output Files:")
     
@@ -515,8 +512,8 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             str(Path(config['stage5']['output']['canonical_persons_file']).parent / 'person_selection_report.html')
         ],
         'stage11': [
-            # Check videos subfolder in video-specific outputs
-            str(Path(config['stage5']['output']['canonical_persons_file']).parent / 'videos')
+            # Check webp subfolder in video-specific outputs
+            str(Path(config['stage5']['output']['canonical_persons_file']).parent / 'webp')
         ]
     }
     
