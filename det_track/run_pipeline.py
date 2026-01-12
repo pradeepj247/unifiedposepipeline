@@ -190,11 +190,10 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         ('Stage 11: HTML Selection Report (Horizontal Tape)', 'stage11_create_selection_html_horizontal.py', 'stage11')
     ]
     
-    # Print header
     print(f"\n{'='*70}")
     print(f"🎬 UNIFIED DETECTION & TRACKING PIPELINE")
     print(f"{'='*70}\n")
-    print(f"Config: {config_path}")
+    print(f"   Loaded config: {config_path}")
     
     # Determine which stages to run
     enabled_stages = config['pipeline']['stages']
@@ -220,7 +219,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                         stage_nums.append(f"{idx+1}")
                         break
         
-        print(f"Running stages: {', '.join(stage_nums)}")
+        print(f"   Running pipeline stages: {', '.join(stage_nums)}")
     else:
         # Run all enabled stages
         stages = [
@@ -228,7 +227,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             if enabled_stages.get(stage[2], True)
         ]
         enabled_nums = [i+1 for i, stage in enumerate(all_stages) if enabled_stages.get(stage[2], True)]
-        print(f"Running enabled stages: {', '.join([str(i) for i in enabled_nums])}")
+        print(f"   Running enabled stages: {', '.join([str(i) for i in enabled_nums])}")
     
     print(f"\n{'='*70}\n")
     

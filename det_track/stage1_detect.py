@@ -462,7 +462,6 @@ def run_detection(config):
     print(f"     Total time: {t_detection_total + t_crop_total:.2f}s\n")
     
     # Save NPZ
-    print(f"\n💾 Saving detections...")
     output_path = Path(detections_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
