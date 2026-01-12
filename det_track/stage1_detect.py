@@ -18,6 +18,8 @@ import re
 import os
 import sys
 import pickle
+import json
+from datetime import datetime
 from pathlib import Path
 from tqdm import tqdm
 
@@ -503,7 +505,6 @@ def run_detection(config):
     try:
         sum_parts = model_load_time + video_open_time + t_loop_total + total_save_time
     except NameError:
-        # Fallback if any timer wasn't set for some reason
         model_load_time = locals().get('model_load_time', 0.0)
         video_open_time = locals().get('video_open_time', 0.0)
         sum_parts = model_load_time + video_open_time + t_loop_total + total_save_time
@@ -516,6 +517,33 @@ def run_detection(config):
     print(f"     Sum of parts: {sum_parts:.2f}s")
     print(f"     (Orchestrator stage time is printed by run_pipeline)")
     print()
+
+    # Write a sidecar JSON with fine-grained timings for the orchestrator to read
+    try:
+        sidecar = {
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'model_load_time': float(model_load_time),
+            'video_open_time': float(video_open_time),
+            'detect_loop_time': float(t_loop_total),
+            'npz_save_time': float(npz_save_time),
+            'crops_save_time': float(crops_save_time),
+            'total_save_time': float(total_save_time),
+            'sum_parts': float(sum_parts),
+            'num_frames': int(num_frames),
+            'total_detections': int(total_detections),
+            'detections_file': str(output_path)
+        }
+
+        sidecar_path = output_path.parent / (output_path.name + '.timings.json')
+        with open(sidecar_path, 'w', encoding='utf-8') as sf:
+            json.dump(sidecar, sf, indent=2)
+
+        if verbose:
+            print(f"     Wrote timings sidecar: {sidecar_path.name}")
+    except Exception:
+        # Non-fatal: sidecar write failure shouldn't stop the pipeline
+        if verbose:
+            print("     ⚠️  Failed to write timings sidecar")
     
     return {
         'detections_file': str(output_path),

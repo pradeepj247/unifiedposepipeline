@@ -263,6 +263,28 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         
         stage_times.append((stage_name, stage_duration, False))  # Not skipped
         
+        # If stage1 (YOLO), try to read the timings sidecar and report overhead
+        try:
+            if stage_key == 'stage1':
+                detections_file = config['stage1']['output'].get('detections_file')
+                if detections_file:
+                    sidecar_path = Path(detections_file).parent / (Path(detections_file).name + '.timings.json')
+                    if sidecar_path.exists():
+                        import json
+                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
+                            data = json.load(sf)
+                        sum_parts = float(data.get('sum_parts', 0.0))
+                        overhead = stage_duration - sum_parts
+                        if overhead < 0 and abs(overhead) < 0.05:
+                            overhead = 0.0
+                        print(f"     Overhead (subprocess/startup): {overhead:.2f}s")
+                    else:
+                        if verbose:
+                            print(f"     (No timings sidecar found at {sidecar_path.name})")
+        except Exception:
+            if verbose:
+                print("     ⚠️  Failed to read timings sidecar")
+        
         if not success:
             print(f"\n❌ Pipeline failed at {stage_name}")
             return False
