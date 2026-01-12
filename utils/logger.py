@@ -77,10 +77,10 @@ class PipelineLogger:
         self._stage_start_time = time.time()
     
     def header(self):
-        """Print stage header with start emoji."""
-        start_emoji = self._get_emoji('start')
-        print(f"\n{start_emoji} {self.stage_name}")
-        print(f"{'-' * 70}")
+        """Print stage header with separator box (consistent with Stage 1 & 2)."""
+        print(f"\n{'='*70}")
+        print(f"📍 {self.stage_name.upper()}")
+        print(f"{'='*70}\n")
     
     def step(self, message):
         """
