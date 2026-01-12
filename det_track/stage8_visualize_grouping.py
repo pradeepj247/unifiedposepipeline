@@ -342,11 +342,11 @@ def main():
     logger.header()
     
     # File paths from config
-    tracklets_file = Path(config['stage2_track']['output']['tracklets_file'])
-    reid_candidates_file = Path(config['stage3_analyze']['output']['candidates_file'])
-    canonical_persons_file = Path(config['stage5_group_canonical']['output']['canonical_persons_file'])
-    grouping_log_file = Path(config['stage5_group_canonical']['output']['grouping_log_file'])
-    ranking_report_file = Path(config['stage5_rank']['output']['ranking_report_file'])
+    tracklets_file = Path(config['stage2']['output']['tracklets_file'])
+    reid_candidates_file = Path(config['stage3']['output']['candidates_file'])
+    canonical_persons_file = Path(config['stage5']['output']['canonical_persons_file'])
+    grouping_log_file = Path(config['stage5']['output']['grouping_log_file'])
+    ranking_report_file = Path(config['stage7']['output']['ranking_report_file'])
     
     # Check files exist
     if not tracklets_file.exists():
