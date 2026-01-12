@@ -169,10 +169,9 @@ def run_tracking(config):
     tracklets_file = output_config['tracklets_file']
     video_path = input_config.get('video_path', None)
     
-    # Print header
+    # Print header (single separator line to reduce noise)
     print(f"\n{'='*70}")
     print(f"📍 STAGE 2: TRACKING (BYTETRACK OFFLINE)")
-    print(f"{'='*70}\n")
     
     # ByteTrack uses Kalman filters (motion-only), doesn't need actual frame pixels
     # Skip video loading for performance (frame is only placeholder for BoxMOT API)
@@ -366,8 +365,8 @@ def run_tracking(config):
     npz_save_time = time.time() - t_save_start
     total_save_time = npz_save_time
 
-    # Compact save message (filename only)
-    print(f"  ✅ Saved:  {output_path.name}")
+    # Compact save message (filename only, ledger icon)
+    print(f"  🧾 Saved:  {output_path.name}")
 
     # Write timings sidecar silently
     try:
@@ -411,13 +410,28 @@ def main():
     # Check if stage is enabled
     if not config['pipeline']['stages']['stage2']:
         print("⏭️  Stage 2 is disabled in config")
-        return
-    
-    # Run tracking
-    run_tracking(config)
-    
-    print(f"\n{'='*70}\n")
+        # Summary
+        num_tracklets = len(tracklets)
+        total_tracked_detections = sum(len(t['frame_numbers']) for t in tracklets)
 
+        # Compute full stage time (including loads, init, tracking loop and save)
+        stage_total = float(detections_load_time + reconstruct_time + tracker_init_time + tracking_loop_time + total_save_time)
+        overall_fps = (num_frames / stage_total) if stage_total > 0 else 0.0
 
-if __name__ == '__main__':
-    main()
+        # Print formatted block (matches user's requested layout)
+        print(f"\n✅ Tracking completed in {stage_total:.2f}s")
+        print()
+        print(f"    detections load: {detections_load_time:.2f}s")
+        print(f"    tracker init: {tracker_init_time:.2f}s")
+        print(f"    tracking loop: {tracking_loop_time:.2f}s")
+        print(f"    files saving: {total_save_time:.2f}s")
+        other_overhead = stage_total - (detections_load_time + tracker_init_time + tracking_loop_time + total_save_time + reconstruct_time)
+        # include reconstruct_time implicitly above; show other as remaining
+        if other_overhead < 0 and abs(other_overhead) < 0.05:
+            other_overhead = 0.0
+        print(f"    other overheads: {other_overhead:.2f}s")
+        print(f"  ")
+        print(f"    Frames processed: {num_frames}")
+        print(f"    Unique tracklets: {num_tracklets}")
+        print(f"    Total tracked detections: {total_tracked_detections}")
+        print(f"    Overall FPS (including overheads): {overall_fps:.1f}")

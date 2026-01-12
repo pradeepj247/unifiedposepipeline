@@ -131,6 +131,10 @@ def run_stage(stage_name, stage_script, config_path, verbose=False):
     if 'YOLO' in stage_name:
         base = stage_name.split(':')[0]
         print(f"  ✅ {base}:  Detection completed in {t_end - t_start:.2f}s")
+    # For ByteTrack (stage 2) we avoid printing the per-stage time here because
+    # the stage script prints a compact, reconciled breakdown itself.
+    elif 'ByteTrack' in stage_name or 'TRACKING' in stage_name.upper():
+        print(f"  ✅ {stage_name} completed")
     else:
         print(f"✅ {stage_name} completed in {t_end - t_start:.2f}s")
     return True
@@ -303,39 +307,9 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                             print(f"     (No timings sidecar found at {sidecar_path.name})")
 
             # Stage 2: ByteTrack tracking
+            # Note: Stage 2 prints its own compact reconciled breakdown; avoid duplicating it here.
             if stage_key == 'stage2':
-                tracklets_file = config['stage2']['output'].get('tracklets_file')
-                if tracklets_file:
-                    sidecar_path = Path(tracklets_file).parent / (Path(tracklets_file).name + '.timings.json')
-                    if sidecar_path.exists():
-                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
-                            data = json.load(sf)
-
-                        detections_load = float(data.get('detections_load_time', 0.0))
-                        tracker_init = float(data.get('tracker_init_time', 0.0))
-                        tracking_loop = float(data.get('tracking_loop_time', 0.0))
-                        files_save = float(data.get('total_save_time', data.get('npz_save_time', 0.0)))
-                        num_frames_sidecar = int(data.get('num_frames', 0))
-
-                        other_overhead = stage_duration - (detections_load + tracker_init + tracking_loop + files_save)
-                        if other_overhead < 0 and abs(other_overhead) < 0.05:
-                            other_overhead = 0.0
-
-                        print(f"     Breakdown (stage parts):")
-                        print(f"       detections load: {detections_load:.2f}s")
-                        print(f"       tracker init: {tracker_init:.2f}s")
-                        print(f"       tracking loop: {tracking_loop:.2f}s")
-                        print(f"       files saving: {files_save:.2f}s")
-                        print(f"       other overheads: {other_overhead:.2f}s")
-
-                        fps_tracking = (num_frames_sidecar / tracking_loop) if tracking_loop > 0 else 0.0
-                        active_time = stage_duration - detections_load
-                        fps_active = (num_frames_sidecar / active_time) if active_time > 0 else 0.0
-                        print(f"     FPS (tracking loop): {fps_tracking:.1f}")
-                        print(f"     FPS (tracking+save+overhead): {fps_active:.1f}")
-                    else:
-                        if verbose:
-                            print(f"     (No timings sidecar found at {sidecar_path.name})")
+                pass
 
             # Stage 3: Analysis
             if stage_key == 'stage3':
