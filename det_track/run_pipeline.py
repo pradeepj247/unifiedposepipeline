@@ -431,7 +431,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
 
             # Stage 11: HTML Selection Report
             if stage_key == 'stage11':
-                print(f"  ✅ Stage 11: HTML Selection Report (Horizontal Tape) completed in {stage_duration:.2f}s")
+                pass  # Stage 11 prints its own completion message
         except Exception:
             if verbose:
                 print("     ⚠️  Failed to read timings sidecar")
