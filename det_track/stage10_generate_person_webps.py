@@ -338,8 +338,6 @@ def main():
     t_end = time.time()
     
     if success:
-        print(f"  ✅ Stage 10 completed in {t_end - t_start:.2f}s")
-        print(f"{'='*70}\n")
         return 0
     else:
         print(f"❌ Stage 10 failed\n")
