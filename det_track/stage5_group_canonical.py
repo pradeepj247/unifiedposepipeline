@@ -19,6 +19,8 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils.logger import PipelineLogger
+import json
+from datetime import datetime, timezone
 
 
 def resolve_path_variables(config):
@@ -316,8 +318,9 @@ def run_canonical_grouping(config):
         raise ValueError(f"Unknown grouping method: {grouping_config['method']}")
     
     t_end = time.time()
-    print(f"  ✅ Created {len(groups)} canonical persons ({t_end - t_start:.2f}s)")
-    logger.timing("Grouping", t_end - t_start)
+    grouping_time = t_end - t_start
+    print(f"  ✅ Created {len(groups)} canonical persons ({grouping_time:.2f}s)")
+    logger.timing("Grouping", grouping_time)
     logger.info(f"Created {len(groups)} canonical persons")
     
     # Merge groups into canonical persons
@@ -353,18 +356,41 @@ def run_canonical_grouping(config):
     # Save canonical persons
     output_path = Path(canonical_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    t_save_start = time.time()
     np.savez_compressed(output_path, persons=np.array(canonical_persons, dtype=object))
+    npz_save_time = time.time() - t_save_start
     logger.file_size(f"Saved canonical persons", output_path.stat().st_size / (1024 * 1024))
     
     # Save log
     log_path = Path(grouping_log_file)
+    t_log_save_start = time.time()
     with open(log_path, 'w') as f:
         json.dump(grouping_log, f, indent=2)
+    log_save_time = time.time() - t_log_save_start
     logger.file_size(f"Saved grouping log", log_path.stat().st_size / (1024 * 1024))
     
     logger.stat("Input tracklets", len(tracklets))
     logger.stat("Output canonical persons", len(canonical_persons))
     logger.success()
+
+    # Write timings sidecar
+    try:
+        sidecar_path = Path(canonical_file).parent / (Path(canonical_file).name + '.timings.json')
+        sidecar = {
+            'canonical_file': str(canonical_file),
+            'grouping_time': float(grouping_time) if 'grouping_time' in locals() else 0.0,
+            'npz_save_time': float(npz_save_time) if 'npz_save_time' in locals() else 0.0,
+            'grouping_log_save_time': float(log_save_time) if 'log_save_time' in locals() else 0.0,
+            'num_persons': int(len(canonical_persons)),
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }
+        with open(sidecar_path, 'w', encoding='utf-8') as sf:
+            json.dump(sidecar, sf, indent=2)
+        if verbose:
+            logger.info(f"Wrote timings sidecar: {sidecar_path.name}")
+    except Exception:
+        if verbose:
+            logger.info("Failed to write timings sidecar for canonical grouping")
 
 
 def main():

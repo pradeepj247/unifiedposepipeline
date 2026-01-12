@@ -13,6 +13,8 @@ import argparse
 import yaml
 import pickle
 import time
+import json
+from datetime import datetime, timezone
 import re
 import sys
 from pathlib import Path
@@ -136,6 +138,24 @@ def run_load_crops_cache(config):
     
     logger.success()
     
+    # Write timings sidecar
+    try:
+        sidecar_path = Path(crops_cache_file).parent / (Path(crops_cache_file).name + '.timings.json')
+        sidecar = {
+            'crops_cache_file': str(crops_cache_file),
+            'cache_size_mb': float(cache_size_mb),
+            'num_frames': int(num_frames),
+            'total_crops': int(total_crops),
+            'load_time': float(t_load),
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }
+        with open(sidecar_path, 'w', encoding='utf-8') as sf:
+            json.dump(sidecar, sf, indent=2)
+        logger.info(f"Wrote timings sidecar: {sidecar_path.name}")
+    except Exception:
+        if verbose:
+            logger.info("Failed to write timings sidecar for crops cache")
+
     return {
         'crops_cache_file': crops_cache_file,
         'crops_cache': crops_cache,

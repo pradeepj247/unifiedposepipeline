@@ -14,6 +14,7 @@ import yaml
 import numpy as np
 import json
 import time
+from datetime import datetime, timezone
 import re
 import sys
 from pathlib import Path
@@ -268,18 +269,21 @@ def run_analysis(config):
             stats.append(stat)
         
         t_end = time.time()
-        logger.timing("Tracklet statistics", t_end - t_start)
+        stats_time = t_end - t_start
+        logger.timing("Tracklet statistics", stats_time)
         logger.info(f"Computed stats for {num_tracklets} tracklets")
         
         # Save statistics
         output_path = Path(tracklet_stats_file)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
+        t_save_start = time.time()
         np.savez_compressed(
             output_path,
             tracklets=tracklets,
             statistics=np.array(stats, dtype=object)
         )
+        npz_save_time = time.time() - t_save_start
         file_size_mb = output_path.stat().st_size / (1024 * 1024)
         logger.file_size(output_path.name, file_size_mb)
     else:
@@ -293,8 +297,9 @@ def run_analysis(config):
         candidates = identify_reid_candidates(tracklets, stats, candidate_criteria)
         
         t_end = time.time()
+        candidate_id_time = t_end - t_start
         num_candidates = len(candidates)
-        logger.timing("ReID candidate identification", t_end - t_start)
+        logger.timing("ReID candidate identification", candidate_id_time)
         logger.info(f"Found {num_candidates} candidate pairs")
         
         if verbose and num_candidates > 0:
@@ -310,8 +315,10 @@ def run_analysis(config):
         output_path = Path(candidates_file)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
+        t_cand_save_start = time.time()
         with open(output_path, 'w') as f:
             json.dump(candidates, f, indent=2)
+        candidate_save_time = time.time() - t_cand_save_start
         
         file_size_mb = output_path.stat().st_size / (1024 * 1024)
         logger.file_size(output_path.name, file_size_mb)
@@ -322,6 +329,28 @@ def run_analysis(config):
     logger.stat("ReID candidates found", len(candidates))
     logger.success()
     
+    # Write timings sidecar
+    try:
+        sidecar_path = Path(tracklet_stats_file).parent / (Path(tracklet_stats_file).name + '.timings.json')
+        sidecar = {
+            'tracklet_stats_file': str(tracklet_stats_file),
+            'candidates_file': str(candidates_file),
+            'stats_time': float(stats_time) if 'stats_time' in locals() else 0.0,
+            'npz_save_time': float(npz_save_time) if 'npz_save_time' in locals() else 0.0,
+            'candidate_id_time': float(candidate_id_time) if 'candidate_id_time' in locals() else 0.0,
+            'candidate_save_time': float(candidate_save_time) if 'candidate_save_time' in locals() else 0.0,
+            'num_tracklets': int(num_tracklets),
+            'num_candidates': int(len(candidates)),
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }
+        with open(sidecar_path, 'w', encoding='utf-8') as sf:
+            json.dump(sidecar, sf, indent=2)
+        if verbose:
+            logger.info(f"Wrote timings sidecar: {sidecar_path.name}")
+    except Exception:
+        if verbose:
+            logger.info("Failed to write timings sidecar")
+
     return {
         'tracklet_stats_file': tracklet_stats_file,
         'candidates_file': candidates_file,

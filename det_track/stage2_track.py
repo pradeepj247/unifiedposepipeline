@@ -14,6 +14,8 @@ import argparse
 import yaml
 import numpy as np
 import time
+import json
+from datetime import datetime, timezone
 import re
 import sys
 from pathlib import Path
@@ -182,20 +184,26 @@ def run_tracking(config):
     
     # Load detections
     print(f"📂 Loading detections: {detections_file}")
+    t_dl_start = time.time()
     detections_data = load_detections(detections_file)
+    detections_load_time = time.time() - t_dl_start
     
     total_detections = len(detections_data['frame_numbers'])
     print(f"  ✅ Loaded {total_detections} detections")
     
     # Reconstruct per-frame detections
     print(f"\n🔄 Reconstructing per-frame detections...")
+    t_rec_start = time.time()
     detections_by_frame, unique_frames = reconstruct_detections_per_frame(detections_data)
+    reconstruct_time = time.time() - t_rec_start
     num_frames = len(unique_frames)
     print(f"  ✅ {num_frames} frames with detections")
     
     # Initialize tracker
     print(f"\n🛠️  Initializing ByteTrack tracker...")
+    t_init_start = time.time()
     tracker = init_bytetrack_tracker(params, frame_rate, verbose)
+    tracker_init_time = time.time() - t_init_start
     
     # Track
     print(f"\n⚡ Running ByteTrack (offline mode)...")
@@ -283,7 +291,8 @@ def run_tracking(config):
     pbar.close()
     
     t_end = time.time()
-    total_time = t_end - t_start
+    tracking_loop_time = t_end - t_start
+    total_time = tracking_loop_time
     tracking_fps = num_frames / total_time if total_time > 0 else 0
     
     # Convert tracklets to list format
@@ -328,13 +337,40 @@ def run_tracking(config):
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
     # Save as structured array
+    t_save_start = time.time()
     np.savez_compressed(
         output_path,
         tracklets=np.array(tracklets, dtype=object)
     )
+    npz_save_time = time.time() - t_save_start
+    total_save_time = npz_save_time
     
     print(f"  ✅ Saved: {output_path}")
     print(f"  Format: {num_tracklets} tracklets")
+
+    # Write timings sidecar
+    try:
+        sidecar_path = output_path.parent / (output_path.name + '.timings.json')
+        sidecar = {
+            'detections_file': str(detections_file),
+            'tracklets_file': str(output_path),
+            'detections_load_time': float(detections_load_time),
+            'reconstruct_time': float(reconstruct_time),
+            'tracker_init_time': float(tracker_init_time),
+            'tracking_loop_time': float(tracking_loop_time),
+            'npz_save_time': float(npz_save_time),
+            'total_save_time': float(total_save_time),
+            'num_frames': int(num_frames),
+            'num_tracklets': int(num_tracklets),
+            'num_detections': int(total_detections),
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }
+        with open(sidecar_path, 'w', encoding='utf-8') as sf:
+            json.dump(sidecar, sf, indent=2)
+        print(f"  ℹ️  Wrote timings sidecar: {sidecar_path.name}")
+    except Exception as e:
+        if verbose:
+            print(f"  ⚠️  Failed to write timings sidecar: {e}")
     
     return {
         'tracklets_file': str(output_path),

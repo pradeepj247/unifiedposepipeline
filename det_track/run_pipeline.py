@@ -263,14 +263,15 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         
         stage_times.append((stage_name, stage_duration, False))  # Not skipped
         
-        # If stage1 (YOLO), try to read the timings sidecar and report overhead
+        # Try to read the timings sidecar for stages that emit one and report overhead
         try:
+            import json
+            # Stage 1: YOLO detection (already supported)
             if stage_key == 'stage1':
                 detections_file = config['stage1']['output'].get('detections_file')
                 if detections_file:
                     sidecar_path = Path(detections_file).parent / (Path(detections_file).name + '.timings.json')
                     if sidecar_path.exists():
-                        import json
                         with open(sidecar_path, 'r', encoding='utf-8') as sf:
                             data = json.load(sf)
 
@@ -297,6 +298,118 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                         print(f"     FPS (detection-only): {fps_detection_only:.1f}")
                         print(f"     FPS (detection+save+overhead): {fps_active:.1f}")
                         print(f"     Sum of parts (model+detect+save): {(model_load_time + detect_loop_time + total_save_time):.2f}s")
+                    else:
+                        if verbose:
+                            print(f"     (No timings sidecar found at {sidecar_path.name})")
+
+            # Stage 2: ByteTrack tracking
+            if stage_key == 'stage2':
+                tracklets_file = config['stage2']['output'].get('tracklets_file')
+                if tracklets_file:
+                    sidecar_path = Path(tracklets_file).parent / (Path(tracklets_file).name + '.timings.json')
+                    if sidecar_path.exists():
+                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
+                            data = json.load(sf)
+
+                        detections_load = float(data.get('detections_load_time', 0.0))
+                        tracker_init = float(data.get('tracker_init_time', 0.0))
+                        tracking_loop = float(data.get('tracking_loop_time', 0.0))
+                        files_save = float(data.get('total_save_time', data.get('npz_save_time', 0.0)))
+                        num_frames_sidecar = int(data.get('num_frames', 0))
+
+                        other_overhead = stage_duration - (detections_load + tracker_init + tracking_loop + files_save)
+                        if other_overhead < 0 and abs(other_overhead) < 0.05:
+                            other_overhead = 0.0
+
+                        print(f"     Breakdown (stage parts):")
+                        print(f"       detections load: {detections_load:.2f}s")
+                        print(f"       tracker init: {tracker_init:.2f}s")
+                        print(f"       tracking loop: {tracking_loop:.2f}s")
+                        print(f"       files saving: {files_save:.2f}s")
+                        print(f"       other overheads: {other_overhead:.2f}s")
+
+                        fps_tracking = (num_frames_sidecar / tracking_loop) if tracking_loop > 0 else 0.0
+                        active_time = stage_duration - detections_load
+                        fps_active = (num_frames_sidecar / active_time) if active_time > 0 else 0.0
+                        print(f"     FPS (tracking loop): {fps_tracking:.1f}")
+                        print(f"     FPS (tracking+save+overhead): {fps_active:.1f}")
+                    else:
+                        if verbose:
+                            print(f"     (No timings sidecar found at {sidecar_path.name})")
+
+            # Stage 3: Analysis
+            if stage_key == 'stage3':
+                stats_file = config['stage3']['output'].get('tracklet_stats_file')
+                if stats_file:
+                    sidecar_path = Path(stats_file).parent / (Path(stats_file).name + '.timings.json')
+                    if sidecar_path.exists():
+                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
+                            data = json.load(sf)
+
+                        stats_time = float(data.get('stats_time', 0.0))
+                        npz_save_time = float(data.get('npz_save_time', 0.0))
+                        candidate_time = float(data.get('candidate_id_time', 0.0))
+                        candidate_save = float(data.get('candidate_save_time', 0.0))
+
+                        other_overhead = stage_duration - (stats_time + npz_save_time + candidate_time + candidate_save)
+                        if other_overhead < 0 and abs(other_overhead) < 0.05:
+                            other_overhead = 0.0
+
+                        print(f"     Breakdown (stage parts):")
+                        print(f"       compute stats: {stats_time:.2f}s")
+                        print(f"       stats save: {npz_save_time:.2f}s")
+                        print(f"       candidate id: {candidate_time:.2f}s")
+                        print(f"       candidate save: {candidate_save:.2f}s")
+                        print(f"       other overheads: {other_overhead:.2f}s")
+                    else:
+                        if verbose:
+                            print(f"     (No timings sidecar found at {sidecar_path.name})")
+
+            # Stage 4: Load crops cache
+            if stage_key == 'stage4':
+                crops_file = config['stage4']['input'].get('crops_cache_file')
+                if crops_file:
+                    sidecar_path = Path(crops_file).parent / (Path(crops_file).name + '.timings.json')
+                    if sidecar_path.exists():
+                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
+                            data = json.load(sf)
+
+                        load_time = float(data.get('load_time', 0.0))
+                        num_frames_sidecar = int(data.get('num_frames', 0))
+
+                        other_overhead = stage_duration - load_time
+                        if other_overhead < 0 and abs(other_overhead) < 0.05:
+                            other_overhead = 0.0
+
+                        print(f"     Breakdown (stage parts):")
+                        print(f"       cache load: {load_time:.2f}s")
+                        print(f"       other overheads: {other_overhead:.2f}s")
+                    else:
+                        if verbose:
+                            print(f"     (No timings sidecar found at {sidecar_path.name})")
+
+            # Stage 5: Canonical grouping
+            if stage_key == 'stage5':
+                canonical_file = config['stage5']['output'].get('canonical_persons_file')
+                if canonical_file:
+                    sidecar_path = Path(canonical_file).parent / (Path(canonical_file).name + '.timings.json')
+                    if sidecar_path.exists():
+                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
+                            data = json.load(sf)
+
+                        grouping_time = float(data.get('grouping_time', 0.0))
+                        save_time = float(data.get('npz_save_time', 0.0))
+                        num_persons = int(data.get('num_persons', 0))
+
+                        other_overhead = stage_duration - (grouping_time + save_time)
+                        if other_overhead < 0 and abs(other_overhead) < 0.05:
+                            other_overhead = 0.0
+
+                        print(f"     Breakdown (stage parts):")
+                        print(f"       grouping: {grouping_time:.2f}s")
+                        print(f"       files saving: {save_time:.2f}s")
+                        print(f"       other overheads: {other_overhead:.2f}s")
+                        print(f"     Output persons: {num_persons}")
                     else:
                         if verbose:
                             print(f"     (No timings sidecar found at {sidecar_path.name})")
