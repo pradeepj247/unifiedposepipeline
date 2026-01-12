@@ -96,15 +96,14 @@ def load_config(config_path):
         video_name = os.path.splitext(video_file)[0]
         config['global']['current_video'] = video_name
     
-    # Debug: Print what's in global before resolution
-    print(f"🔍 Debug - repo_root before resolution: {config['global'].get('repo_root', 'NOT FOUND')}")
-    
     # Resolve path variables
     resolved_config = resolve_path_variables(config)
     
-    # Debug: Print model_path after resolution
-    model_path = resolved_config['stage1']['detector']['model_path']
-    print(f"🔍 Debug - model_path after resolution: {model_path}")
+    # Debug: Print model_path after resolution (verbose only)
+    if resolved_config['stage1'].get('advanced', {}).get('verbose', False):
+        print(f"🔍 Debug - repo_root before resolution: {config['global'].get('repo_root', 'NOT FOUND')}")
+        model_path = resolved_config['stage1']['detector']['model_path']
+        print(f"🔍 Debug - model_path after resolution: {model_path}")
     
     return resolved_config
 
@@ -388,7 +387,7 @@ def run_detection(config):
     t_crop_start = None
     t_crop_total = 0.0
     
-    pbar = tqdm(total=num_frames, desc="Detecting", mininterval=1.0)
+    pbar = tqdm(total=num_frames, desc="     Detecting", mininterval=1.0)
     
     frame_idx = 0
     while frame_idx < num_frames:

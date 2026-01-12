@@ -107,9 +107,8 @@ def load_config(config_path):
 
 def run_stage(stage_name, stage_script, config_path, verbose=False):
     """Run a single stage script"""
-    print(f"\n🚀 Running {stage_name}...")
-    
     if verbose:
+        print(f"\n🚀 Running {stage_name}...")
         print(f"   Script: {stage_script}")
         print(f"   Config: {config_path}")
     
