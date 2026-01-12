@@ -383,9 +383,7 @@ def run_detection(config):
     # Process frames
     if verbose:
         print(f"⚡ Running detection...")
-    t_detection_start = time.time()
-    t_crop_start = None
-    t_crop_total = 0.0
+    t_loop_start = time.time()
     
     pbar = tqdm(total=num_frames, desc="     Detecting", mininterval=1.0)
     
@@ -412,9 +410,6 @@ def run_detection(config):
         num_detections_per_frame.append(num_dets)
         
         # Extract crops for this frame
-        if t_crop_start is None:
-            t_crop_start = time.time()
-        
         crops_cache[frame_idx] = {}
         
         for i in range(num_dets):
@@ -434,12 +429,9 @@ def run_detection(config):
     pbar.close()
     cap.release()
     
-    if t_crop_start is not None:
-        t_crop_total = time.time() - t_crop_start
-    
-    t_detection_end = time.time()
-    t_detection_total = t_detection_end - t_detection_start
-    processing_fps = num_frames / t_detection_total if t_detection_total > 0 else 0
+    t_loop_end = time.time()
+    t_loop_total = t_loop_end - t_loop_start
+    processing_fps = num_frames / t_loop_total if t_loop_total > 0 else 0
     
     # Convert to numpy arrays
     frame_numbers = np.array(all_frame_numbers, dtype=np.int64)
@@ -457,9 +449,7 @@ def run_detection(config):
     print(f"     Total detections: {total_detections}")
     print(f"     Avg detections/frame: {avg_detections_per_frame:.1f}")
     print(f"     Processing FPS: {processing_fps:.1f}")
-    print(f"     Detection time: {t_detection_total:.2f}s")
-    print(f"     Crop extraction time: {t_crop_total:.2f}s")
-    print(f"     Total time: {t_detection_total + t_crop_total:.2f}s\n")
+    print(f"     Detection + crop time: {t_loop_total:.2f}s\n")
     
     # Save NPZ
     output_path = Path(detections_file)
