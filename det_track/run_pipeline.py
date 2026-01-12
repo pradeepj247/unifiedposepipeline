@@ -135,8 +135,10 @@ def run_stage(stage_name, stage_script, config_path, verbose=False):
     # the stage script prints a compact, reconciled breakdown itself.
     elif 'ByteTrack' in stage_name or 'TRACKING' in stage_name.upper():
         print(f"  ✅ {stage_name} completed")
-    # For Stage 3, completion message will be printed after reading sidecar
+    # For Stage 3 and 4, completion message will be printed after reading sidecar
     elif 'Stage 3' in stage_name or 'Tracklet Analysis' in stage_name:
+        pass  # Will print completion with breakdown below
+    elif 'Stage 4' in stage_name or 'Load Crops Cache' in stage_name:
         pass  # Will print completion with breakdown below
     else:
         print(f"✅ {stage_name} completed in {t_end - t_start:.2f}s")
@@ -364,12 +366,16 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                         if other_overhead < 0 and abs(other_overhead) < 0.05:
                             other_overhead = 0.0
 
-                        print(f"     Breakdown (stage parts):")
+                        # Print completion message with 3-space indent and breakdown
+                        print(f"   ✅ Stage 4: Load Crops Cache completed in {stage_duration:.2f}s")
+                        print(f"      Breakdown (stage parts):")
                         print(f"       cache load: {load_time:.2f}s")
                         print(f"       other overheads: {other_overhead:.2f}s")
                     else:
                         if verbose:
                             print(f"     (No timings sidecar found at {sidecar_path.name})")
+                        else:
+                            print(f"   ✅ Stage 4: Load Crops Cache completed in {stage_duration:.2f}s")
 
             # Stage 5: Canonical grouping
             if stage_key == 'stage5':

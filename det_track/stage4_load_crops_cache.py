@@ -107,11 +107,11 @@ def run_load_crops_cache(config):
             'cache_size_mb': 0,
             'num_frames': 0
         }
-    logger.step(f"Loading crops cache: {crops_cache_file}")
+    
+    logger.info(f"Loading crops cache: {Path(crops_cache_file).name}")
     
     if not Path(crops_cache_file).exists():
         logger.error(f"Crops cache file not found: {crops_cache_file}")
-        logger.info("rops cache file not found: {crops_cache_file}")
         print(f"   Please run Stage 1 first to generate crops_cache.pkl")
         return {
             'crops_cache_file': None,
@@ -130,12 +130,6 @@ def run_load_crops_cache(config):
     total_crops = sum(len(frame_crops) for frame_crops in crops_cache.values())
     cache_size_mb = Path(crops_cache_file).stat().st_size / (1024 * 1024)
     
-    logger.info(f"Crops cache loaded!")
-    logger.stat("Frames", num_frames)
-    logger.stat("Total crops", total_crops)
-    logger.file_size("Cache size", cache_size_mb)
-    logger.timing("Load time", t_load)
-    
     # Write timings sidecar
     try:
         sidecar_path = Path(crops_cache_file).parent / (Path(crops_cache_file).name + '.timings.json')
@@ -149,7 +143,6 @@ def run_load_crops_cache(config):
         }
         with open(sidecar_path, 'w', encoding='utf-8') as sf:
             json.dump(sidecar, sf, indent=2)
-        logger.info(f"Wrote timings sidecar: {sidecar_path.name}")
     except Exception:
         if verbose:
             logger.info("Failed to write timings sidecar for crops cache")
