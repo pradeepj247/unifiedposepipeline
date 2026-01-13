@@ -353,7 +353,7 @@ stage10b:
     quality: 80              # WebP quality (0-100, 80 is good balance)
   
   input:
-    crops_by_person_file: ${outputs_dir}/${current_video}/crops_by_person.pkl
+    crops_by_person_file: ${outputs_dir}/${current_video}/crops_by_person.h5
   
   output:
     webp_dir: ${outputs_dir}/${current_video}/webp

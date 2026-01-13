@@ -14,16 +14,16 @@ Phase 2 implements HDF5 storage format for Stage 4b output and Stage 10b input t
 **Conservative Approach**: Optimize Stage 4b and 10b only, don't touch Stage 1 yet.
 
 ### Key Optimizations
-1. **HDF5 Format**: Binary-efficient storage with compression
-2. **Gzip Compression**: Level 4 (balanced speed/size)
+1. **HDF5 Format**: Binary-efficient storage
+2. **Smart Compression**: Gzip level 1 on metadata only (not crops - images don't compress well)
 3. **Partial Loading**: Stage 10b loads only top 10 persons, not all 48
 4. **Backward Compatibility**: Pickle fallback maintained
 
 ### Expected Results
-- File size: 812 MB → 250-350 MB (60-70% reduction)
-- Stage 4b save: 2.69s → 0.5-0.8s (70-80% faster)
-- Stage 10b load: ~2s → 0.3-0.5s (80-85% faster)
-- Total pipeline: 9.38s → 6-6.5s (30-35% faster)
+- File size: 812 MB → ~800 MB (minimal change - crops are already compressed JPEGs internally)
+- Stage 4b save: 2.69s → 1.5-2s (faster I/O, no compression overhead)
+- Stage 10b load: ~2s → 0.3-0.5s (80-85% faster via partial loading)
+- Total pipeline: 9.38s → 7-7.5s (20-25% faster)
 
 ## Implementation Details
 
@@ -112,10 +112,18 @@ stage4b:
 - Added `compression_level: 4` parameter
 
 ## Compression Level Guidance
-- **Level 1**: Fastest, ~50% compression
-- **Level 4**: Balanced (RECOMMENDED)
-- **Level 6**: Default, slower
-- **Level 9**: Maximum compression, slowest
+**IMPORTANT**: Crops are NOT compressed (images don't benefit from gzip).
+
+Only metadata is compressed:
+- **frame_numbers**: gzip level 1 (fast)
+- **bboxes**: gzip level 1 (fast)
+- **confidences**: gzip level 1 (fast)
+
+**Why no crop compression?**
+- Crops are already compressed as JPEG internally (cv2.imencode)
+- Gzip on JPEG data provides minimal benefit (~5% reduction)
+- Compression overhead adds 40+ seconds (42s observed in testing)
+- Uncompressed HDF5 is still efficient due to contiguous storage
 
 ## Testing Protocol
 
@@ -136,11 +144,11 @@ python run_pipeline.py --config configs/pipeline_config.yaml
 ### Validation Checklist
 - [ ] Stage 4b completes successfully
 - [ ] crops_by_person.h5 file created
-- [ ] File size 250-350 MB (verify with `ls -lh`)
-- [ ] Stage 4b timing < 1s in timing sidecar
+- [ ] File size ~800 MB (verify with `ls -lh`)
+- [ ] Stage 4b timing ~2s in timing sidecar
 - [ ] Stage 10b completes successfully
 - [ ] Stage 10b timing < 1s in timing sidecar
-- [ ] Total pipeline time 6-6.5s (verify in orchestrator output)
+- [ ] Total pipeline time 7-7.5s (verify in orchestrator output)
 - [ ] WebP files created correctly
 - [ ] HTML report loads and displays correctly
 
@@ -168,11 +176,12 @@ Both stages support pickle format:
 **Solution**: Verify stage4b output file extension matches format parameter
 
 ### Issue: Slower than expected
-**Symptom**: Stage 4b takes > 1s
+**Symptom**: Stage 4b takes > 5s
 **Solution**: 
-- Check compression_level (try level 1 or 2)
+- Verify crops are NOT compressed (compression=None for crops)
+- Check that only metadata uses compression (level 1)
 - Verify SSD storage (HDD will be slower)
-- Check file size (should be 250-350 MB)
+- File size should be ~800 MB (similar to pickle)
 
 ### Issue: HDF5 file corrupted
 **Symptom**: h5py.File() raises error
@@ -192,11 +201,13 @@ File size: 812 MB
 
 ### Expected (Phase 2 - HDF5)
 ```
-Stage 4b:  ~1.3s total (0.59s load + 0.5-0.8s save)
+Stage 4b:  ~2s total (0.59s load + 1.5s save)
 Stage 10b: 0.3-0.5s load + 1s process + 1s save = ~2.5s
-File size: 250-350 MB (60-70% reduction)
-Improvement: 3.5s saved (30-35% faster)
+File size: ~800 MB (similar to pickle - crops don't compress)
+Improvement: 2s saved (20-25% faster for these stages)
 ```
+
+**Note**: File size similar because crops are already JPEG-compressed internally.
 
 ## Next Steps (Future Phases)
 
@@ -221,19 +232,27 @@ git add det_track/stage4b_reorganize_crops.py
 git add det_track/stage10b_generate_webps.py
 git add det_track/configs/pipeline_config.yaml
 git add det_track/docs/PHASE2_HDF5_IMPLEMENTATION.md
-git commit -m "feat: Phase 2 HDF5 optimization for Stage 4b and 10b
+git commit -m "fix: Phase 2 HDF5 - remove crop compression for 20x speedup
 
-- Add HDF5 storage with gzip compression (level 4)
-- Implement partial loading in Stage 10b (top 10 persons only)
-- Maintain pickle fallback for backward compatibility
-- Expected: 60-70% file size reduction, 30-35% speedup
-- File size: 812 MB → 250-350 MB
-- Pipeline time: 9.38s → 6-6.5s
+CRITICAL FIX: Remove gzip compression from crops
+- Testing revealed: gzip on crops = 42s save time (9.4x slower!)
+- Root cause: Crops are already JPEG-compressed internally
+- Solution: Only compress metadata (frame_numbers, bboxes, confidences)
+
+Performance after fix:
+- Expected Stage 4b save: 42s → ~2s (20x faster)
+- File size: ~800 MB (similar to pickle - expected)
+- Compression benefit minimal for pre-compressed image data
+
+Additional fixes:
+- stage10b: Update input path to crops_by_person.h5
+- Config: Change stage10b input from .pkl to .h5
+- Docs: Update expected results based on testing
 
 Changes:
-- stage4b: Add save_crops_to_hdf5() function
-- stage10b: Add load_top_n_persons_from_hdf5() function
-- config: Change output to crops_by_person.h5 with format parameter
+- stage4b: Set compression=None for crops datasets
+- stage4b: Use gzip level 1 for metadata (fast)
+- config: Fix stage10b input path mismatch
 "
 git push origin main
 ```
@@ -241,10 +260,11 @@ git push origin main
 ## Success Criteria
 1. ✅ Code committed and pushed
 2. ⏳ Pipeline runs successfully on Colab
-3. ⏳ File size < 400 MB (target: 250-350 MB)
-4. ⏳ Total pipeline time < 7s (target: 6-6.5s)
-5. ⏳ WebP output quality unchanged
-6. ⏳ HTML report displays correctly
+3. ⏳ File size ~800 MB (similar to pickle - expected)
+4. ⏳ Stage 4b save time < 3s (target: ~2s)
+5. ⏳ Total pipeline time < 8s (target: 7-7.5s)
+6. ⏳ WebP output quality unchanged
+7. ⏳ HTML report displays correctly
 
 ---
 **Status**: Implementation complete, awaiting Colab validation
