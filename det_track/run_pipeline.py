@@ -135,10 +135,16 @@ def run_stage(stage_name, stage_script, config_path, verbose=False):
     # the stage script prints a compact, reconciled breakdown itself.
     elif 'ByteTrack' in stage_name or 'TRACKING' in stage_name.upper():
         print(f"  ✅ {stage_name} completed")
-    # For Stage 3, 4, 5, 6, and 7, completion message will be printed by orchestrator
-    elif 'Stage 3' in stage_name or 'Tracklet Analysis' in stage_name:
+    # For Stage 3, 3a, 3b, 3c, 4, 4b, 5, 6, 7, 10, 10b, completion message will be printed by orchestrator
+    elif 'Stage 3' in stage_name or 'Tracklet Analysis' in stage_name or 'Stage 3a' in stage_name:
+        pass  # Will print completion with breakdown below
+    elif 'Stage 3b' in stage_name or 'Enhanced Canonical Grouping' in stage_name:
+        pass  # Will print completion with breakdown below
+    elif 'Stage 3c' in stage_name or 'Person Ranking' in stage_name:
         pass  # Will print completion with breakdown below
     elif 'Stage 4' in stage_name or 'Load Crops Cache' in stage_name:
+        pass  # Will print completion with breakdown below
+    elif 'Stage 4b' in stage_name or 'Reorganize Crops by Person' in stage_name:
         pass  # Will print completion with breakdown below
     elif 'Stage 5' in stage_name or 'Canonical Person Grouping' in stage_name:
         pass  # Will print completion with breakdown below
@@ -146,7 +152,7 @@ def run_stage(stage_name, stage_script, config_path, verbose=False):
         pass  # Will print completion below
     elif 'Stage 7' in stage_name or 'Rank Persons' in stage_name:
         pass  # Will print completion below
-    elif 'Stage 10' in stage_name or 'Generate Person Animated WebPs' in stage_name:
+    elif 'Stage 10' in stage_name or 'Generate Person Animated WebPs' in stage_name or 'Generate WebP Animations' in stage_name:
         pass  # Will print completion below
     elif 'Stage 11' in stage_name or 'HTML Selection Report' in stage_name:
         pass  # Will print completion below
@@ -163,13 +169,18 @@ def check_stage_outputs_exist(config, stage_key):
         'stage1': 'stage1',
         'stage2': 'stage2',
         'stage3': 'stage3',
+        'stage3a': 'stage3a',
+        'stage3b': 'stage3b',
+        'stage3c': 'stage3c',
         'stage4': 'stage4',
+        'stage4b': 'stage4b',
         'stage5': 'stage5',
         'stage6': 'stage6',
         'stage7': 'stage7',
         'stage8': 'stage8',
         'stage9': 'stage9',
         'stage10': 'stage10',
+        'stage10b': 'stage10b',
         'stage11': 'stage11'
     }
     
@@ -200,18 +211,25 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     
     # Pipeline stages - SIMPLE NUMERIC IDs FOR CLEAR REFERENCING
     # Usage: --stages 1,2,3  or  --stages 10,11
-    # NOTE: Stage 10 must run AFTER Stage 11 (generate WebPs before embedding in HTML)
+    # NOTE: Stage 10b must run AFTER Stage 4b (uses reorganized crops)
+    # NEW: Stages 3a, 3b, 3c are the reorganized analysis pipeline
+    # NEW: Stages 4b, 10b are the optimized crop handling and visualization
     all_stages = [
         ('Stage 1: YOLO Detection', 'stage1_detect.py', 'stage1'),
         ('Stage 2: ByteTrack Tracking', 'stage2_track.py', 'stage2'),
-        ('Stage 3: Tracklet Analysis', 'stage3_analyze_tracklets.py', 'stage3'),
+        ('Stage 3: Tracklet Analysis (OLD)', 'stage3_analyze_tracklets.py', 'stage3'),
+        ('Stage 3a: Tracklet Analysis', 'stage3a_analyze_tracklets.py', 'stage3a'),
+        ('Stage 3b: Enhanced Canonical Grouping', 'stage3b_group_canonical.py', 'stage3b'),
+        ('Stage 3c: Person Ranking', 'stage3c_rank_persons.py', 'stage3c'),
         ('Stage 4: Load Crops Cache', 'stage4_load_crops_cache.py', 'stage4'),
-        ('Stage 5: Canonical Person Grouping', 'stage5_group_canonical.py', 'stage5'),
+        ('Stage 4b: Reorganize Crops by Person', 'stage4b_reorganize_crops.py', 'stage4b'),
+        ('Stage 5: Canonical Person Grouping (OLD)', 'stage5_group_canonical.py', 'stage5'),
         ('Stage 6: Enrich Crops with HDF5', 'stage6_enrich_crops.py', 'stage6'),
-        ('Stage 7: Rank Persons', 'stage7_rank_persons.py', 'stage7'),
+        ('Stage 7: Rank Persons (OLD)', 'stage7_rank_persons.py', 'stage7'),
         ('Stage 8: Visualize Grouping (Debug)', 'stage8_visualize_grouping.py', 'stage8'),
         ('Stage 9: Output Video Visualization', 'stage9_create_output_video.py', 'stage9'),
-        ('Stage 10: Generate Person Animated WebPs', 'stage10_generate_person_webps.py', 'stage10'),
+        ('Stage 10: Generate Person Animated WebPs (OLD)', 'stage10_generate_person_webps.py', 'stage10'),
+        ('Stage 10b: Generate WebP Animations (Simplified)', 'stage10b_generate_webps.py', 'stage10b'),
         ('Stage 11: HTML Selection Report (Horizontal Tape)', 'stage11_create_selection_html_horizontal.py', 'stage11')
     ]
     
@@ -327,7 +345,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             if stage_key == 'stage2':
                 pass
 
-            # Stage 3: Analysis
+            # Stage 3: Analysis (OLD - legacy)
             if stage_key == 'stage3':
                 stats_file = config['stage3']['output'].get('tracklet_stats_file')
                 if stats_file:
@@ -360,6 +378,87 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                         else:
                             print(f"   ✅ Stage 3: Tracklet Analysis completed in {stage_duration:.2f}s")
 
+            # Stage 3a: Analysis (NEW)
+            if stage_key == 'stage3a':
+                stats_file = config['stage3a']['output'].get('tracklet_stats_file')
+                if stats_file:
+                    sidecar_path = Path(stats_file).parent / (Path(stats_file).name + '.timings.json')
+                    if sidecar_path.exists():
+                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
+                            data = json.load(sf)
+
+                        stats_time = float(data.get('stats_time', 0.0))
+                        npz_save_time = float(data.get('npz_save_time', 0.0))
+                        num_tracklets = int(data.get('num_tracklets', 0))
+
+                        other_overhead = stage_duration - (stats_time + npz_save_time)
+                        if other_overhead < 0 and abs(other_overhead) < 0.05:
+                            other_overhead = 0.0
+
+                        print(f"   ✅ Stage 3a: Tracklet Analysis completed in {stage_duration:.2f}s")
+                        print(f"      Breakdown (stage parts):")
+                        print(f"       compute stats: {stats_time:.2f}s")
+                        print(f"       stats save: {npz_save_time:.2f}s")
+                        print(f"       other overheads: {other_overhead:.2f}s")
+                    else:
+                        print(f"   ✅ Stage 3a: Tracklet Analysis completed in {stage_duration:.2f}s")
+
+            # Stage 3b: Enhanced grouping (NEW)
+            if stage_key == 'stage3b':
+                canonical_file = config['stage3b']['output'].get('canonical_persons_file')
+                if canonical_file:
+                    sidecar_path = Path(canonical_file).parent / (Path(canonical_file).name + '.timings.json')
+                    if sidecar_path.exists():
+                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
+                            data = json.load(sf)
+
+                        grouping_time = float(data.get('grouping_time', 0.0))
+                        save_time = float(data.get('npz_save_time', 0.0))
+                        num_persons = int(data.get('num_persons', 0))
+                        num_merged = int(data.get('num_merged_groups', 0))
+
+                        other_overhead = stage_duration - (grouping_time + save_time)
+                        if other_overhead < 0 and abs(other_overhead) < 0.05:
+                            other_overhead = 0.0
+
+                        print(f"   ✅ Stage 3b: Enhanced Canonical Grouping completed in {stage_duration:.2f}s")
+                        print(f"      Breakdown (stage parts):")
+                        print(f"       grouping (5 checks): {grouping_time:.2f}s")
+                        print(f"       files saving: {save_time:.2f}s")
+                        print(f"       other overheads: {other_overhead:.2f}s")
+                        if verbose:
+                            print(f"      Merge stats: {num_merged} groups merged from multiple tracklets")
+                    else:
+                        print(f"   ✅ Stage 3b: Enhanced Canonical Grouping completed in {stage_duration:.2f}s")
+
+            # Stage 3c: Ranking (NEW)
+            if stage_key == 'stage3c':
+                primary_file = config['stage3c']['output'].get('primary_person_file')
+                if primary_file:
+                    sidecar_path = Path(primary_file).parent / (Path(primary_file).name + '.timings.json')
+                    if sidecar_path.exists():
+                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
+                            data = json.load(sf)
+
+                        ranking_time = float(data.get('ranking_time', 0.0))
+                        save_time = float(data.get('npz_save_time', 0.0))
+                        num_persons = int(data.get('num_persons', 0))
+                        primary_id = int(data.get('primary_person_id', -1))
+
+                        other_overhead = stage_duration - (ranking_time + save_time)
+                        if other_overhead < 0 and abs(other_overhead) < 0.05:
+                            other_overhead = 0.0
+
+                        print(f"   ✅ Stage 3c: Person Ranking completed in {stage_duration:.2f}s")
+                        print(f"      Breakdown (stage parts):")
+                        print(f"       ranking: {ranking_time:.2f}s")
+                        print(f"       files saving: {save_time:.2f}s")
+                        print(f"       other overheads: {other_overhead:.2f}s")
+                        if verbose:
+                            print(f"      Selected primary person: {primary_id} from {num_persons} candidates")
+                    else:
+                        print(f"   ✅ Stage 3c: Person Ranking completed in {stage_duration:.2f}s")
+
             # Stage 4: Load crops cache
             if stage_key == 'stage4':
                 crops_file = config['stage4']['input'].get('crops_cache_file')
@@ -386,6 +485,36 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                             print(f"     (No timings sidecar found at {sidecar_path.name})")
                         else:
                             print(f"   ✅ Stage 4: Load Crops Cache completed in {stage_duration:.2f}s")
+
+            # Stage 4b: Reorganize crops by person (NEW)
+            if stage_key == 'stage4b':
+                crops_by_person_file = config['stage4b']['output'].get('crops_by_person_file')
+                if crops_by_person_file:
+                    sidecar_path = Path(crops_by_person_file).parent / (Path(crops_by_person_file).stem + '_timing.json')
+                    if sidecar_path.exists():
+                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
+                            data = json.load(sf)
+
+                        load_time = float(data.get('load_crops_time', 0.0))
+                        reorg_time = float(data.get('reorganize_time', 0.0))
+                        save_time = float(data.get('save_time', 0.0))
+                        num_persons = int(data.get('num_persons', 0))
+                        num_crops = int(data.get('num_crops', 0))
+
+                        other_overhead = stage_duration - (load_time + reorg_time + save_time)
+                        if other_overhead < 0 and abs(other_overhead) < 0.05:
+                            other_overhead = 0.0
+
+                        print(f"   ✅ Stage 4b: Reorganize Crops by Person completed in {stage_duration:.2f}s")
+                        print(f"      Breakdown (stage parts):")
+                        print(f"       load crops cache: {load_time:.2f}s")
+                        print(f"       reorganize: {reorg_time:.2f}s")
+                        print(f"       save: {save_time:.2f}s")
+                        print(f"       other overheads: {other_overhead:.2f}s")
+                        if verbose:
+                            print(f"      Output: {num_crops} crops organized for {num_persons} persons")
+                    else:
+                        print(f"   ✅ Stage 4b: Reorganize Crops by Person completed in {stage_duration:.2f}s")
 
             # Stage 5: Canonical grouping
             if stage_key == 'stage5':
@@ -424,10 +553,37 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             if stage_key == 'stage7':
                 print(f"   ✅ Stage 7: Rank Persons completed in {stage_duration:.2f}s")
 
-            # Stage 10: Generate Person Animated WebPs
+            # Stage 10: Generate Person Animated WebPs (OLD)
             if stage_key == 'stage10':
                 print(f"  ✅ Stage 10: Generate Person Animated WebPs completed in {stage_duration:.2f}s")
                 print(f"{'='*70}")
+
+            # Stage 10b: Generate WebP Animations (NEW - SIMPLIFIED)
+            if stage_key == 'stage10b':
+                webp_dir = config['stage10b']['output'].get('webp_dir')
+                if webp_dir:
+                    sidecar_path = Path(webp_dir) / 'webp_generation_timing.json'
+                    if sidecar_path.exists():
+                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
+                            data = json.load(sf)
+
+                        gen_time = float(data.get('generation_time', 0.0))
+                        num_webps = int(data.get('num_webps_created', 0))
+
+                        other_overhead = stage_duration - gen_time
+                        if other_overhead < 0 and abs(other_overhead) < 0.05:
+                            other_overhead = 0.0
+
+                        print(f"  ✅ Stage 10b: Generate WebP Animations (Simplified) completed in {stage_duration:.2f}s")
+                        print(f"      Breakdown (stage parts):")
+                        print(f"       webp generation: {gen_time:.2f}s")
+                        print(f"       other overheads: {other_overhead:.2f}s")
+                        if verbose:
+                            print(f"      Created {num_webps} WebP animations")
+                        print(f"{'='*70}")
+                    else:
+                        print(f"  ✅ Stage 10b: Generate WebP Animations (Simplified) completed in {stage_duration:.2f}s")
+                        print(f"{'='*70}")
 
             # Stage 11: HTML Selection Report
             if stage_key == 'stage11':
@@ -495,7 +651,17 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             config['stage3']['output']['tracklet_stats_file'],
             config['stage3']['output']['candidates_file']
         ],
+        'stage3a': config.get('stage3a', {}).get('output', {}).get('tracklet_stats_file', 'N/A'),
+        'stage3b': [
+            config.get('stage3b', {}).get('output', {}).get('canonical_persons_file', 'N/A'),
+            config.get('stage3b', {}).get('output', {}).get('grouping_log_file', 'N/A')
+        ],
+        'stage3c': [
+            config.get('stage3c', {}).get('output', {}).get('primary_person_file', 'N/A'),
+            config.get('stage3c', {}).get('output', {}).get('ranking_report_file', 'N/A')
+        ],
         'stage4': [],  # Lightweight stage - no outputs, just loads crops cache
+        'stage4b': config.get('stage4b', {}).get('output', {}).get('crops_by_person_file', 'N/A'),
         'stage5': [
             config['stage5']['output']['canonical_persons_file'],
             config['stage5']['output']['grouping_log_file']
@@ -511,6 +677,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             # HTML report - check the person_selection_report.html file
             str(Path(config['stage5']['output']['canonical_persons_file']).parent / 'person_selection_report.html')
         ],
+        'stage10b': config.get('stage10b', {}).get('output', {}).get('webp_dir', 'N/A'),
         'stage11': [
             # Check webp subfolder in video-specific outputs
             str(Path(config['stage5']['output']['canonical_persons_file']).parent / 'webp')

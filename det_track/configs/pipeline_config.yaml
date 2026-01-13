@@ -32,18 +32,24 @@ global:
 pipeline:
   # Stage execution control - SIMPLE NUMERIC IDs 1-11 - the ONLY place to enable/disable stages
   # NOTE: Order matters! Stage 11 MUST run before Stage 10 (generate GIFs before embedding in HTML)
+  # NEW: Stages 3a, 3b, 3c replace old stages 3, 5, 7 with optimized analysis chain
   stages:
     stage1: true                           # Stage 1: YOLO detection
     stage2: true                           # Stage 2: ByteTrack offline tracking
-    stage3: true                           # Stage 3: Tracklet statistics & candidate analysis
+    stage3: false                          # Stage 3: OLD - Tracklet statistics (REPLACED by 3a)
+    stage3a: true                          # Stage 3a: NEW - Tracklet analysis (computes stats once)
+    stage3b: true                          # Stage 3b: NEW - Enhanced grouping (5 checks, loads 3a stats)
+    stage3c: true                          # Stage 3c: NEW - Person ranking (clean separation)
     stage4: true                           # Stage 4: Load crops cache (lightweight)
-    stage5: true                           # Stage 5: Group tracklets into canonical persons
+    stage4b: true                          # Stage 4b: NEW - Reorganize crops by person (efficient lookup)
+    stage5: false                          # Stage 5: OLD - Canonical grouping (REPLACED by 3b)
     stage6: false                          # Stage 6: DISABLED - In-memory optimization (skip HDF5 write)
-    stage7: true                           # Stage 7: Rank persons by appearance time
+    stage7: false                          # Stage 7: OLD - Rank persons (REPLACED by 3c)
     stage8: false                          # Stage 8: Optional: Show grouping tables (debug)
     stage9: false                          # Stage 9: DISABLED - Video output saves 22% time (optional)
+    stage10: false                         # Stage 10: OLD - Complex WebP generation (REPLACED by 10b)
+    stage10b: true                         # Stage 10b: NEW - Simplified WebP generation (uses 4b output)
     stage11: true                          # Stage 11: Generate animated WebPs for top 10 persons (BEFORE stage10!)
-    stage10: true                          # Stage 10: Create HTML selection report (needs WebPs from stage11)
   
   # Global settings inherited by all stages (can be overridden per-stage if needed)
   advanced:
@@ -90,8 +96,10 @@ stage2:
     tracklets_file: ${outputs_dir}/${current_video}/tracklets_raw.npz
 
 # ============================================================================
-# Stage 3: Tracklet Analysis
+# Stage 3: Tracklet Analysis (OLD - LEGACY)
 # ============================================================================
+# NOTE: Stage 3 is REPLACED by Stage 3a in the new pipeline
+# Keep this config for backward compatibility and rollback
 stage3:
   analysis:
     compute_statistics: true  # Temporal, spatial, motion stats
@@ -110,6 +118,76 @@ stage3:
     candidates_file: ${outputs_dir}/${current_video}/reid_candidates.json
 
 # ============================================================================
+# Stage 3a: Tracklet Analysis (NEW - Reorganized Pipeline)
+# ============================================================================
+# Computes statistics once for reuse by Stage 3b
+# Includes motion features: velocity, jitter (used by enhanced grouping)
+stage3a:
+  input:
+    tracklets_file: ${outputs_dir}/${current_video}/tracklets_raw.npz
+  
+  output:
+    tracklet_stats_file: ${outputs_dir}/${current_video}/tracklet_stats.npz
+  
+  advanced:
+    verbose: false  # Set true to see per-tracklet statistics
+
+# ============================================================================
+# Stage 3b: Enhanced Canonical Grouping (NEW - Reorganized Pipeline)
+# ============================================================================
+# Enhanced grouping with 5 merge checks (3 existing + 2 NEW motion-based)
+# Loads pre-computed stats from Stage 3a (NO recomputation!)
+stage3b:
+  grouping:
+    method: enhanced  # Enhanced heuristic with motion checks
+    
+    # Enhanced criteria (5 checks total)
+    enhanced_criteria:
+      # Existing checks (from old Stage 5)
+      max_temporal_gap: 30              # Temporal proximity (frames)
+      max_spatial_distance: 200         # Spatial proximity (pixels)
+      area_ratio_range: [0.7, 1.3]      # Size consistency
+      
+      # NEW motion-based checks
+      min_motion_alignment: 0.6         # Cosine similarity of velocity vectors (>0.6 = same direction)
+      max_jitter_difference: 40.0       # Max difference in center_jitter (pixels)
+  
+  input:
+    tracklet_stats_file: ${outputs_dir}/${current_video}/tracklet_stats.npz
+  
+  output:
+    canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
+    grouping_log_file: ${outputs_dir}/${current_video}/grouping_log.json
+  
+  advanced:
+    verbose: false  # Set true to see merge criteria and sample merges
+
+# ============================================================================
+# Stage 3c: Person Ranking (NEW - Reorganized Pipeline)
+# ============================================================================
+# Ranks canonical persons and selects primary person for pose estimation
+stage3c:
+  ranking:
+    method: auto  # Options: auto (manual selection not yet implemented)
+    
+    # Auto-ranking weights
+    weights:
+      duration: 0.4       # Longest presence in video
+      coverage: 0.3       # Percentage of frames covered
+      center: 0.2         # Proximity to frame center
+      smoothness: 0.1     # Motion stability (less jitter)
+  
+  input:
+    canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
+  
+  output:
+    primary_person_file: ${outputs_dir}/${current_video}/primary_person.npz
+    ranking_report_file: ${outputs_dir}/${current_video}/ranking_report.json
+  
+  advanced:
+    verbose: false  # Set true to see top 5 persons with scores
+
+# ============================================================================
 # Stage 4: Load Crops Cache (Lightweight - No ReID Recovery)
 # ============================================================================
 # NOTE: This is the lightweight version that loads pre-cached crops from Stage 1
@@ -123,9 +201,23 @@ stage4:
     # No outputs - crops cache is loaded and passed to Stage 7
 
 # ============================================================================
-# Stage 5: Canonical Person Grouping
+# Stage 4b: Reorganize Crops by Person (NEW - EFFICIENT LOOKUP)
 # ============================================================================
-# To disable this stage, set pipeline.stages.stage5 to false
+# Pre-organizes crops by person_id for efficient downstream access
+# Eliminates complex index conversion logic in visualization stages
+stage4b:
+  input:
+    crops_cache_file: ${outputs_dir}/${current_video}/crops_cache.pkl
+    canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
+  
+  output:
+    crops_by_person_file: ${outputs_dir}/${current_video}/crops_by_person.pkl
+
+# ============================================================================
+# Stage 5: Canonical Person Grouping (OLD - LEGACY)
+# ============================================================================
+# NOTE: Stage 5 is REPLACED by Stage 3b in the new pipeline
+# Keep this config for backward compatibility and rollback
 stage5:
   grouping:
     method: heuristic  # Options: heuristic, clustering, hybrid
@@ -168,8 +260,10 @@ stage6:
     crops_enriched_file: ${outputs_dir}/${current_video}/crops_enriched.h5
 
 # ============================================================================
-# Stage 7: Rank Persons by Appearance Time
+# Stage 7: Rank Persons by Appearance Time (OLD - LEGACY)
 # ============================================================================
+# NOTE: Stage 7 is REPLACED by Stage 3c in the new pipeline
+# Keep this config for backward compatibility and rollback
 stage7:
   ranking:
     method: auto  # Options: auto (manual selection not yet implemented)
@@ -221,9 +315,11 @@ stage9:
     video_file: ${outputs_dir}/${current_video}/top_persons_visualization.mp4
 
 # ============================================================================
-# Stage 10: Generate Person Animated WebPs
+# Stage 10: Generate Person Animated WebPs (OLD - LEGACY)
 # ============================================================================
-# To disable this stage, set pipeline.stages.stage10 to false
+# NOTE: Stage 10 is REPLACED by Stage 10b in the new pipeline
+# Keep this config for backward compatibility and rollback
+# OLD VERSION: 50+ lines of complex index conversion logic
 stage10:
   
   video_generation:
@@ -234,6 +330,27 @@ stage10:
     frame_width: 128         # Reduced width for horizontal tape (3.5x smaller area)
     frame_height: 192        # Reduced height for horizontal tape
     quality: 80              # WebP quality (0-100, 80 is good balance)
+  
+  output:
+    webp_dir: ${outputs_dir}/${current_video}/webp
+
+# ============================================================================
+# Stage 10b: Generate WebP Animations (NEW - SIMPLIFIED)
+# ============================================================================
+# Pure visualization - NO association logic!
+# Uses pre-organized crops_by_person.pkl from Stage 4b
+# DRAMATICALLY SIMPLIFIED: 20 lines vs 50+ lines in old Stage 10
+stage10b:
+  video_generation:
+    fps: 10                  # Frames per second (10 fps = smooth playback at ~6 seconds)
+    max_frames: 60           # Maximum frames per WebP (60 frames @ 10fps = 6 seconds)
+    max_persons: 10          # Generate WebPs for top 10 persons
+    frame_width: 128         # Reduced width for horizontal tape (3.5x smaller area)
+    frame_height: 192        # Reduced height for horizontal tape
+    quality: 80              # WebP quality (0-100, 80 is good balance)
+  
+  input:
+    crops_by_person_file: ${outputs_dir}/${current_video}/crops_by_person.pkl
   
   output:
     webp_dir: ${outputs_dir}/${current_video}/webp
