@@ -364,7 +364,7 @@ def run_enhanced_grouping(config):
     np.savez_compressed(output_path, persons=np.array(canonical_persons, dtype=object))
     npz_save_time = time.time() - t_save_start
     
-    logger.saved(f"Canonical persons saved: {output_path.name}")
+    logger.info(f"Saved canonical persons: {output_path.name}")
     
     # Save log
     log_path = Path(grouping_log_file)

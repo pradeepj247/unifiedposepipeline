@@ -237,7 +237,7 @@ def run_ranking(config):
     )
     npz_save_time = time.time() - t_save_start
     
-    logger.saved(f"Primary person saved: {output_path.name}")
+    logger.info(f"Saved primary person: {output_path.name}")
     
     # Save ranking report
     ranking_report = []

@@ -206,7 +206,7 @@ def run_analysis(config):
     )
     npz_save_time = time.time() - t_save_start
     
-    logger.saved(f"Tracklet stats saved: {output_path.name}")
+    logger.info(f"Saved tracklet stats: {output_path.name}")
     
     # Write timings sidecar
     try:
