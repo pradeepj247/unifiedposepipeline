@@ -23,8 +23,22 @@ import pickle
 import time
 import re
 import sys
+import json
 from pathlib import Path
 from tqdm import tqdm
+from datetime import datetime, timezone
+
+# Try to import h5py, install if not available
+try:
+    import h5py
+    HDF5_AVAILABLE = True
+except ImportError:
+    print("⚠️  h5py not found. Installing...")
+    import subprocess
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'h5py'])
+    import h5py
+    HDF5_AVAILABLE = True
+    print("✅ h5py installed successfully")
 
 
 def resolve_path_variables(config):
@@ -159,6 +173,84 @@ def reorganize_crops_by_person(crops_cache, canonical_persons):
     return crops_by_person
 
 
+def save_crops_to_hdf5(crops_by_person, output_file, compression_level=4):
+    """
+    Save crops to HDF5 format with compression.
+    
+    Args:
+        crops_by_person: Dict of {person_id: {'frame_numbers', 'crops', 'bboxes', 'confidences'}}
+        output_file: Path to output .h5 file
+        compression_level: Gzip compression level (1-9, 4=balanced)
+    
+    Returns:
+        file_size_mb: File size in megabytes
+    """
+    with h5py.File(output_file, 'w') as f:
+        for person_id, data in tqdm(crops_by_person.items(), desc="Saving to HDF5"):
+            grp = f.create_group(f'person_{person_id:03d}')
+            
+            # Store frame numbers (compressed)
+            grp.create_dataset(
+                'frame_numbers',
+                data=data['frame_numbers'],
+                compression='gzip',
+                compression_opts=compression_level
+            )
+            
+            # Store crops with compression (main data - largest)
+            crops_grp = grp.create_group('crops')
+            for idx, crop in enumerate(data['crops']):
+                crops_grp.create_dataset(
+                    str(idx),
+                    data=crop,
+                    compression='gzip',
+                    compression_opts=compression_level
+                )
+            
+            # Store metadata (bboxes, confidences) if present
+            if data['bboxes'] is not None:
+                grp.create_dataset(
+                    'bboxes',
+                    data=data['bboxes'],
+                    compression='gzip',
+                    compression_opts=compression_level
+                )
+            if data['confidences'] is not None:
+                grp.create_dataset(
+                    'confidences',
+                    data=data['confidences'],
+                    compression='gzip',
+                    compression_opts=compression_level
+                )
+        
+        # Add global metadata
+        meta = f.create_group('metadata')
+        meta.attrs['num_persons'] = len(crops_by_person)
+        meta.attrs['created_timestamp'] = datetime.now(timezone.utc).isoformat()
+        meta.attrs['format_version'] = '1.0'
+    
+    file_size_mb = Path(output_file).stat().st_size / (1024 * 1024)
+    return file_size_mb
+
+
+def save_crops_to_pickle(crops_by_person, output_file):
+    """
+    Save crops to pickle format (legacy/fallback).
+    
+    Args:
+        crops_by_person: Dict of {person_id: {'frame_numbers', 'crops', 'bboxes', 'confidences'}}
+        output_file: Path to output .pkl file
+    
+    Returns:
+        file_size_mb: File size in megabytes
+    """
+    with open(output_file, 'wb') as f:
+        pickle.dump(crops_by_person, f)
+    
+    file_size_mb = Path(output_file).stat().st_size / (1024 * 1024)
+    return file_size_mb
+
+
 def run_reorganize_crops(config):
     """Main function for Stage 4b"""
     
@@ -168,9 +260,18 @@ def run_reorganize_crops(config):
     canonical_persons_file = stage_config['input']['canonical_persons_file']
     output_file = stage_config['output']['crops_by_person_file']
     
+    # Get output format (default: hdf5)
+    output_format = stage_config['output'].get('format', 'hdf5').lower()
+    compression_level = stage_config['output'].get('compression_level', 4)
+    
+    # Auto-detect format from file extension if not specified
+    if output_format == 'auto':
+        output_format = 'hdf5' if output_file.endswith('.h5') else 'pickle'
+    
     # Timing sidecar
     timing = {
         'stage': 'stage4b_reorganize_crops',
+        'output_format': output_format,
         'start_time': time.time()
     }
     
@@ -178,6 +279,12 @@ def run_reorganize_crops(config):
     print("STAGE 4b: REORGANIZE CROPS BY PERSON")
     print("="*60)
     print(f"Input (crops cache):      {crops_cache_file}")
+    print(f"Input (canonical persons): {canonical_persons_file}")
+    print(f"Output:                   {output_file}")
+    print(f"Output format:            {output_format.upper()}")
+    if output_format == 'hdf5':
+        print(f"Compression level:        {compression_level}")
+    print("-"*60)
     print(f"Input (canonical persons): {canonical_persons_file}")
     print(f"Output:                   {output_file}")
     print("-"*60)
@@ -224,26 +331,30 @@ def run_reorganize_crops(config):
     
     print(f"\n✅ Reorganized {total_crops_reorg} crops for {total_persons} persons ({reorg_time:.3f}s)")
     
-    # Save
+    # Save to appropriate format
     print(f"\nSaving to {output_file}...")
     save_start = time.time()
     Path(output_file).parent.mkdir(parents=True, exist_ok=True)
-    with open(output_file, 'wb') as f:
-        pickle.dump(crops_by_person, f)
+    
+    if output_format == 'hdf5':
+        file_size_mb = save_crops_to_hdf5(crops_by_person, output_file, compression_level)
+    else:  # pickle
+        file_size_mb = save_crops_to_pickle(crops_by_person, output_file)
+    
     save_time = time.time() - save_start
     timing['save_time'] = save_time
     
-    file_size_mb = Path(output_file).stat().st_size / (1024 * 1024)
     print(f"  Saved: {file_size_mb:.2f} MB ({save_time:.3f}s)")
     
     # Timing summary
     timing['end_time'] = time.time()
     timing['total_time'] = timing['end_time'] - timing['start_time']
+    timing['file_size_mb'] = file_size_mb
     
     # Save timing sidecar
-    timing_file = output_file.replace('.pkl', '_timing.json')
+    output_path = Path(output_file)
+    timing_file = output_path.parent / (output_path.stem + '_timing.json')
     with open(timing_file, 'w') as f:
-        import json
         json.dump(timing, f, indent=2)
     
     print("\n" + "="*60)

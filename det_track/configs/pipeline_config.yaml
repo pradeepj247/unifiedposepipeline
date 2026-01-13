@@ -205,13 +205,16 @@ stage4:
 # ============================================================================
 # Pre-organizes crops by person_id for efficient downstream access
 # Eliminates complex index conversion logic in visualization stages
+# Phase 2: HDF5 format for 60-70% size reduction and partial loading
 stage4b:
   input:
     crops_cache_file: ${outputs_dir}/${current_video}/crops_cache.pkl
     canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
   
   output:
-    crops_by_person_file: ${outputs_dir}/${current_video}/crops_by_person.pkl
+    format: hdf5                                    # hdf5 (default) or pickle
+    crops_by_person_file: ${outputs_dir}/${current_video}/crops_by_person.h5
+    compression_level: 4                            # Gzip level 1-9 (4=balanced)
 
 # ============================================================================
 # Stage 5: Canonical Person Grouping (OLD - LEGACY)

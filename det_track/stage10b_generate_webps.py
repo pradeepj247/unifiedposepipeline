@@ -38,6 +38,14 @@ except ImportError:
     subprocess.check_call(['pip', 'install', 'Pillow'])
     from PIL import Image
 
+try:
+    import h5py
+except ImportError:
+    print("Installing h5py for HDF5 support...")
+    import subprocess
+    subprocess.check_call(['pip', 'install', 'h5py'])
+    import h5py
+
 
 def resolve_path_variables(config):
     """Recursively resolve ${variable} in config"""
@@ -181,37 +189,125 @@ def create_webp_for_person_simple(person_id, person_data, output_dir,
     return True, f"person_{person_id:02d}.webp ({len(frames_list)} frames, {file_size_mb:.2f} MB)"
 
 
+def load_top_n_persons_from_hdf5(hdf5_file, max_persons=10):
+    """
+    Load only top N persons from HDF5 file.
+    
+    KEY OPTIMIZATION: Only reads needed persons, not all 48!
+    This saves ~2s vs loading entire file.
+    
+    Args:
+        hdf5_file: Path to crops_by_person.h5
+        max_persons: Number of top persons to load (default: 10)
+    
+    Returns:
+        crops_by_person: Dict mapping person_id → person_data
+    """
+    crops_by_person = {}
+    
+    with h5py.File(hdf5_file, 'r') as f:
+        # Get all person groups
+        person_ids = []
+        person_sizes = []
+        
+        for key in f.keys():
+            if key.startswith('person_') and key != 'metadata':
+                person_id = int(key.split('_')[1])
+                person_group = f[key]
+                num_crops = len(person_group['frame_numbers'])
+                person_ids.append(person_id)
+                person_sizes.append(num_crops)
+        
+        # Sort by size (duration) and take top N
+        sorted_indices = np.argsort(person_sizes)[::-1][:max_persons]
+        top_person_ids = [person_ids[i] for i in sorted_indices]
+        
+        # Load only top persons
+        print(f"Loading top {len(top_person_ids)} persons from HDF5 (out of {len(person_ids)} total)...")
+        for person_id in tqdm(top_person_ids, desc="Loading HDF5"):
+            person_key = f'person_{person_id:03d}'
+            person_group = f[person_key]
+            
+            # Load crops
+            crops_group = person_group['crops']
+            crops = []
+            for i in range(len(crops_group)):
+                crop = crops_group[str(i)][:]
+                crops.append(crop)
+            
+            # Load metadata
+            frame_numbers = person_group['frame_numbers'][:]
+            bboxes = person_group['bboxes'][:]
+            confidences = person_group['confidences'][:]
+            
+            crops_by_person[person_id] = {
+                'frame_numbers': frame_numbers,
+                'crops': crops,
+                'bboxes': bboxes,
+                'confidences': confidences
+            }
+    
+    return crops_by_person
+
+
+def load_crops_by_person(file_path, max_persons=10):
+    """
+    Load crops with auto-format detection (HDF5 or pickle).
+    
+    Args:
+        file_path: Path to crops_by_person file (.h5 or .pkl)
+        max_persons: Number of top persons to load (default: 10)
+    
+    Returns:
+        crops_by_person: Dict mapping person_id → person_data
+    """
+    file_path = Path(file_path)
+    
+    if file_path.suffix == '.h5':
+        print("Detected HDF5 format")
+        return load_top_n_persons_from_hdf5(file_path, max_persons)
+    else:
+        print("Detected pickle format (loading all persons)")
+        with open(file_path, 'rb') as f:
+            crops_by_person = pickle.load(f)
+        
+        # Sort and limit to top N
+        sorted_persons = sorted(
+            crops_by_person.items(),
+            key=lambda x: len(x[1]['crops']),
+            reverse=True
+        )
+        top_persons = dict(sorted_persons[:max_persons])
+        return top_persons
+
+
 def create_webps_for_top_persons(crops_by_person_file, output_dir, config):
     """
     Generate WebPs for top 10 persons (by duration).
     
     Args:
-        crops_by_person_file: Path to crops_by_person.pkl
+        crops_by_person_file: Path to crops_by_person file (.h5 or .pkl)
         output_dir: Directory to save WebP files
         config: Stage configuration dict
     
     Returns:
         success_count: Number of WebPs successfully created
     """
-    # Load pre-organized crops
-    print("Loading pre-organized crops...")
-    with open(crops_by_person_file, 'rb') as f:
-        crops_by_person = pickle.load(f)
+    # Load pre-organized crops (auto-detects format)
+    max_persons = config.get('max_persons', 10)
+    print(f"Loading pre-organized crops (top {max_persons} persons)...")
+    crops_by_person = load_crops_by_person(crops_by_person_file, max_persons)
     
     print(f"  Loaded {len(crops_by_person)} persons")
     
-    # Sort by number of crops (duration)
+    # Sort by number of crops (duration) - already sorted if HDF5
     sorted_persons = sorted(
         crops_by_person.items(),
         key=lambda x: len(x[1]['crops']),
         reverse=True
     )
     
-    # Take top 10
-    max_persons = config.get('max_persons', 10)
-    top_persons = sorted_persons[:max_persons]
-    
-    print(f"\nGenerating WebPs for top {len(top_persons)} persons...")
+    print(f"\nGenerating WebPs for {len(sorted_persons)} persons...")
     
     # Extract parameters
     video_config = config.get('video_generation', {})
@@ -228,7 +324,7 @@ def create_webps_for_top_persons(crops_by_person_file, output_dir, config):
     success_count = 0
     failed_persons = []
     
-    for person_id, person_data in tqdm(top_persons, desc="Generating WebPs"):
+    for person_id, person_data in tqdm(sorted_persons, desc="Generating WebPs"):
         success, message = create_webp_for_person_simple(
             person_id,
             person_data,
