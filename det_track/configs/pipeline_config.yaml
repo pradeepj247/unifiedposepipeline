@@ -16,7 +16,7 @@ global:
   
   # Video input settings - change video_file to process different videos
   video_dir: ${demo_data_dir}/videos/
-  video_file: kohli_nets.mp4
+  video_file: dance.mp4
   
   # Logging and output control
   verbose: false                             # Set to true for detailed debug output across all stages
@@ -393,6 +393,7 @@ stage10:
 
 stage10b_ondemand:
   # Input files
+  video_file: ${outputs_dir}/${current_video}/canonical_video.mp4
   canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
   
   # Output directory

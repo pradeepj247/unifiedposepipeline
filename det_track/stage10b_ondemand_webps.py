@@ -78,6 +78,13 @@ def main():
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
     
+    # Auto-extract current_video from video_file (needed for path resolution)
+    video_file = config.get('global', {}).get('video_file', '')
+    if video_file:
+        import os
+        video_name = os.path.splitext(video_file)[0]
+        config['global']['current_video'] = video_name
+    
     config = resolve_path_variables(config)
     
     # Extract configuration
@@ -85,7 +92,7 @@ def main():
     stage_config = config.get('stage10b_ondemand', {})
     
     # Input/output paths
-    video_path = global_config.get('video_file')
+    video_path = stage_config.get('video_file')  # Use canonical video from stage config
     canonical_persons_file = stage_config.get('canonical_persons_file')
     output_dir = stage_config.get('output_dir')
     
