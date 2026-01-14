@@ -6,8 +6,8 @@
 # ============================================================================
 global:
   # Repository root - change this for different environments
-  # repo_root: /content/unifiedposepipeline  # Colab
-  repo_root: D:/trials/unifiedpipeline/newrepo  # Windows (uncomment for local)
+  repo_root: /content/unifiedposepipeline  # Colab
+  # repo_root: D:/trials/unifiedpipeline/newrepo  # Windows (uncomment for local)
   
   # Derived paths (use ${variable} syntax)
   models_dir: ${repo_root}/models
