@@ -136,7 +136,7 @@ def main():
     extraction_start = time.time()
     
     try:
-        person_buckets = extract_crops_from_video(
+        person_buckets, metadata = extract_crops_from_video(
             video_path=video_path,
             persons=persons,
             target_crops_per_person=crops_per_person,
@@ -163,6 +163,7 @@ def main():
         generate_webp_animations(
             person_buckets=person_buckets,
             output_dir=output_path,
+            metadata=metadata,
             resize_to=resize_to,
             duration_ms=webp_duration_ms
         )

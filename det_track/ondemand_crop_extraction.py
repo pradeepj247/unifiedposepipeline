@@ -219,12 +219,26 @@ def extract_crops_from_video(
         else:
             print(f"   {person_id:<12} {count:<10} {total_available:<10} {'N/A':<8} {'N/A':<8} {'N/A':<8}")
     
-    return person_buckets
+    # Return buckets + metadata for HTML generation
+    metadata = {
+        'total_frames': total_frames,
+        'person_info': {}
+    }
+    for person_id in person_buckets.keys():
+        frames_used = person_frames_used[person_id]
+        metadata['person_info'][person_id] = {
+            'num_frames': person_total_frames[person_id],
+            'start_frame': frames_used[0] if frames_used else 0,
+            'end_frame': frames_used[-1] if frames_used else 0
+        }
+    
+    return person_buckets, metadata
 
 
 def generate_webp_animations(
     person_buckets: Dict[int, List[np.ndarray]],
     output_dir: Path,
+    metadata: Dict[str, Any] = None,
     resize_to: Tuple[int, int] = (256, 256),
     duration_ms: int = 100
 ) -> None:
@@ -234,6 +248,7 @@ def generate_webp_animations(
     Args:
         person_buckets: Dict mapping person_id -> list of crops
         output_dir: Where to save WebP files
+        metadata: Optional dict with 'total_frames' and 'person_info' for HTML generation
         resize_to: Target size for crops (width, height)
         duration_ms: Frame duration in milliseconds
     """
@@ -274,13 +289,17 @@ def generate_webp_animations(
     
     # Generate HTML viewer
     html_file = output_dir / "viewer.html"
-    _generate_html_viewer(person_buckets, output_dir, html_file)
+    _generate_html_viewer(person_buckets, output_dir, html_file, metadata)
     print(f"   HTML viewer: {html_file}")
 
 
-def _generate_html_viewer(person_buckets: Dict[int, List[np.ndarray]], output_dir: Path, html_file: Path) -> None:
-    """Generate HTML file to view all WebP animations with embedded base64 images"""
+def _generate_html_viewer(person_buckets: Dict[int, List[np.ndarray]], output_dir: Path, html_file: Path, metadata: Dict[str, Any] = None) -> None:
+    """Generate HTML file to view all WebP animations with embedded base64 images (horizontal tape layout)"""
     import base64
+    
+    # Get video metadata
+    total_frames = metadata.get('total_frames', 0) if metadata else 0
+    person_info = metadata.get('person_info', {}) if metadata else {}
     
     html_content = """<!DOCTYPE html>
 <html>
@@ -301,22 +320,27 @@ def _generate_html_viewer(person_buckets: Dict[int, List[np.ndarray]], output_di
             margin-bottom: 30px;
         }
         .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            max-width: 1400px;
-            margin: 0 auto;
+            display: flex;
+            gap: 15px;
+            overflow-x: auto;
+            padding: 20px;
+            background: #f5f5f5;
         }
         .person-card {
-            background: #2a2a2a;
+            flex: 0 0 auto;
+            width: 180px;
+            background: white;
+            border: 2px solid #ddd;
             border-radius: 8px;
-            padding: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            transition: transform 0.2s;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            cursor: pointer;
         }
         .person-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 6px 12px rgba(76, 175, 80, 0.3);
+            border-color: #4CAF50;
+            box-shadow: 0 6px 16px rgba(76, 175, 80, 0.3);
+            transform: scale(1.05);
         }
         .person-title {
             font-size: 18px;
@@ -408,11 +432,18 @@ __PERSON_CARDS__
     # Generate person cards with base64-embedded WebP images
     cards = []
     total_crops = 0
-    for person_id in sorted(person_buckets.keys()):
+    for rank, person_id in enumerate(sorted(person_buckets.keys()), 1):
         crops = person_buckets[person_id]
         webp_file = output_dir / f"person_{person_id:03d}.webp"
         num_crops = len(crops)
         total_crops += num_crops
+        
+        # Get metadata for this person
+        info = person_info.get(person_id, {})
+        num_frames = info.get('num_frames', 0)
+        start_frame = info.get('start_frame', 0)
+        end_frame = info.get('end_frame', 0)
+        coverage_pct = (num_frames / total_frames * 100) if total_frames > 0 else 0
         
         # Read WebP file and encode as base64
         with open(webp_file, 'rb') as f:
@@ -421,8 +452,8 @@ __PERSON_CARDS__
         data_uri = f"data:image/webp;base64,{base64_webp}"
         
         card = f"""        <div class="person-card">
-            <div class="person-title">Person {person_id}</div>
-            <div class="person-info">{num_crops} frames</div>
+            <div class="person-title">#{rank} Person {person_id}</div>
+            <div class="person-info">{num_frames} frames | {start_frame}-{end_frame} | {coverage_pct:.0f}% coverage</div>
             <div class="webp-container">
                 <img src="{data_uri}" alt="Person {person_id}">
             </div>
