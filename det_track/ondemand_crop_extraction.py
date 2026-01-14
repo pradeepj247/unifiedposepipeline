@@ -35,7 +35,8 @@ def extract_crops_from_video(
     persons: List[Dict[str, Any]],
     target_crops_per_person: int = 50,
     top_n: int = 10,
-    max_first_appearance_ratio: float = 0.5
+    max_first_appearance_ratio: float = 0.5,
+    verbose: bool = False
 ) -> Dict[int, List[np.ndarray]]:
     """
     Extract person crops via single linear pass through video.
@@ -58,7 +59,8 @@ def extract_crops_from_video(
         - Multi-person batching (extract 3-4 persons per frame)
     """
     
-    print(f"\n[On-Demand Extraction] Starting linear pass...")
+    if verbose:
+        print(f"\n[On-Demand Extraction] Starting linear pass...")
     start_time = time.time()
     
     # Get video info to determine appearance threshold
@@ -80,16 +82,19 @@ def extract_crops_from_video(
     
     # Report filtering
     excluded = [p for p in top_n_candidates if p['frame_numbers'][0] > max_first_frame]
-    print(f"   Target: top {top_n} persons by frame count, {target_crops_per_person} crops each")
-    print(f"   Early appearance filter: first frame ≤ {max_first_frame} ({max_first_appearance_ratio*100:.0f}% of video)")
-    if excluded:
-        print(f"   Excluded {len(excluded)} late-appearing person(s) from top {top_n}:")
-        for p in excluded:
-            pid = int(p['person_id'])
-            first_frame = p['frame_numbers'][0]
-            frame_count = len(p['frame_numbers'])
-            print(f"     Person {pid}: starts at frame {first_frame} ({first_frame/total_frames*100:.1f}%), {frame_count} frames")
-    print(f"   Selected {len(top_persons)} persons for extraction (no backfill)")
+    if verbose:
+        print(f"   Target: top {top_n} persons by frame count, {target_crops_per_person} crops each")
+        print(f"   Early appearance filter: first frame ≤ {max_first_frame} ({max_first_appearance_ratio*100:.0f}% of video)")
+        if excluded:
+            print(f"   Excluded {len(excluded)} late-appearing person(s) from top {top_n}:")
+            for p in excluded:
+                pid = int(p['person_id'])
+                first_frame = p['frame_numbers'][0]
+                frame_count = len(p['frame_numbers'])
+                print(f"     Person {pid}: starts at frame {first_frame} ({first_frame/total_frames*100:.1f}%), {frame_count} frames")
+        print(f"   Selected {len(top_persons)} persons for extraction (no backfill)")
+    else:
+        print(f"   Extracting {len(top_persons)} persons, {target_crops_per_person} crops each...")
     
     # Phase 1: Build extraction plan
     # Maps frame_number -> [(person_id, bbox), ...]
@@ -124,11 +129,13 @@ def extract_crops_from_video(
             
             frame_to_persons[frame_num].append((person_id, bbox))
         
-        print(f"     Person {person_id}: target={target}, first_frame={available_frames[0]}, last_frame={available_frames[-1]}")
+        if verbose:
+            print(f"     Person {person_id}: target={target}, first_frame={available_frames[0]}, last_frame={available_frames[-1]}")
     
     # Calculate maximum frame needed (we can stop here!)
     max_frame_needed = max(frame_to_persons.keys())
-    print(f"\n   Maximum frame needed: {max_frame_needed} (no need to read beyond this)")
+    if verbose:
+        print(f"\n   Maximum frame needed: {max_frame_needed} (no need to read beyond this)")
     
     # Phase 2: Linear pass through video
     cap = cv2.VideoCapture(str(video_path))
@@ -138,8 +145,9 @@ def extract_crops_from_video(
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = cap.get(cv2.CAP_PROP_FPS)
     
-    print(f"   Video: {total_frames} frames @ {fps:.2f} FPS")
-    print(f"   Will read: 0-{max_frame_needed} ({max_frame_needed+1} frames, {(max_frame_needed+1)/total_frames*100:.1f}% of video)")
+    if verbose:
+        print(f"   Video: {total_frames} frames @ {fps:.2f} FPS")
+        print(f"   Will read: 0-{max_frame_needed} ({max_frame_needed+1} frames, {(max_frame_needed+1)/total_frames*100:.1f}% of video)")
     
     frames_with_targets = sorted(frame_to_persons.keys())
     next_target_idx = 0
@@ -184,7 +192,8 @@ def extract_crops_from_video(
         
         # Early termination: all buckets full (may happen before max_frame_needed)
         if all(len(person_buckets[pid]) >= person_targets[pid] for pid in person_targets):
-            print(f"   Early termination: All buckets full at frame {frame_idx}/{max_frame_needed} ({frame_idx/max_frame_needed*100:.1f}% of needed range)")
+            if verbose:
+                print(f"   Early termination: All buckets full at frame {frame_idx}/{max_frame_needed} ({frame_idx/max_frame_needed*100:.1f}% of needed range)")
             break
         
         frame_idx += 1
@@ -195,29 +204,32 @@ def extract_crops_from_video(
     processing_fps = frames_processed / elapsed if elapsed > 0 else 0
     
     # Report results
-    print(f"\n   Extraction complete:")
-    print(f"     Frames processed: {frames_processed}/{total_frames}")
-    print(f"     Crops extracted: {crops_extracted}")
-    print(f"     Time: {elapsed:.2f}s @ {processing_fps:.1f} FPS")
-    
-    buckets_filled = sum(1 for pid in person_targets if len(person_buckets[pid]) >= person_targets[pid])
-    print(f"     Buckets filled: {buckets_filled}/{len(person_targets)}")
-    
-    # Print debug table: frame ranges used per person
-    print(f"\n   Frame ranges used per bucket:")
-    print(f"   {'Person ID':<12} {'Extracted':<10} {'Available':<10} {'Start':<8} {'End':<8} {'Span':<8}")
-    print(f"   {'-'*68}")
-    for person_id in sorted(person_buckets.keys()):
-        count = len(person_buckets[person_id])
-        total_available = person_total_frames[person_id]
-        frames_used = person_frames_used[person_id]
-        if frames_used:
-            start_frame = frames_used[0]
-            end_frame = frames_used[-1]
-            span = end_frame - start_frame
-            print(f"   {person_id:<12} {count:<10} {total_available:<10} {start_frame:<8} {end_frame:<8} {span:<8}")
-        else:
-            print(f"   {person_id:<12} {count:<10} {total_available:<10} {'N/A':<8} {'N/A':<8} {'N/A':<8}")
+    if verbose:
+        print(f"\n   Extraction complete:")
+        print(f"     Frames processed: {frames_processed}/{total_frames}")
+        print(f"     Crops extracted: {crops_extracted}")
+        print(f"     Time: {elapsed:.2f}s @ {processing_fps:.1f} FPS")
+        
+        buckets_filled = sum(1 for pid in person_targets if len(person_buckets[pid]) >= person_targets[pid])
+        print(f"     Buckets filled: {buckets_filled}/{len(person_targets)}")
+        
+        # Print debug table: frame ranges used per person
+        print(f"\n   Frame ranges used per bucket:")
+        print(f"   {'Person ID':<12} {'Extracted':<10} {'Available':<10} {'Start':<8} {'End':<8} {'Span':<8}")
+        print(f"   {'-'*68}")
+        for person_id in sorted(person_buckets.keys()):
+            count = len(person_buckets[person_id])
+            total_available = person_total_frames[person_id]
+            frames_used = person_frames_used[person_id]
+            if frames_used:
+                start_frame = frames_used[0]
+                end_frame = frames_used[-1]
+                span = end_frame - start_frame
+                print(f"   {person_id:<12} {count:<10} {total_available:<10} {start_frame:<8} {end_frame:<8} {span:<8}")
+            else:
+                print(f"   {person_id:<12} {count:<10} {total_available:<10} {'N/A':<8} {'N/A':<8} {'N/A':<8}")
+    else:
+        print(f"   Extracted {crops_extracted} crops in {elapsed:.2f}s")
     
     # Return buckets + metadata for HTML generation
     metadata = {
@@ -240,7 +252,8 @@ def generate_webp_animations(
     output_dir: Path,
     metadata: Dict[str, Any] = None,
     resize_to: Tuple[int, int] = (256, 256),
-    duration_ms: int = 100
+    duration_ms: int = 100,
+    verbose: bool = False
 ) -> None:
     """
     Generate WebP animations from extracted crops.
@@ -257,7 +270,8 @@ def generate_webp_animations(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    print(f"\n[WebP Generation] Creating animations...")
+    if verbose:
+        print(f"\n[WebP Generation] Creating animations...")
     start_time = time.time()
     
     for person_id, crops in sorted(person_buckets.items()):
@@ -281,11 +295,15 @@ def generate_webp_animations(
             loop=0
         )
         
-        file_size_kb = output_file.stat().st_size / 1024
-        print(f"   Person {person_id}: {len(crops)} frames → {output_file.name} ({file_size_kb:.0f} KB)")
+        if verbose:
+            file_size_kb = output_file.stat().st_size / 1024
+            print(f"   Person {person_id}: {len(crops)} frames → {output_file.name} ({file_size_kb:.0f} KB)")
     
     elapsed = time.time() - start_time
-    print(f"   Generated {len(person_buckets)} WebP animations in {elapsed:.2f}s")
+    if verbose:
+        print(f"   Generated {len(person_buckets)} WebP animations in {elapsed:.2f}s")
+    else:
+        print(f"   Generated {len(person_buckets)} WebP animations in {elapsed:.2f}s")
     
     # Generate HTML viewer
     html_file = output_dir / "viewer.html"

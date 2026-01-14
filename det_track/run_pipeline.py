@@ -279,8 +279,9 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             stage for stage in all_stages
             if enabled_stages.get(stage[2], True)
         ]
-        enabled_nums = [i+1 for i, stage in enumerate(all_stages) if enabled_stages.get(stage[2], True)]
-        print(f"   Running enabled stages: {', '.join([str(i) for i in enabled_nums])}")
+        # Show stage keys instead of indices for clarity
+        enabled_keys = [stage[2] for stage in all_stages if enabled_stages.get(stage[2], True)]
+        print(f"   Running enabled stages: {', '.join(enabled_keys)}")
     
     print(f"\n{'='*70}\n")
     

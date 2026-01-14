@@ -141,7 +141,8 @@ def main():
             persons=persons,
             target_crops_per_person=crops_per_person,
             top_n=top_n_persons,
-            max_first_appearance_ratio=max_first_appearance_ratio
+            max_first_appearance_ratio=max_first_appearance_ratio,
+            verbose=verbose
         )
         extraction_time = time.time() - extraction_start
         logger.timing("Extraction", extraction_time)
@@ -165,7 +166,8 @@ def main():
             output_dir=output_path,
             metadata=metadata,
             resize_to=resize_to,
-            duration_ms=webp_duration_ms
+            duration_ms=webp_duration_ms,
+            verbose=verbose
         )
         webp_time = time.time() - webp_start
         logger.timing("WebP generation", webp_time)
