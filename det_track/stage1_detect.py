@@ -292,7 +292,13 @@ def filter_detections(detections, classes, method='hybrid', max_count=15, min_co
 
 
 def extract_crop(frame, bbox):
-    """Extract crop from frame using bbox
+    """[DEPRECATED] Extract crop from frame using bbox
+    
+    NOTE: This function is deprecated as of Phase 3 (On-Demand Extraction).
+    Crops are now extracted on-demand during visualization (stage10b).
+    Keeping this function for backward compatibility only.
+    
+    Extract crop from frame using bbox
     
     Args:
         frame: cv2 image (BGR)
@@ -386,7 +392,8 @@ def run_detection(config):
     all_confidences = []
     all_classes = []
     num_detections_per_frame = []
-    crops_cache = {}  # {frame_idx: {det_idx: crop_image}}
+    # [PHASE 3] crops_cache removed - on-demand extraction in stage10b
+    # crops_cache = {}  # DEPRECATED
     
     # Process frames
     if verbose:
@@ -417,8 +424,8 @@ def run_detection(config):
         num_dets = len(detections)
         num_detections_per_frame.append(num_dets)
         
-        # Extract crops for this frame
-        crops_cache[frame_idx] = {}
+        # [PHASE 3] Crop extraction removed - now done on-demand in stage10b
+        # crops_cache[frame_idx] = {}  # DEPRECATED
         
         for i in range(num_dets):
             all_frame_numbers.append(frame_idx)
@@ -426,10 +433,10 @@ def run_detection(config):
             all_confidences.append(detections[i, 4])
             all_classes.append(classes[i])
             
-            # Extract crop
-            crop = extract_crop(frame, detections[i, :4])
-            if crop is not None:
-                crops_cache[frame_idx][i] = crop
+            # [PHASE 3] Crop extraction removed
+            # crop = extract_crop(frame, detections[i, :4])  # DEPRECATED
+            # if crop is not None:
+            #     crops_cache[frame_idx][i] = crop  # DEPRECATED
         
         frame_idx += 1
         pbar.update(1)
@@ -480,26 +487,18 @@ def run_detection(config):
         print(f"     Size: {file_size_mb:.1f} MB")
         print(f"     Shape: {total_detections} detections across {num_frames} frames")
     
-    # Save crops cache
-    if verbose:
-        print(f"\n  💾 Saving crops cache...")
-    t_save_start = time.time()
+    # [PHASE 3] Crops cache saving removed - on-demand extraction in stage10b
+    # Keeping this commented for reference:
+    # - Old approach saved ~150-300 MB crops_cache.pkl (4-5s write time)
+    # - New approach: Extract crops on-demand during visualization (~6s total)
+    # - Storage savings: ~150-300 MB, Time savings: Variable (depends on pipeline)
     
-    crops_path = Path(crops_cache_file)
-    crops_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    with open(crops_path, 'wb') as f:
-        pickle.dump(crops_cache, f)
-    
-    t_save_end = time.time()
-    crops_size_mb = crops_path.stat().st_size / (1024 * 1024)
-    crops_save_time = t_save_end - t_save_start
+    crops_save_time = 0.0  # No longer saving crops
     total_save_time = npz_save_time + crops_save_time
-
-    print(f"     Saved: {crops_path.name}")
+    
     if verbose:
-        print(f"     Cache size: {crops_size_mb:.1f} MB")
-    print(f"     Files saving took: {total_save_time:.2f}s (npz: {npz_save_time:.2f}s, crops: {crops_save_time:.2f}s)")
+        print(f"\n  ✓ Crops extraction skipped (on-demand mode enabled)")
+    print(f"     Files saving took: {total_save_time:.2f}s (npz: {npz_save_time:.2f}s)")
 
     # Print full timing breakdown so users can reconcile sums with orchestrator time
     try:

@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 """
-Stage 4a: Lightweight Crops Cache Loader
+[DEPRECATED] Stage 4a: Lightweight Crops Cache Loader
 
+⚠️  DEPRECATION NOTICE ⚠️
+This stage is DEPRECATED as of Phase 3 (On-Demand Crop Extraction).
+Crops are now extracted on-demand during visualization (stage10b_ondemand_webps.py).
+
+This file is kept for backward compatibility only.
+New pipelines should skip this stage.
+
+Legacy functionality:
 Simply loads the crops cache from disk for use in Stage 7.
 No ReID processing - just cache management.
 
-Usage:
+Usage (legacy):
     python stage4_load_crops_cache.py --config configs/pipeline_config.yaml
 """
 

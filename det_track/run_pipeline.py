@@ -186,6 +186,7 @@ def check_stage_outputs_exist(config, stage_key):
         'stage9': 'stage9',
         'stage10': 'stage10',
         'stage10b': 'stage10b',
+        'stage10b_ondemand': 'stage10b_ondemand',
         'stage11': 'stage11'
     }
     
@@ -217,9 +218,10 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     # Pipeline stages - SIMPLE NUMERIC IDs FOR CLEAR REFERENCING
     # Usage: --stages 0,1,2,3  or  --stages 10,11
     # NOTE: Stage 0 runs FIRST - normalizes video before YOLO
-    # NOTE: Stage 10b must run AFTER Stage 4b (uses reorganized crops)
+    # NOTE: Stage 10b must run AFTER Stage 4b (uses reorganized crops) [DEPRECATED]
+    # NOTE: Stage 10b_ondemand replaces Stage 10b and does NOT need Stage 4/4b (Phase 3)
     # NEW: Stages 3a, 3b, 3c are the reorganized analysis pipeline
-    # NEW: Stages 4b, 10b are the optimized crop handling and visualization
+    # NEW: Stages 4b, 10b are DEPRECATED (Phase 3: on-demand extraction)
     all_stages = [
         ('Stage 0: Video Normalization', 'stage0_normalize_video.py', 'stage0'),
         ('Stage 1: YOLO Detection', 'stage1_detect.py', 'stage1'),
@@ -228,15 +230,16 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         ('Stage 3a: Tracklet Analysis', 'stage3a_analyze_tracklets.py', 'stage3a'),
         ('Stage 3b: Enhanced Canonical Grouping', 'stage3b_group_canonical.py', 'stage3b'),
         ('Stage 3c: Person Ranking', 'stage3c_rank_persons.py', 'stage3c'),
-        ('Stage 4: Load Crops Cache', 'stage4_load_crops_cache.py', 'stage4'),
-        ('Stage 4b: Reorganize Crops by Person', 'stage4b_reorganize_crops.py', 'stage4b'),
+        ('Stage 4: Load Crops Cache [DEPRECATED]', 'stage4_load_crops_cache.py', 'stage4'),
+        ('Stage 4b: Reorganize Crops by Person [DEPRECATED]', 'stage4b_reorganize_crops.py', 'stage4b'),
         ('Stage 5: Canonical Person Grouping (OLD)', 'stage5_group_canonical.py', 'stage5'),
         ('Stage 6: Enrich Crops with HDF5', 'stage6_enrich_crops.py', 'stage6'),
         ('Stage 7: Rank Persons (OLD)', 'stage7_rank_persons.py', 'stage7'),
         ('Stage 8: Visualize Grouping (Debug)', 'stage8_visualize_grouping.py', 'stage8'),
         ('Stage 9: Output Video Visualization', 'stage9_create_output_video.py', 'stage9'),
         ('Stage 10: Generate Person Animated WebPs (OLD)', 'stage10_generate_person_webps.py', 'stage10'),
-        ('Stage 10b: Generate WebP Animations (Simplified)', 'stage10b_generate_webps.py', 'stage10b'),
+        ('Stage 10b: Generate WebP Animations [DEPRECATED]', 'stage10b_generate_webps.py', 'stage10b'),
+        ('Stage 10b: On-Demand WebP Generation (Phase 3)', 'stage10b_ondemand_webps.py', 'stage10b_ondemand'),
         ('Stage 11: HTML Selection Report (Horizontal Tape)', 'stage11_create_selection_html_horizontal.py', 'stage11')
     ]
     
@@ -592,6 +595,37 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                         print(f"  ✅ Stage 10b: Generate WebP Animations (Simplified) completed in {stage_duration:.2f}s")
                         print(f"{'='*70}")
 
+            # Stage 10b_ondemand: On-Demand WebP Generation (Phase 3)
+            if stage_key == 'stage10b_ondemand':
+                webp_dir = config['stage10b_ondemand']['output'].get('webp_dir')
+                if webp_dir:
+                    sidecar_path = Path(webp_dir) / 'ondemand_webp_timing.json'
+                    if sidecar_path.exists():
+                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
+                            data = json.load(sf)
+
+                        extraction_time = float(data.get('extraction_time', 0.0))
+                        webp_time = float(data.get('webp_generation_time', 0.0))
+                        num_webps = int(data.get('num_webps_created', 0))
+                        storage_saved = int(data.get('storage_saved_mb', 0))
+
+                        other_overhead = stage_duration - extraction_time - webp_time
+                        if other_overhead < 0 and abs(other_overhead) < 0.05:
+                            other_overhead = 0.0
+
+                        print(f"  ✅ Stage 10b: On-Demand WebP Generation (Phase 3) completed in {stage_duration:.2f}s")
+                        print(f"      Breakdown (stage parts):")
+                        print(f"       crop extraction: {extraction_time:.2f}s")
+                        print(f"       webp generation: {webp_time:.2f}s")
+                        print(f"       other overheads: {other_overhead:.2f}s")
+                        if verbose:
+                            print(f"      Created {num_webps} WebP animations")
+                            print(f"      Storage saved: {storage_saved} MB (vs old approach)")
+                        print(f"{'='*70}")
+                    else:
+                        print(f"  ✅ Stage 10b: On-Demand WebP Generation (Phase 3) completed in {stage_duration:.2f}s")
+                        print(f"{'='*70}")
+
             # Stage 11: HTML Selection Report
             if stage_key == 'stage11':
                 pass  # Stage 11 prints its own completion message
@@ -689,6 +723,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             str(Path(config['stage5']['output']['canonical_persons_file']).parent / 'person_selection_report.html')
         ],
         'stage10b': config.get('stage10b', {}).get('output', {}).get('webp_dir', 'N/A'),
+        'stage10b_ondemand': config.get('stage10b_ondemand', {}).get('output', {}).get('webp_dir', 'N/A'),
         'stage11': [
             # Check webp subfolder in video-specific outputs
             str(Path(config['stage5']['output']['canonical_persons_file']).parent / 'webp')

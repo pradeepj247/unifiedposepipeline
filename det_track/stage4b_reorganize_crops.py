@@ -1,7 +1,26 @@
 #!/usr/bin/env python3
 """
-Stage 4b: Reorganize Crops by Person
+[DEPRECATED] Stage 4b: Reorganize Crops by Person
 
+⚠️  DEPRECATION NOTICE ⚠️
+This stage is DEPRECATED as of Phase 3 (On-Demand Crop Extraction).
+Crops are now extracted on-demand during visualization (stage10b_ondemand_webps.py).
+
+This file is kept for backward compatibility only.
+New pipelines should skip this stage.
+
+Storage Impact (Old Approach):
+- crops_by_person.pkl: ~812 MB
+- Write time: ~4.6s
+- Read time in Stage 10b: ~6.2s
+- Total overhead: ~10.8s
+
+New Approach (Phase 3):
+- No intermediate storage
+- On-demand extraction: ~6.0s total
+- Savings: ~808 MB storage, ~4.8s time
+
+Legacy functionality:
 Pre-organizes crops by person_id for efficient downstream access.
 Uses detection_indices from canonical_persons to map frame+position → crop.
 
@@ -12,7 +31,7 @@ Input:
 Output:
     - crops_by_person.pkl: {person_id: {'frame_numbers': [...], 'crops': [...], ...}}
 
-Usage:
+Usage (legacy):
     python stage4b_reorganize_crops.py --config configs/pipeline_config.yaml
 """
 

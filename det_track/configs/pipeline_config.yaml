@@ -34,23 +34,25 @@ pipeline:
   # NOTE: Stage 0 runs FIRST - validates and normalizes video before YOLO
   # NOTE: Order matters! Stage 11 MUST run before Stage 10 (generate GIFs before embedding in HTML)
   # NEW: Stages 3a, 3b, 3c replace old stages 3, 5, 7 with optimized analysis chain
+  # PHASE 3: Stage 10b_ondemand replaces old stage10b with on-demand extraction (no Stage 4 needed)
   stages:
     stage0: true                           # Stage 0: Video normalization & validation (RUNS FIRST)
-    stage1: true                           # Stage 1: YOLO detection
+    stage1: true                           # Stage 1: YOLO detection (no crop extraction as of Phase 3)
     stage2: true                           # Stage 2: ByteTrack offline tracking
     stage3: false                          # Stage 3: OLD - Tracklet statistics (REPLACED by 3a)
     stage3a: true                          # Stage 3a: NEW - Tracklet analysis (computes stats once)
     stage3b: true                          # Stage 3b: NEW - Enhanced grouping (5 checks, loads 3a stats)
     stage3c: true                          # Stage 3c: NEW - Person ranking (clean separation)
-    stage4: true                           # Stage 4: Load crops cache (lightweight)
-    stage4b: true                          # Stage 4b: NEW - Reorganize crops by person (efficient lookup)
+    stage4: false                          # Stage 4: DEPRECATED - Load crops cache (Phase 3: on-demand extraction)
+    stage4b: false                         # Stage 4b: DEPRECATED - Reorganize crops (Phase 3: on-demand extraction)
     stage5: false                          # Stage 5: OLD - Canonical grouping (REPLACED by 3b)
     stage6: false                          # Stage 6: DISABLED - In-memory optimization (skip HDF5 write)
     stage7: false                          # Stage 7: OLD - Rank persons (REPLACED by 3c)
     stage8: false                          # Stage 8: Optional: Show grouping tables (debug)
     stage9: false                          # Stage 9: DISABLED - Video output saves 22% time (optional)
     stage10: false                         # Stage 10: OLD - Complex WebP generation (REPLACED by 10b)
-    stage10b: true                         # Stage 10b: NEW - Simplified WebP generation (uses 4b output)
+    stage10b: false                        # Stage 10b: LEGACY - Uses crops_by_person.pkl (REPLACED by 10b_ondemand)
+    stage10b_ondemand: true                # Stage 10b: PHASE 3 - On-demand extraction (NO Stage 4 needed!)
     stage11: true                          # Stage 11: Generate animated WebPs for top 10 persons (BEFORE stage10!)
   
   # Global settings inherited by all stages (can be overridden per-stage if needed)
@@ -378,11 +380,45 @@ stage10:
     webp_dir: ${outputs_dir}/${current_video}/webp
 
 # ============================================================================
-# Stage 10b: Generate WebP Animations (NEW - SIMPLIFIED)
+# Stage 10b: Generate WebP Animations (PHASE 3 - ON-DEMAND EXTRACTION)
 # ============================================================================
-# Pure visualization - NO association logic!
-# Uses pre-organized crops_by_person.pkl from Stage 4b
-# DRAMATICALLY SIMPLIFIED: 20 lines vs 50+ lines in old Stage 10
+# On-demand crop extraction from video - no intermediate storage!
+# Replaces old approach that used crops_by_person.pkl (~812 MB)
+# 
+# Key improvements:
+# - 808 MB storage savings (no crops_by_person.pkl)
+# - Faster execution (~6s vs ~11s old approach)
+# - Better quality control (early appearance filter)
+# - Simpler pipeline (no Stage 4a/4b needed)
+
+stage10b_ondemand:
+  # Input files
+  canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
+  
+  # Output directory
+  output_dir: ${outputs_dir}/${current_video}/webp_ondemand
+  
+  # Extraction parameters
+  crops_per_person: 50                    # Number of crops to extract per person
+  top_n_persons: 10                       # Consider top N persons by frame count
+  max_first_appearance_ratio: 0.5         # Exclude persons appearing after 50% of video
+  
+  # WebP generation parameters
+  resize_to: [256, 256]                   # Resize crops to this size (width, height)
+  webp_duration_ms: 100                   # Frame duration in WebP (100ms = 10 FPS)
+  
+  # Logging
+  log_file: ${outputs_dir}/${current_video}/stage10b_ondemand.log
+  
+  # Output paths
+  output:
+    webp_dir: ${outputs_dir}/${current_video}/webp_ondemand
+
+# ============================================================================
+# Stage 10b: Generate WebP Animations (LEGACY - DEPRECATED)
+# ============================================================================
+# [DEPRECATED] This configuration is for the old approach using crops_by_person.pkl
+# Kept for backward compatibility only. Use stage10b_ondemand instead.
 stage10b:
   video_generation:
     fps: 10                  # Frames per second (10 fps = smooth playback at ~6 seconds)
