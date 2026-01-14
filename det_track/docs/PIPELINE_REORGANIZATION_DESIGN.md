@@ -2432,3 +2432,19 @@ Total Pipeline:
    - Recommendation: Store all (flexibility > 70 MB savings)
 
 ---
+##  PHASE 0: VIDEO INGESTION & NORMALIZATION (PROPOSED)
+
+### Status
+- **Phase:** Design/Proposal Stage  
+- **Date:** January 14, 2026
+- **Priority:** Critical - Foundation for production system
+- **Note:** This is actually **Phase 0** (runs before Phase 1) but documented after Phase 3 discovery
+
+### Problem Statement (Production Reality)
+
+**Current assumption:** Users provide well-formatted MP4 videos  
+**Reality:** Users will upload ANY video format, resolution, frame rate, codec
+
+**See full Phase 0 design in PHASE0_VIDEO_NORMALIZATION.md**
+
+---
