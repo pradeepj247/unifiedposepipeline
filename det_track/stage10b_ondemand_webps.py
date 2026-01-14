@@ -151,10 +151,6 @@ def main():
         logger.error(f"Error during crop extraction: {e}")
         return 1
     
-    # Generate WebP animations
-    logger.log("")
-    logger.log("🎨 Generating WebP animations...")
-    
     # Generate WebPs
     print()
     logger.step("Generating WebP animations...")
