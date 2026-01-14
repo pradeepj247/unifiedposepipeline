@@ -546,7 +546,6 @@ def run_detection(config):
     
     return {
         'detections_file': str(output_path),
-        'crops_cache_file': str(crops_path),
         'num_frames': num_frames,
         'total_detections': total_detections
     }
