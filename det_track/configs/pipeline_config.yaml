@@ -53,7 +53,7 @@ pipeline:
     stage10: false                         # Stage 10: OLD - Complex WebP generation (REPLACED by 10b)
     stage10b: false                        # Stage 10b: LEGACY - Uses crops_by_person.pkl (REPLACED by 10b_ondemand)
     stage10b_ondemand: true                # Stage 10b: PHASE 3 - On-demand extraction (NO Stage 4 needed!)
-    stage11: true                          # Stage 11: Generate animated WebPs for top 10 persons (BEFORE stage10!)
+    stage11: false                         # Stage 11: DEPRECATED - Replaced by stage10b_ondemand viewer.html
   
   # Global settings inherited by all stages (can be overridden per-stage if needed)
   advanced:
