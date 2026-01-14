@@ -30,30 +30,20 @@ global:
 # Use ONLY the settings below to control pipeline execution.
 # ============================================================================
 pipeline:
-  # Stage execution control - SIMPLE NUMERIC IDs 0-11 - the ONLY place to enable/disable stages
-  # NOTE: Stage 0 runs FIRST - validates and normalizes video before YOLO
-  # NOTE: Order matters! Stage 11 MUST run before Stage 10 (generate GIFs before embedding in HTML)
-  # NEW: Stages 3a, 3b, 3c replace old stages 3, 5, 7 with optimized analysis chain
-  # PHASE 3: Stage 10b_ondemand replaces old stage10b with on-demand extraction (no Stage 4 needed)
+  # Stage execution control - Simplified 5-stage pipeline (Phase 3)
+  # 0. Video Normalization
+  # 1. Detection
+  # 2. Tracking
+  # 3. Analysis & Ranking (3a → 3b → 3c)
+  # 4. HTML Generation (on-demand extraction + WebP + viewer)
   stages:
-    stage0: true                           # Stage 0: Video normalization & validation (RUNS FIRST)
-    stage1: true                           # Stage 1: YOLO detection (no crop extraction as of Phase 3)
-    stage2: true                           # Stage 2: ByteTrack offline tracking
-    stage3: false                          # Stage 3: OLD - Tracklet statistics (REPLACED by 3a)
-    stage3a: true                          # Stage 3a: NEW - Tracklet analysis (computes stats once)
-    stage3b: true                          # Stage 3b: NEW - Enhanced grouping (5 checks, loads 3a stats)
-    stage3c: true                          # Stage 3c: NEW - Person ranking (clean separation)
-    stage4: false                          # Stage 4: DEPRECATED - Load crops cache (Phase 3: on-demand extraction)
-    stage4b: false                         # Stage 4b: DEPRECATED - Reorganize crops (Phase 3: on-demand extraction)
-    stage5: false                          # Stage 5: OLD - Canonical grouping (REPLACED by 3b)
-    stage6: false                          # Stage 6: DISABLED - In-memory optimization (skip HDF5 write)
-    stage7: false                          # Stage 7: OLD - Rank persons (REPLACED by 3c)
-    stage8: false                          # Stage 8: Optional: Show grouping tables (debug)
-    stage9: false                          # Stage 9: DISABLED - Video output saves 22% time (optional)
-    stage10: false                         # Stage 10: OLD - Complex WebP generation (REPLACED by 10b)
-    stage10b: false                        # Stage 10b: LEGACY - Uses crops_by_person.pkl (REPLACED by 10b_ondemand)
-    stage10b_ondemand: true                # Stage 10b: PHASE 3 - On-demand extraction (NO Stage 4 needed!)
-    stage11: false                         # Stage 11: DEPRECATED - Replaced by stage10b_ondemand viewer.html
+    stage0: true                           # Stage 0: Video normalization & validation
+    stage1: true                           # Stage 1: YOLO detection
+    stage2: true                           # Stage 2: ByteTrack tracking
+    stage3a: true                          # Stage 3a: Tracklet analysis
+    stage3b: true                          # Stage 3b: Canonical grouping
+    stage3c: true                          # Stage 3c: Person ranking
+    stage4: true                           # Stage 4: Generate HTML viewer (on-demand extraction)
   
   # Global settings inherited by all stages (can be overridden per-stage if needed)
   advanced:
@@ -391,13 +381,16 @@ stage10:
 # - Better quality control (early appearance filter)
 # - Simpler pipeline (no Stage 4a/4b needed)
 
-stage10b_ondemand:
+# ============================================================================
+# Stage 4: Generate HTML Viewer (Phase 3)
+# ============================================================================
+stage4_generate_html:
   # Input files
   video_file: ${outputs_dir}/${current_video}/canonical_video.mp4
   canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
   
   # Output directory
-  output_dir: ${outputs_dir}/${current_video}/webp_ondemand
+  output_dir: ${outputs_dir}/${current_video}/webp_viewer
   
   # Extraction parameters
   crops_per_person: 50                    # Number of crops to extract per person
@@ -409,17 +402,17 @@ stage10b_ondemand:
   webp_duration_ms: 100                   # Frame duration in WebP (100ms = 10 FPS)
   
   # Logging
-  log_file: ${outputs_dir}/${current_video}/stage10b_ondemand.log
+  log_file: ${outputs_dir}/${current_video}/stage4_generate_html.log
   
   # Output paths
   output:
-    webp_dir: ${outputs_dir}/${current_video}/webp_ondemand
+    webp_dir: ${outputs_dir}/${current_video}/webp_viewer
 
 # ============================================================================
 # Stage 10b: Generate WebP Animations (LEGACY - DEPRECATED)
 # ============================================================================
 # [DEPRECATED] This configuration is for the old approach using crops_by_person.pkl
-# Kept for backward compatibility only. Use stage10b_ondemand instead.
+# Kept for backward compatibility only. Use stage4_generate_html instead.
 stage10b:
   video_generation:
     fps: 10                  # Frames per second (10 fps = smooth playback at ~6 seconds)

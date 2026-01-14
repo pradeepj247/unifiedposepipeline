@@ -1,0 +1,26 @@
+{
+  "results": {
+    "optimal": {
+      "extraction": {
+        "frames_seeked": 450,
+        "total_planned_seeks": 450,
+        "crops_extracted": 500,
+        "elapsed_seconds": 321.4075839519501,
+        "seeks_per_second": 1.400091418089482
+      },
+      "webp_generation": {
+        "webp_count": 10,
+        "elapsed_seconds": 2.036100149154663
+      },
+      "total_time": 323.44368410110474
+    }
+  },
+  "comparison_with_old": {
+    "old_time": 10.7,
+    "new_time": 323.44368410110474,
+    "time_saved": -312.74368410110475,
+    "old_storage_mb": 812,
+    "new_storage_mb": 1,
+    "storage_saved_mb": 811
+  }
+}

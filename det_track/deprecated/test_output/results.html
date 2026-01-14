@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>On-Demand Extraction Test Results</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .performance-summary {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .metric {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        .metric.positive {
+            background: #d4edda;
+            color: #155724;
+        }
+        .metric.positive .metric-value {
+            color: #28a745;
+        }
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .person-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .person-card h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .person-card img {
+            width: 100%;
+            height: auto;
+            border-radius: 4px;
+            background: #f0f0f0;
+        }
+        .person-info {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>On-Demand Crop Extraction - Test Results</h1>
+    <p class="subtitle">Linear-pass extraction: 225.4 FPS, Early termination at 83.9% of video</p>
+    
+    <div class="performance-summary">
+        <h2>Performance Comparison</h2>
+        <div class="metrics">
+            <div class="metric">
+                <div class="metric-label">Extraction Time</div>
+                <div class="metric-value">7.54s</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">WebP Generation</div>
+                <div class="metric-value">2.90s</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Total Time</div>
+                <div class="metric-value">10.44s</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Old Approach Time</div>
+                <div class="metric-value">10.70s</div>
+            </div>
+            <div class="metric positive">
+                <div class="metric-label">Time Saved</div>
+                <div class="metric-value">0.26s</div>
+            </div>
+            <div class="metric positive">
+                <div class="metric-label">Storage Saved</div>
+                <div class="metric-value">811 MB</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Processing Speed</div>
+                <div class="metric-value">225 FPS</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Frames Processed</div>
+                <div class="metric-value">1700/2027</div>
+            </div>
+        </div>
+    </div>
+    
+    <h2>Top 10 Persons - Animated WebPs (50 frames each)</h2>
+    <div class="gallery">
+        <div class="person-card">
+            <h3>Person 3</h3>
+            <img src="person_003.webp" alt="Person 3">
+            <div class="person-info">2019 total frames | 815 KB</div>
+        </div>
+        <div class="person-card">
+            <h3>Person 4</h3>
+            <img src="person_004.webp" alt="Person 4">
+            <div class="person-info">561 total frames | 365 KB</div>
+        </div>
+        <div class="person-card">
+            <h3>Person 20</h3>
+            <img src="person_020.webp" alt="Person 20">
+            <div class="person-info">593 total frames | 392 KB</div>
+        </div>
+        <div class="person-card">
+            <h3>Person 29</h3>
+            <img src="person_029.webp" alt="Person 29">
+            <div class="person-info">425 total frames | 508 KB</div>
+        </div>
+        <div class="person-card">
+            <h3>Person 37</h3>
+            <img src="person_037.webp" alt="Person 37">
+            <div class="person-info">655 total frames | 335 KB</div>
+        </div>
+        <div class="person-card">
+            <h3>Person 40</h3>
+            <img src="person_040.webp" alt="Person 40">
+            <div class="person-info">496 total frames | 407 KB</div>
+        </div>
+        <div class="person-card">
+            <h3>Person 65</h3>
+            <img src="person_065.webp" alt="Person 65">
+            <div class="person-info">737 total frames | 240 KB</div>
+        </div>
+        <div class="person-card">
+            <h3>Person 66</h3>
+            <img src="person_066.webp" alt="Person 66">
+            <div class="person-info">526 total frames | 267 KB</div>
+        </div>
+        <div class="person-card">
+            <h3>Person 87</h3>
+            <img src="person_087.webp" alt="Person 87">
+            <div class="person-info">490 total frames | 367 KB</div>
+        </div>
+        <div class="person-card">
+            <h3>Person 89</h3>
+            <img src="person_089.webp" alt="Person 89">
+            <div class="person-info">388 total frames | 341 KB</div>
+        </div>
+    </div>
+    
+    <div class="performance-summary" style="margin-top: 30px;">
+        <h2>Summary</h2>
+        <ul style="line-height: 1.8;">
+            <li><strong>Approach:</strong> Linear pass through video, extract crops on-demand</li>
+            <li><strong>Processing speed:</strong> 225.4 FPS (2x faster than expected!)</li>
+            <li><strong>Early termination:</strong> Stopped at frame 1700/2027 (saved 327 frames)</li>
+            <li><strong>Efficiency:</strong> Extracted 500 crops in 7.54 seconds</li>
+            <li><strong>Time comparison:</strong> 10.44s vs 10.70s (similar performance)</li>
+            <li><strong>Storage comparison:</strong> 1 MB vs 812 MB (99.9% reduction)</li>
+            <li><strong>Result:</strong> ✅ SUCCESS - Similar speed, massive storage savings!</li>
+        </ul>
+    </div>
+</body>
+</html>

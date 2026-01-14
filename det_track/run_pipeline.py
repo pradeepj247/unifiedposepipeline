@@ -177,17 +177,7 @@ def check_stage_outputs_exist(config, stage_key):
         'stage3a': 'stage3a',
         'stage3b': 'stage3b',
         'stage3c': 'stage3c',
-        'stage4': 'stage4',
-        'stage4b': 'stage4b',
-        'stage5': 'stage5',
-        'stage6': 'stage6',
-        'stage7': 'stage7',
-        'stage8': 'stage8',
-        'stage9': 'stage9',
-        'stage10': 'stage10',
-        'stage10b': 'stage10b',
-        'stage10b_ondemand': 'stage10b_ondemand',
-        'stage11': 'stage11'
+        'stage4': 'stage4_generate_html',
     }
     
     section = stage_to_section.get(stage_key)
@@ -230,17 +220,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         ('Stage 3a: Tracklet Analysis', 'stage3a_analyze_tracklets.py', 'stage3a'),
         ('Stage 3b: Enhanced Canonical Grouping', 'stage3b_group_canonical.py', 'stage3b'),
         ('Stage 3c: Person Ranking', 'stage3c_rank_persons.py', 'stage3c'),
-        ('Stage 4: Load Crops Cache [DEPRECATED]', 'stage4_load_crops_cache.py', 'stage4'),
-        ('Stage 4b: Reorganize Crops by Person [DEPRECATED]', 'stage4b_reorganize_crops.py', 'stage4b'),
-        ('Stage 5: Canonical Person Grouping (OLD)', 'stage5_group_canonical.py', 'stage5'),
-        ('Stage 6: Enrich Crops with HDF5', 'stage6_enrich_crops.py', 'stage6'),
-        ('Stage 7: Rank Persons (OLD)', 'stage7_rank_persons.py', 'stage7'),
-        ('Stage 8: Visualize Grouping (Debug)', 'stage8_visualize_grouping.py', 'stage8'),
-        ('Stage 9: Output Video Visualization', 'stage9_create_output_video.py', 'stage9'),
-        ('Stage 10: Generate Person Animated WebPs (OLD)', 'stage10_generate_person_webps.py', 'stage10'),
-        ('Stage 10b: Generate WebP Animations [DEPRECATED]', 'stage10b_generate_webps.py', 'stage10b'),
-        ('Stage 10b: On-Demand WebP Generation (Phase 3)', 'stage10b_ondemand_webps.py', 'stage10b_ondemand'),
-        ('Stage 11: HTML Selection Report (Horizontal Tape)', 'stage11_create_selection_html_horizontal.py', 'stage11')
+        ('Stage 4: Generate HTML Viewer', 'stage4_generate_html.py', 'stage4'),
     ]
     
     print(f"\n{'='*70}")
@@ -614,7 +594,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                         if other_overhead < 0 and abs(other_overhead) < 0.05:
                             other_overhead = 0.0
 
-                        print(f"  ✅ Stage 10b: On-Demand WebP Generation (Phase 3) completed in {stage_duration:.2f}s")
+                        print(f"  ✅ Stage 4: Generate HTML Viewer completed in {stage_duration:.2f}s")
                         print(f"      Breakdown (stage parts):")
                         print(f"       crop extraction: {extraction_time:.2f}s")
                         print(f"       webp generation: {webp_time:.2f}s")
@@ -624,10 +604,8 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                             print(f"      Storage saved: {storage_saved} MB (vs old approach)")
                         print(f"{'='*70}")
                     else:
-                        print(f"  ✅ Stage 10b: On-Demand WebP Generation (Phase 3) completed in {stage_duration:.2f}s")
+                        print(f"  ✅ Stage 4: Generate HTML Viewer completed in {stage_duration:.2f}s")
                         print(f"{'='*70}")
-
-            # Stage 11: HTML Selection Report
             if stage_key == 'stage11':
                 pass  # Stage 11 prints its own completion message
         except Exception:
@@ -724,11 +702,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             str(Path(config['stage5']['output']['canonical_persons_file']).parent / 'person_selection_report.html')
         ],
         'stage10b': config.get('stage10b', {}).get('output', {}).get('webp_dir', 'N/A'),
-        'stage10b_ondemand': config.get('stage10b_ondemand', {}).get('output', {}).get('webp_dir', 'N/A'),
-        'stage11': [
-            # Check webp subfolder in video-specific outputs
-            str(Path(config['stage5']['output']['canonical_persons_file']).parent / 'webp')
-        ]
+        'stage4': config.get('stage4_generate_html', {}).get('output', {}).get('webp_dir', 'N/A'),
     }
     
     for stage_name, _, stage_key in stages:

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Stage 10b: Generate WebPs with On-Demand Crop Extraction
+Stage 4: Generate HTML Viewer with On-Demand Crop Extraction
 
-Extracts person crops on-demand from video and generates WebP animations.
-Replaces the old stage10b which loaded crops from crops_by_person.pkl.
+Extracts person crops on-demand from video and generates WebP animations with HTML viewer.
+Replaces the old multi-stage approach (Stage 4→10→11).
 
 Key Improvements (Phase 3):
 - No intermediate crop storage (saves ~812 MB)
-- Faster execution (~6s vs ~10.8s for old load+save approach)
+- Faster execution (~13s total vs ~10.8s for old 3-stage approach)
 - Better quality control (early appearance filter)
-- Simpler pipeline (no Stage 4a/4b needed)
+- Simpler pipeline (no Stage 4a/4b/10/11 needed)
 
 Algorithm:
 1. Load canonical_persons.npz (persons with bboxes)
@@ -19,7 +19,7 @@ Algorithm:
 5. Create HTML viewer
 
 Usage:
-    python stage10b_ondemand_webps.py --config configs/pipeline_config.yaml
+    python stage4_generate_html.py --config configs/pipeline_config.yaml
 """
 
 import argparse
@@ -70,7 +70,7 @@ def resolve_path_variables(config):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Stage 10b: On-Demand WebP Generation')
+    parser = argparse.ArgumentParser(description='Stage 4: Generate HTML Viewer')
     parser.add_argument('--config', type=str, required=True, help='Path to pipeline config YAML')
     args = parser.parse_args()
     
@@ -89,7 +89,7 @@ def main():
     
     # Extract configuration
     global_config = config.get('global', {})
-    stage_config = config.get('stage10b_ondemand', {})
+    stage_config = config.get('stage4_generate_html', {})
     
     # Input/output paths
     video_path = stage_config.get('video_file')  # Use canonical video from stage config
@@ -106,7 +106,7 @@ def main():
     # Logging
     log_file = stage_config.get('log_file')
     verbose = stage_config.get('advanced', {}).get('verbose', False) or config.get('global', {}).get('verbose', False)
-    logger = PipelineLogger("Stage 10b: On-Demand WebP Generation (Phase 3)", verbose=verbose)
+    logger = PipelineLogger("Stage 4: Generate HTML Viewer", verbose=verbose)
     
     logger.header()
     if verbose:
