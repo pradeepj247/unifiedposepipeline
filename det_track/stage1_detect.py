@@ -17,7 +17,6 @@ import time
 import re
 import os
 import sys
-import pickle
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -291,40 +290,6 @@ def filter_detections(detections, classes, method='hybrid', max_count=15, min_co
     return detections, classes
 
 
-def extract_crop(frame, bbox):
-    """[DEPRECATED] Extract crop from frame using bbox
-    
-    NOTE: This function is deprecated as of Phase 3 (On-Demand Extraction).
-    Crops are now extracted on-demand during visualization (stage10b).
-    Keeping this function for backward compatibility only.
-    
-    Extract crop from frame using bbox
-    
-    Args:
-        frame: cv2 image (BGR)
-        bbox: [x1, y1, x2, y2]
-        
-    Returns:
-        crop: resized to (256, 128, 3) for ReID compatibility
-    """
-    x1, y1, x2, y2 = bbox.astype(int)
-    
-    # Clip to frame bounds
-    x1 = max(0, x1)
-    y1 = max(0, y1)
-    x2 = min(frame.shape[1], x2)
-    y2 = min(frame.shape[0], y2)
-    
-    crop = frame[y1:y2, x1:x2]
-    
-    if crop.size == 0:
-        return None
-    
-    # Resize to (256, 128) for ReID model compatibility
-    crop = cv2.resize(crop, (128, 256))  # width, height
-    return crop
-
-
 def run_detection(config):
     """Run Stage 1: Detection"""
     
@@ -347,8 +312,6 @@ def run_detection(config):
     max_frames = input_config['max_frames']
     
     detections_file = output_config['detections_file']
-    crops_cache_file = output_config.get('crops_cache_file', 
-                                          str(Path(detections_file).parent / 'crops_cache.pkl'))
     
     # Print header
     print(f"\n{'='*70}")
@@ -392,8 +355,6 @@ def run_detection(config):
     all_confidences = []
     all_classes = []
     num_detections_per_frame = []
-    # [PHASE 3] crops_cache removed - on-demand extraction in stage10b
-    # crops_cache = {}  # DEPRECATED
     
     # Process frames
     if verbose:
@@ -424,19 +385,11 @@ def run_detection(config):
         num_dets = len(detections)
         num_detections_per_frame.append(num_dets)
         
-        # [PHASE 3] Crop extraction removed - now done on-demand in stage10b
-        # crops_cache[frame_idx] = {}  # DEPRECATED
-        
         for i in range(num_dets):
             all_frame_numbers.append(frame_idx)
             all_bboxes.append(detections[i, :4])
             all_confidences.append(detections[i, 4])
             all_classes.append(classes[i])
-            
-            # [PHASE 3] Crop extraction removed
-            # crop = extract_crop(frame, detections[i, :4])  # DEPRECATED
-            # if crop is not None:
-            #     crops_cache[frame_idx][i] = crop  # DEPRECATED
         
         frame_idx += 1
         pbar.update(1)
@@ -463,7 +416,7 @@ def run_detection(config):
     print(f"     Total detections: {total_detections}")
     print(f"     Avg detections/frame: {avg_detections_per_frame:.1f}")
     print(f"     Processing FPS: {processing_fps:.1f}")
-    print(f"     Detection + crop time: {t_loop_total:.2f}s\n")
+    print(f"     Detection time: {t_loop_total:.2f}s\n")
     
     # Save NPZ
     output_path = Path(detections_file)
@@ -486,35 +439,17 @@ def run_detection(config):
     if verbose:
         print(f"     Size: {file_size_mb:.1f} MB")
         print(f"     Shape: {total_detections} detections across {num_frames} frames")
-    
-    # [PHASE 3] Crops cache saving removed - on-demand extraction in stage10b
-    # Keeping this commented for reference:
-    # - Old approach saved ~150-300 MB crops_cache.pkl (4-5s write time)
-    # - New approach: Extract crops on-demand during visualization (~6s total)
-    # - Storage savings: ~150-300 MB, Time savings: Variable (depends on pipeline)
-    
-    crops_save_time = 0.0  # No longer saving crops
-    total_save_time = npz_save_time + crops_save_time
-    
-    if verbose:
-        print(f"\n  ✓ Crops extraction skipped (on-demand mode enabled)")
-    print(f"     Files saving took: {total_save_time:.2f}s (npz: {npz_save_time:.2f}s)")
+    print(f"     NPZ save time: {npz_save_time:.2f}s")
 
-    # Print full timing breakdown so users can reconcile sums with orchestrator time
-    try:
-        sum_parts = model_load_time + video_open_time + t_loop_total + total_save_time
-    except NameError:
-        model_load_time = locals().get('model_load_time', 0.0)
-        video_open_time = locals().get('video_open_time', 0.0)
-        sum_parts = model_load_time + video_open_time + t_loop_total + total_save_time
+    # Print full timing breakdown
+    sum_parts = model_load_time + video_open_time + t_loop_total + npz_save_time
 
     print(f"     Breakdown:")
     print(f"       model load: {model_load_time:.2f}s")
     print(f"       video open: {video_open_time:.2f}s")
-    print(f"       detect+crop loop: {t_loop_total:.2f}s")
-    print(f"       saves: {total_save_time:.2f}s (npz: {npz_save_time:.2f}s, crops: {crops_save_time:.2f}s)")
+    print(f"       detection loop: {t_loop_total:.2f}s")
+    print(f"       npz save: {npz_save_time:.2f}s")
     print(f"     Sum of parts: {sum_parts:.2f}s")
-    print(f"     (Orchestrator stage time is printed by run_pipeline)")
     print()
 
     # Write a sidecar JSON with fine-grained timings for the orchestrator to read
@@ -525,8 +460,6 @@ def run_detection(config):
             'video_open_time': float(video_open_time),
             'detect_loop_time': float(t_loop_total),
             'npz_save_time': float(npz_save_time),
-            'crops_save_time': float(crops_save_time),
-            'total_save_time': float(total_save_time),
             'sum_parts': float(sum_parts),
             'num_frames': int(num_frames),
             'total_detections': int(total_detections),
@@ -546,7 +479,6 @@ def run_detection(config):
     
     return {
         'detections_file': str(output_path),
-        'crops_cache_file': str(crops_path),
         'num_frames': num_frames,
         'total_detections': total_detections
     }
