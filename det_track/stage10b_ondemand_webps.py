@@ -109,30 +109,34 @@ def main():
     logger = PipelineLogger("Stage 10b: On-Demand WebP Generation (Phase 3)", verbose=verbose)
     
     logger.header()
-    logger.info(f"Video: {video_path}")
-    logger.info(f"Canonical persons: {canonical_persons_file}")
-    logger.info(f"Output directory: {output_dir}")
-    logger.info(f"Configuration:")
-    logger.info(f"  - Crops per person: {crops_per_person}")
-    logger.info(f"  - Top N persons: {top_n_persons}")
-    logger.info(f"  - Early appearance threshold: {max_first_appearance_ratio*100:.0f}% of video")
-    logger.info(f"  - Resize to: {resize_to}")
-    logger.info(f"  - WebP duration: {webp_duration_ms}ms")
-    print()
+    if verbose:
+        logger.info(f"Video: {video_path}")
+        logger.info(f"Canonical persons: {canonical_persons_file}")
+        logger.info(f"Output directory: {output_dir}")
+        logger.info(f"Configuration:")
+        logger.info(f"  - Crops per person: {crops_per_person}")
+        logger.info(f"  - Top N persons: {top_n_persons}")
+        logger.info(f"  - Early appearance threshold: {max_first_appearance_ratio*100:.0f}% of video")
+        logger.info(f"  - Resize to: {resize_to}")
+        logger.info(f"  - WebP duration: {webp_duration_ms}ms")
+        print()
     
     # Load canonical persons
-    logger.step("Loading canonical persons...")
+    if verbose:
+        logger.step("Loading canonical persons...")
     try:
         data = np.load(canonical_persons_file, allow_pickle=True)
         persons = data['persons']
-        logger.info(f"Loaded {len(persons)} persons from {Path(canonical_persons_file).name}")
+        if verbose:
+            logger.info(f"Loaded {len(persons)} persons from {Path(canonical_persons_file).name}")
     except Exception as e:
         logger.error(f"Error loading canonical persons: {e}")
         return 1
     
     # Extract crops on-demand
-    print()
-    logger.step("Extracting crops on-demand from video...")
+    if verbose:
+        print()
+        logger.step("Extracting crops on-demand from video...")
     extraction_start = time.time()
     
     try:
@@ -145,16 +149,18 @@ def main():
             verbose=verbose
         )
         extraction_time = time.time() - extraction_start
-        logger.timing("Extraction", extraction_time)
-        logger.info(f"Extracted {sum(len(crops) for crops in person_buckets.values())} total crops")
-        logger.info(f"Selected {len(person_buckets)} persons")
+        if verbose:
+            logger.timing("Extraction", extraction_time)
+            logger.info(f"Extracted {sum(len(crops) for crops in person_buckets.values())} total crops")
+            logger.info(f"Selected {len(person_buckets)} persons")
     except Exception as e:
         logger.error(f"Error during crop extraction: {e}")
         return 1
     
     # Generate WebPs
-    print()
-    logger.step("Generating WebP animations...")
+    if verbose:
+        print()
+        logger.step("Generating WebP animations...")
     webp_start = time.time()
     
     try:
@@ -170,29 +176,31 @@ def main():
             verbose=verbose
         )
         webp_time = time.time() - webp_start
-        logger.timing("WebP generation", webp_time)
+        if verbose:
+            logger.timing("WebP generation", webp_time)
     except Exception as e:
         logger.error(f"Error during WebP generation: {e}")
         return 1
     
     # Summary
     total_time = extraction_time + webp_time
-    print()
-    print("=" * 70)
-    logger.info(f"Timing breakdown:")
-    logger.info(f"  - Crop extraction: {extraction_time:.2f}s")
-    logger.info(f"  - WebP generation: {webp_time:.2f}s")
-    logger.info(f"  - Total: {total_time:.2f}s")
-    print()
-    logger.info(f"Output:")
-    logger.info(f"  - WebP files: {output_path}")
-    logger.info(f"  - HTML viewer: {output_path / 'viewer.html'}")
-    print()
-    logger.verbose_info(f"Storage savings vs old approach:")
-    logger.verbose_info(f"  - Old: crops_by_person.pkl (~812 MB)")
-    logger.verbose_info(f"  - New: Direct extraction (0 MB intermediate)")
-    logger.verbose_info(f"  - Savings: ~812 MB")
-    print()
+    if verbose:
+        print()
+        print("=" * 70)
+        logger.info(f"Timing breakdown:")
+        logger.info(f"  - Crop extraction: {extraction_time:.2f}s")
+        logger.info(f"  - WebP generation: {webp_time:.2f}s")
+        logger.info(f"  - Total: {total_time:.2f}s")
+        print()
+        logger.info(f"Output:")
+        logger.info(f"  - WebP files: {output_path}")
+        logger.info(f"  - HTML viewer: {output_path / 'viewer.html'}")
+        print()
+        logger.verbose_info(f"Storage savings vs old approach:")
+        logger.verbose_info(f"  - Old: crops_by_person.pkl (~812 MB)")
+        logger.verbose_info(f"  - New: Direct extraction (0 MB intermediate)")
+        logger.verbose_info(f"  - Savings: ~812 MB")
+        print()
     
     logger.success()
     
