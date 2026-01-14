@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """
-Person Selector - Extract selected persons' tracklet data
-=========================================================
+Stage 5: Person Selection (Manual)
+==================================
 
-Extracts frame-by-frame bounding box data for selected persons from canonical_persons.npz
+Extracts frame-by-frame bounding box data for selected person(s) from canonical_persons.npz
 and saves as final_tracklet.npz.
 
+This is a MANUAL step - run AFTER viewing the HTML report from Stage 4 to select which
+person(s) you want to extract for pose estimation.
+
 Usage:
-    python stage12_keyperson_selector.py --persons p3
-    python stage12_keyperson_selector.py --persons p3,p4,p40
-    python stage12_keyperson_selector.py --persons p3,p4,p40 --video kohli_nets.mp4
+    python stage5_select_person.py --persons p3
+    python stage5_select_person.py --persons p3,p4,p40
+    python stage5_select_person.py --config configs/pipeline_config.yaml --persons p3
 """
 
 import argparse
@@ -17,19 +20,24 @@ import numpy as np
 from pathlib import Path
 import json
 import sys
+import yaml
+import re
 from datetime import datetime
 
 
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Extract selected persons' tracklet data from canonical_persons.npz",
+        description="Stage 5: Extract selected person(s) tracklet data from canonical_persons.npz",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python stage12_keyperson_selector.py --persons p3
-  python stage12_keyperson_selector.py --persons p3,p4,p40
-  python stage12_keyperson_selector.py --persons p3,p4 --video kohli_nets.mp4
+  # After viewing Stage 4 HTML report, select person(s):
+  python stage5_select_person.py --config configs/pipeline_config.yaml --persons p3
+  python stage5_select_person.py --config configs/pipeline_config.yaml --persons p3,p4
+  
+  # Or specify video directly:
+  python stage5_select_person.py --persons p3 --video kohli_nets.mp4
         """
     )
     
@@ -41,10 +49,17 @@ Examples:
     )
     
     parser.add_argument(
+        '--config',
+        type=str,
+        default=None,
+        help='Path to pipeline config YAML (recommended - auto-detects paths)'
+    )
+    
+    parser.add_argument(
         '--video',
         type=str,
-        default='kohli_nets.mp4',
-        help='Video file name (default: kohli_nets.mp4)'
+        default=None,
+        help='Video file name (alternative to --config)'
     )
     
     parser.add_argument(
@@ -88,6 +103,32 @@ def parse_person_ids(persons_str):
             raise ValueError(f"Invalid person ID: {person_str}")
     
     return sorted(set(person_ids))  # Remove duplicates and sort
+
+
+def load_config(config_path):
+    \"\"\"Load and resolve YAML configuration.\"\"\"
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    # Auto-extract current_video from video_file
+    video_file = config.get('global', {}).get('video_file', '')
+    if video_file:
+        video_name = Path(video_file).stem
+        config['global']['current_video'] = video_name
+    
+    return config
+
+
+def get_output_dir_from_config(config):
+    \"\"\"Get output directory from config.\"\"\"
+    outputs_dir = config['global']['outputs_dir']
+    current_video = config['global']['current_video']
+    
+    # Resolve ${...} variables
+    outputs_dir = outputs_dir.replace('${demo_data_dir}', config['global']['demo_data_dir'])
+    outputs_dir = outputs_dir.replace('${repo_root}', config['global']['repo_root'])
+    
+    return Path(outputs_dir) / current_video
 
 
 def get_output_dir(video_file):
@@ -216,9 +257,7 @@ def save_detector_format(output_data, output_path):
 
 def print_summary_detector_format(output_data, selected_data):
     """Print summary of extracted data in detector format."""
-    print("\n" + "="*70)
-    print("PERSON SELECTOR - DETECTOR FORMAT OUTPUT")
-    print("="*70)
+
     
     frame_numbers = output_data['frame_numbers']
     bboxes = output_data['bboxes']
@@ -239,13 +278,26 @@ def print_summary_detector_format(output_data, selected_data):
     print(f"\n📊 Detector Format Output:")
     print(f"   • Total frames in output: {len(frame_numbers)}")
     print(f"   • Bboxes shape: {bboxes.shape}")
-    print(f"   • Frame range: {int(frame_numbers[0])} - {int(frame_numbers[-1])}")
+    print(f\"\\n{'='*70}\")
+    print(f\"🎯 STAGE 5: PERSON SELECTION (MANUAL)\")
+    print(f\"{'='*70}\\n\")
+    print(f\"🔍 Extracting persons: {', '.join([f'P{p}' for p in selected_ids])}\")
     
-    # Check for overlaps
-    total_original_frames = sum(len(data['frame_numbers']) for data in selected_data.values())
-    overlaps = total_original_frames - len(frame_numbers)
-    if overlaps > 0:
-        print(f"   • Overlapping frames (resolved by priority): {overlaps}")
+    # Determine output directory
+    if args.config:
+        # Load from config (recommended)
+        config = load_config(args.config)
+        output_dir = get_output_dir_from_config(config)
+        if args.verbose:
+            print(f\"   Using config: {args.config}\")
+    elif args.video:
+        # Legacy: Use video name directly
+        output_dir = get_output_dir(args.video)
+        if args.verbose:
+            print(f\"   Using video: {args.video}\")
+    else:
+        print(f\"❌ Error: Must specify either --config or --video\")
+        sys.exit(1)ed by priority): {overlaps}")
     
     print(f"\n   This output is compatible with run_posedet.py")
     print(f"   Usage: python run_posedet.py --config configs/posedet.yaml")
@@ -309,10 +361,13 @@ def main():
     
     # Print summary
     print_summary_detector_format(output_data, selected_data)
-    print(f"✅ Saved to: {output_path}")
-    print(f"   File size: {output_path.stat().st_size / 1024:.1f} KB")
-    print(f"   Format: Detector compatible (frame_numbers, bboxes)")
-    print(f"\n   Ready for: python run_posedet.py --config configs/posedet.yaml")
+    
+    print(f\"\\n💾 Output:\")
+    print(f\"   File: {output_path}\")
+    print(f\"   Size: {output_path.stat().st_size / 1024:.1f} KB\")
+    print(f\"   Format: Detector compatible (frame_numbers, bboxes)\")
+    
+    print(f\"\\n{'='*70}\\n\")
 
 
 if __name__ == '__main__':
