@@ -311,40 +311,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             if stage_key == 'stage2':
                 pass
 
-            # Stage 3: Analysis (OLD - legacy)
-            if stage_key == 'stage3':
-                stats_file = config['stage3']['output'].get('tracklet_stats_file')
-                if stats_file:
-                    sidecar_path = Path(stats_file).parent / (Path(stats_file).name + '.timings.json')
-                    if sidecar_path.exists():
-                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
-                            data = json.load(sf)
-
-                        stats_time = float(data.get('stats_time', 0.0))
-                        npz_save_time = float(data.get('npz_save_time', 0.0))
-                        candidate_time = float(data.get('candidate_id_time', 0.0))
-                        candidate_save = float(data.get('candidate_save_time', 0.0))
-                        num_tracklets = int(data.get('num_tracklets', 0))
-
-                        other_overhead = stage_duration - (stats_time + npz_save_time + candidate_time + candidate_save)
-                        if other_overhead < 0 and abs(other_overhead) < 0.05:
-                            other_overhead = 0.0
-
-                        # Print completion message with 3-space indent and breakdown
-                        print(f"   ✅ Stage 3: Tracklet Analysis completed in {stage_duration:.2f}s")
-                        print(f"      Breakdown (stage parts):")
-                        print(f"       compute stats: {stats_time:.2f}s")
-                        print(f"       stats save: {npz_save_time:.2f}s")
-                        print(f"       candidate id: {candidate_time:.2f}s")
-                        print(f"       candidate save: {candidate_save:.2f}s")
-                        print(f"       other overheads: {other_overhead:.2f}s")
-                    else:
-                        if verbose:
-                            print(f"     (No timings sidecar found at {sidecar_path.name})")
-                        else:
-                            print(f"   ✅ Stage 3: Tracklet Analysis completed in {stage_duration:.2f}s")
-
-            # Stage 3a: Analysis (NEW)
+            # Stage 3a: Tracklet Analysis
             if stage_key == 'stage3a':
                 stats_file = config['stage3a_analyze']['output'].get('tracklet_stats_file')
                 if stats_file:
@@ -369,7 +336,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                     else:
                         print(f"   ✅ Stage 3a: Tracklet Analysis completed in {stage_duration:.2f}s")
 
-            # Stage 3b: Enhanced grouping (NEW)
+            # Stage 3b: Canonical Grouping
             if stage_key == 'stage3b':
                 canonical_file = config['stage3b_group']['output'].get('canonical_persons_file')
                 if canonical_file:
@@ -397,7 +364,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                     else:
                         print(f"   ✅ Stage 3b: Enhanced Canonical Grouping completed in {stage_duration:.2f}s")
 
-            # Stage 3c: Ranking (NEW)
+            # Stage 3c: Person Ranking
             if stage_key == 'stage3c':
                 primary_file = config['stage3c_rank']['output'].get('primary_person_file')
                 if primary_file:
@@ -425,135 +392,9 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                     else:
                         print(f"   ✅ Stage 3c: Person Ranking completed in {stage_duration:.2f}s")
 
-            # Stage 4: Load crops cache
+            # Stage 4: Generate HTML Viewer (with on-demand crop extraction)
             if stage_key == 'stage4':
-                crops_file = config['stage4']['input'].get('crops_cache_file')
-                if crops_file:
-                    sidecar_path = Path(crops_file).parent / (Path(crops_file).name + '.timings.json')
-                    if sidecar_path.exists():
-                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
-                            data = json.load(sf)
-
-                        load_time = float(data.get('load_time', 0.0))
-                        num_frames_sidecar = int(data.get('num_frames', 0))
-
-                        other_overhead = stage_duration - load_time
-                        if other_overhead < 0 and abs(other_overhead) < 0.05:
-                            other_overhead = 0.0
-
-                        # Print completion message with 3-space indent and breakdown
-                        print(f"   ✅ Stage 4: Load Crops Cache completed in {stage_duration:.2f}s")
-                        print(f"      Breakdown (stage parts):")
-                        print(f"       cache load: {load_time:.2f}s")
-                        print(f"       other overheads: {other_overhead:.2f}s")
-                    else:
-                        if verbose:
-                            print(f"     (No timings sidecar found at {sidecar_path.name})")
-                        else:
-                            print(f"   ✅ Stage 4: Load Crops Cache completed in {stage_duration:.2f}s")
-
-            # Stage 4b: Reorganize crops by person (NEW)
-            if stage_key == 'stage4b':
-                crops_by_person_file = config['stage4b']['output'].get('crops_by_person_file')
-                if crops_by_person_file:
-                    sidecar_path = Path(crops_by_person_file).parent / (Path(crops_by_person_file).stem + '_timing.json')
-                    if sidecar_path.exists():
-                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
-                            data = json.load(sf)
-
-                        load_time = float(data.get('load_crops_time', 0.0))
-                        reorg_time = float(data.get('reorganize_time', 0.0))
-                        save_time = float(data.get('save_time', 0.0))
-                        num_persons = int(data.get('num_persons', 0))
-                        num_crops = int(data.get('num_crops', 0))
-
-                        other_overhead = stage_duration - (load_time + reorg_time + save_time)
-                        if other_overhead < 0 and abs(other_overhead) < 0.05:
-                            other_overhead = 0.0
-
-                        print(f"   ✅ Stage 4b: Reorganize Crops by Person completed in {stage_duration:.2f}s")
-                        print(f"      Breakdown (stage parts):")
-                        print(f"       load crops cache: {load_time:.2f}s")
-                        print(f"       reorganize: {reorg_time:.2f}s")
-                        print(f"       save: {save_time:.2f}s")
-                        print(f"       other overheads: {other_overhead:.2f}s")
-                        if verbose:
-                            print(f"      Output: {num_crops} crops organized for {num_persons} persons")
-                    else:
-                        print(f"   ✅ Stage 4b: Reorganize Crops by Person completed in {stage_duration:.2f}s")
-
-            # Stage 5: Canonical grouping
-            if stage_key == 'stage5':
-                canonical_file = config['stage5']['output'].get('canonical_persons_file')
-                if canonical_file:
-                    sidecar_path = Path(canonical_file).parent / (Path(canonical_file).name + '.timings.json')
-                    if sidecar_path.exists():
-                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
-                            data = json.load(sf)
-
-                        grouping_time = float(data.get('grouping_time', 0.0))
-                        save_time = float(data.get('npz_save_time', 0.0))
-                        num_persons = int(data.get('num_persons', 0))
-
-                        other_overhead = stage_duration - (grouping_time + save_time)
-                        if other_overhead < 0 and abs(other_overhead) < 0.05:
-                            other_overhead = 0.0
-
-                        # Print completion message with 3-space indent and breakdown (no Output persons line)
-                        print(f"   ✅ Stage 5: Canonical Person Grouping completed in {stage_duration:.2f}s")
-                        print(f"      Breakdown (stage parts):")
-                        print(f"       grouping: {grouping_time:.2f}s")
-                        print(f"       files saving: {save_time:.2f}s")
-                        print(f"       other overheads: {other_overhead:.2f}s")
-                    else:
-                        if verbose:
-                            print(f"     (No timings sidecar found at {sidecar_path.name})")
-                        else:
-                            print(f"   ✅ Stage 5: Canonical Person Grouping completed in {stage_duration:.2f}s")
-
-            # Stage 6: Enrich crops (DISABLED - in-memory optimization)
-            if stage_key == 'stage6':
-                print(f"   ✅ Stage 6: Enrich Crops with HDF5 completed in {stage_duration:.2f}s")
-
-            # Stage 7: Rank persons
-            if stage_key == 'stage7':
-                print(f"   ✅ Stage 7: Rank Persons completed in {stage_duration:.2f}s")
-
-            # Stage 10: Generate Person Animated WebPs (OLD)
-            if stage_key == 'stage10':
-                print(f"  ✅ Stage 10: Generate Person Animated WebPs completed in {stage_duration:.2f}s")
-                print(f"{'='*70}")
-
-            # Stage 10b: Generate WebP Animations (NEW - SIMPLIFIED)
-            if stage_key == 'stage10b':
-                webp_dir = config['stage10b']['output'].get('webp_dir')
-                if webp_dir:
-                    sidecar_path = Path(webp_dir) / 'webp_generation_timing.json'
-                    if sidecar_path.exists():
-                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
-                            data = json.load(sf)
-
-                        gen_time = float(data.get('generation_time', 0.0))
-                        num_webps = int(data.get('num_webps_created', 0))
-
-                        other_overhead = stage_duration - gen_time
-                        if other_overhead < 0 and abs(other_overhead) < 0.05:
-                            other_overhead = 0.0
-
-                        print(f"  ✅ Stage 10b: Generate WebP Animations (Simplified) completed in {stage_duration:.2f}s")
-                        print(f"      Breakdown (stage parts):")
-                        print(f"       webp generation: {gen_time:.2f}s")
-                        print(f"       other overheads: {other_overhead:.2f}s")
-                        if verbose:
-                            print(f"      Created {num_webps} WebP animations")
-                        print(f"{'='*70}")
-                    else:
-                        print(f"  ✅ Stage 10b: Generate WebP Animations (Simplified) completed in {stage_duration:.2f}s")
-                        print(f"{'='*70}")
-
-            # Stage 10b_ondemand: On-Demand WebP Generation (Phase 3)
-            if stage_key == 'stage10b_ondemand':
-                webp_dir = config['stage10b_ondemand']['output'].get('webp_dir')
+                webp_dir = config['stage4_generate_html']['output'].get('webp_dir')
                 if webp_dir:
                     sidecar_path = Path(webp_dir) / 'ondemand_webp_timing.json'
                     if sidecar_path.exists():
@@ -581,8 +422,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                     else:
                         print(f"  ✅ Stage 4: Generate HTML Viewer completed in {stage_duration:.2f}s")
                         print(f"{'='*70}")
-            if stage_key == 'stage11':
-                pass  # Stage 11 prints its own completion message
+
         except Exception:
             if verbose:
                 print("     ⚠️  Failed to read timings sidecar")
@@ -646,37 +486,15 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         ],
         'stage1': config['stage1_detect']['output']['detections_file'],
         'stage2': config['stage2_track']['output']['tracklets_file'],
-        'stage3': [
-            config['stage3']['output']['tracklet_stats_file'],
-            config['stage3']['output']['candidates_file']
-        ],
-        'stage3a': config.get('stage3a', {}).get('output', {}).get('tracklet_stats_file', 'N/A'),
+        'stage3a': config.get('stage3a_analyze', {}).get('output', {}).get('tracklet_stats_file', 'N/A'),
         'stage3b': [
-            config.get('stage3b', {}).get('output', {}).get('canonical_persons_file', 'N/A'),
-            config.get('stage3b', {}).get('output', {}).get('grouping_log_file', 'N/A')
+            config.get('stage3b_group', {}).get('output', {}).get('canonical_persons_file', 'N/A'),
+            config.get('stage3b_group', {}).get('output', {}).get('grouping_log_file', 'N/A')
         ],
         'stage3c': [
-            config.get('stage3c', {}).get('output', {}).get('primary_person_file', 'N/A'),
-            config.get('stage3c', {}).get('output', {}).get('ranking_report_file', 'N/A')
+            config.get('stage3c_rank', {}).get('output', {}).get('primary_person_file', 'N/A'),
+            config.get('stage3c_rank', {}).get('output', {}).get('ranking_report_file', 'N/A')
         ],
-        'stage4': [],  # Lightweight stage - no outputs, just loads crops cache
-        'stage4b': config.get('stage4b', {}).get('output', {}).get('crops_by_person_file', 'N/A'),
-        'stage5': [
-            config['stage5']['output']['canonical_persons_file'],
-            config['stage5']['output']['grouping_log_file']
-        ],
-        'stage7': [
-            config['stage7']['output']['primary_person_file'],
-            config['stage7']['output']['ranking_report_file']
-        ],
-        'stage9': [
-            config.get('stage9', {}).get('output', {}).get('video_file', 'N/A')
-        ],
-        'stage10': [
-            # HTML report - check the person_selection_report.html file
-            str(Path(config['stage5']['output']['canonical_persons_file']).parent / 'person_selection_report.html')
-        ],
-        'stage10b': config.get('stage10b', {}).get('output', {}).get('webp_dir', 'N/A'),
         'stage4': config.get('stage4_generate_html', {}).get('output', {}).get('webp_dir', 'N/A'),
     }
     
