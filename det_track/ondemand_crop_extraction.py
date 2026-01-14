@@ -308,7 +308,8 @@ def generate_webp_animations(
     # Generate HTML viewer
     html_file = output_dir / "viewer.html"
     _generate_html_viewer(person_buckets, output_dir, html_file, metadata)
-    print(f"   HTML viewer: {html_file}")
+    if verbose:
+        print(f"   HTML viewer: {html_file}")
 
 
 def _generate_html_viewer(person_buckets: Dict[int, List[np.ndarray]], output_dir: Path, html_file: Path, metadata: Dict[str, Any] = None) -> None:
