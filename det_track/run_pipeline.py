@@ -2,35 +2,28 @@
 """
 Unified Detection & Tracking Pipeline
 
-STAGE NUMBERING (Simple & Clear):
-  Stage 0:  Video Normalization & Validation (NEW - runs FIRST)
-  Stage 1:  YOLO Detection
-  Stage 2:  ByteTrack Tracking
-  Stage 3:  Tracklet Analysis
-  Stage 4:  Load Crops Cache
-  Stage 5:  Canonical Person Grouping
-  Stage 6:  Enrich Crops with HDF5
-  Stage 7:  Rank Persons
-  Stage 8:  Visualize Grouping (Debug only)
-  Stage 9:  Output Video Visualization
-  Stage 10: HTML Selection Report
-  Stage 11: Generate Person WebPs
+SIMPLIFIED 5-STAGE ARCHITECTURE:
+  Stage 0:  Video Normalization & Validation (runs FIRST)
+  Stage 1:  Detection (YOLO)
+  Stage 2:  Tracking (ByteTrack)
+  Stage 3:  Analysis & Ranking:
+            - Stage 3a: Tracklet Analysis
+            - Stage 3b: Canonical Grouping
+            - Stage 3c: Person Ranking
+  Stage 4:  HTML Viewer Generation (with on-demand crop extraction)
 
 USAGE EXAMPLES:
-  # Run all enabled stages (including Stage 0 normalization)
+  # Run all enabled stages
   python run_pipeline.py --config configs/pipeline_config.yaml
   
-  # Run only normalization (test Stage 0)
-  python run_pipeline.py --config configs/pipeline_config.yaml --stages 0
+  # Run specific stages (e.g., Stage 3 analysis sub-stages)
+  python run_pipeline.py --config configs/pipeline_config.yaml --stages 3a,3b,3c
   
-  # Run specific stages (e.g., HTML + WebPs)
-  python run_pipeline.py --config configs/pipeline_config.yaml --stages 10,11
+  # Run with --force to skip cache checks
+  python run_pipeline.py --config configs/pipeline_config.yaml --stages 4 --force
   
-  # Run specific stages with --force (skip cache check)
-  python run_pipeline.py --config configs/pipeline_config.yaml --stages 10,11 --force
-  
-  # Run from detection through ranking (skip normalization if already done)
-  python run_pipeline.py --config configs/pipeline_config.yaml --stages 1,2,3,4,5,6,7
+  # Run detection through ranking (skip normalization if already done)
+  python run_pipeline.py --config configs/pipeline_config.yaml --stages 1,2,3a,3b,3c
 """
 
 import argparse
@@ -192,20 +185,15 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     # Load config
     config = load_config(config_path)
     
-    # Pipeline stages - SIMPLE NUMERIC IDs FOR CLEAR REFERENCING
-    # Usage: --stages 0,1,2,3  or  --stages 10,11
-    # NOTE: Stage 0 runs FIRST - normalizes video before YOLO
-    # NOTE: Stage 10b must run AFTER Stage 4b (uses reorganized crops) [DEPRECATED]
-    # NOTE: Stage 10b_ondemand replaces Stage 10b and does NOT need Stage 4/4b (Phase 3)
-    # NEW: Stages 3a, 3b, 3c are the reorganized analysis pipeline
-    # NEW: Stages 4b, 10b are DEPRECATED (Phase 3: on-demand extraction)
+    # Simplified 5-stage pipeline: 0→1→2→3→4
+    # Stage 3 splits into 3a (analyze) → 3b (group) → 3c (rank)
+    # Usage: --stages 0,1,2,3a,3b,3c,4  or  --stages stage0,stage1,stage4
     all_stages = [
         ('Stage 0: Video Normalization', 'stage0_normalize_video.py', 'stage0'),
-        ('Stage 1: YOLO Detection', 'stage1_detect.py', 'stage1'),
-        ('Stage 2: ByteTrack Tracking', 'stage2_track.py', 'stage2'),
-        ('Stage 3: Tracklet Analysis (OLD)', 'stage3_analyze_tracklets.py', 'stage3'),
+        ('Stage 1: Detection', 'stage1_detect.py', 'stage1'),
+        ('Stage 2: Tracking', 'stage2_track.py', 'stage2'),
         ('Stage 3a: Tracklet Analysis', 'stage3a_analyze_tracklets.py', 'stage3a'),
-        ('Stage 3b: Enhanced Canonical Grouping', 'stage3b_group_canonical.py', 'stage3b'),
+        ('Stage 3b: Canonical Grouping', 'stage3b_group_canonical.py', 'stage3b'),
         ('Stage 3c: Person Ranking', 'stage3c_rank_persons.py', 'stage3c'),
         ('Stage 4: Generate HTML Viewer', 'stage4_generate_html.py', 'stage4'),
     ]
