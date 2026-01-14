@@ -279,7 +279,8 @@ def generate_webp_animations(
 
 
 def _generate_html_viewer(person_buckets: Dict[int, List[np.ndarray]], output_dir: Path, html_file: Path) -> None:
-    """Generate HTML file to view all WebP animations"""
+    """Generate HTML file to view all WebP animations with embedded base64 images"""
+    import base64
     
     html_content = """<!DOCTYPE html>
 <html>
@@ -404,20 +405,26 @@ __PERSON_CARDS__
 </body>
 </html>"""
     
-    # Generate person cards
+    # Generate person cards with base64-embedded WebP images
     cards = []
     total_crops = 0
     for person_id in sorted(person_buckets.keys()):
         crops = person_buckets[person_id]
-        webp_file = f"person_{person_id:03d}.webp"
+        webp_file = output_dir / f"person_{person_id:03d}.webp"
         num_crops = len(crops)
         total_crops += num_crops
+        
+        # Read WebP file and encode as base64
+        with open(webp_file, 'rb') as f:
+            webp_data = f.read()
+        base64_webp = base64.b64encode(webp_data).decode('utf-8')
+        data_uri = f"data:image/webp;base64,{base64_webp}"
         
         card = f"""        <div class="person-card">
             <div class="person-title">Person {person_id}</div>
             <div class="person-info">{num_crops} frames</div>
             <div class="webp-container">
-                <img src="{webp_file}" alt="Person {person_id}">
+                <img src="{data_uri}" alt="Person {person_id}">
             </div>
         </div>"""
         cards.append(card)
