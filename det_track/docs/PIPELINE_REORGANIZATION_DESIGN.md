@@ -2087,3 +2087,348 @@ stage4b:
 **Estimated implementation time:** 2-3 hours for all code + testing
 
 **STATUS:** ✅ APPROVED AND COMPLETED - January 13, 2026
+---
+
+## 🚀 PHASE 3: LMDB + JPEG STORAGE OPTIMIZATION (PROPOSED)
+
+### Status
+- **Phase:** Design/Proposal Stage
+- **Date:** January 14, 2026
+- **Priority:** High - Addresses real bottleneck identified in Phase 2 analysis
+
+### Problem Statement (Root Cause Analysis)
+
+**Phase 2 taught us:** HDF5 format changes didn't help because we're storing data in the wrong representation.
+
+**Current approach (Phases 1 & 2):**
+```python
+# Stage 1: Extract crops as NumPy arrays
+crop = frame[y1:y2, x1:x2]  # uint8[H,W,3] - raw pixels
+
+# Stage 1: Save to pickle
+crops_cache = {frame_id: [crop1, crop2, ...]}
+pickle.dump(crops_cache, file)  # 812 MB
+
+# Problem:
+- Storing DECODED pixels (raw RGB arrays)
+- No compression (pixels are already uncompressed)
+- Using serialization format as a database
+- All-or-nothing loading
+```
+
+**Why this is inefficient:**
+1. **Raw pixels are huge**: 192×128×3 bytes = 73 KB per crop
+2. **No natural compression**: Unlike HDF5 assumption, pixels DON'T compress (we were right!)
+3. **Python object overhead**: Pickle adds metadata per object
+4. **Monolithic file**: Can't access individual crops without loading all
+
+**The insight from external review:**
+> "You're using a serialization format as a database, and raw tensors as a video codec. This fights the grain of the problem."
+
+### Proposed Solution: LMDB + JPEG Storage
+
+**Core idea:** Store crops in **already-compressed format** (JPEG bytes), not raw pixels.
+
+#### Architecture Change
+
+**Stage 1: Store JPEG bytes in LMDB**
+```python
+import lmdb
+import cv2
+
+# During detection loop
+lmdb_env = lmdb.open('crops_cache.lmdb', map_size=500*1024*1024)  # 500 MB
+with lmdb_env.begin(write=True) as txn:
+    for frame_id, detections in enumerate(all_detections):
+        for det_id, bbox in enumerate(detections):
+            crop = frame[y1:y2, x1:x2]  # Raw pixels
+            
+            # Encode to JPEG (THIS IS THE KEY CHANGE)
+            jpeg_bytes = cv2.imencode('.jpg', crop, 
+                                      [cv2.IMWRITE_JPEG_QUALITY, 90])[1]
+            
+            # Store compressed bytes with key
+            key = f"{frame_id:06d}_{det_id:03d}".encode('utf-8')
+            txn.put(key, jpeg_bytes.tobytes())
+```
+
+**Stage 4b: Map persons to LMDB keys (metadata only)**
+```python
+# No copying! Just store which keys belong to which person
+crops_by_person = {
+    person_id: {
+        'lmdb_keys': ['000123_002', '000124_001', ...],  # Just strings!
+        'frame_numbers': [123, 124, ...],
+        'bboxes': [[x1,y1,x2,y2], ...]
+    }
+}
+# Save metadata only (tiny file, <1 MB)
+pickle.dump(crops_by_person, 'crops_by_person_meta.pkl')
+```
+
+**Stage 10b: Random access to needed crops**
+```python
+lmdb_env = lmdb.open('crops_cache.lmdb', readonly=True)
+with lmdb_env.begin() as txn:
+    for person_id in top_10_persons:
+        person_keys = crops_by_person[person_id]['lmdb_keys'][:200]  # First 200
+        
+        for key in person_keys:
+            jpeg_bytes = txn.get(key.encode('utf-8'))
+            crop = cv2.imdecode(np.frombuffer(jpeg_bytes, np.uint8), 
+                               cv2.IMREAD_COLOR)
+            # Generate WebP...
+```
+
+### Expected Performance Improvements
+
+#### File Size Reduction
+```
+Current (raw pixels):
+  8,661 crops × 73 KB avg = 812 MB pickle
+  
+Proposed (JPEG @ quality 90):
+  8,661 crops × 10-15 KB avg = 90-130 MB LMDB
+  
+Reduction: 85-90% smaller (700 MB saved!)
+```
+
+#### Timing Improvements
+```
+Stage 1 (Detection + Crop):
+  Current:  46.7s detect + 4.6s save = 51.3s
+  Proposed: 46.7s detect + 1.0s JPEG encode + 0.5s LMDB write = 48.2s
+  Change:   +0.5s for encoding, -4.1s for write = 3.1s faster
+  
+Stage 4b (Reorganize Crops):
+  Current:  0.6s load + 0.02s reorg + 4.5s save = 5.1s
+  Proposed: 0.01s metadata + 0.02s reorg + 0.1s save = 0.13s
+  Improvement: 5.0s faster (metadata only, no copying!)
+  
+Stage 10b (WebP Generation):
+  Current:  2.9s load all + 2.5s generate = 5.4s
+  Proposed: 0.3s LMDB fetch (600 crops) + 2.5s generate = 2.8s
+  Improvement: 2.6s faster (random access, not full load)
+  
+Total Pipeline:
+  Current:  74.7s
+  Proposed: 64.0s
+  Improvement: 10.7s faster (14% speedup) + 700 MB saved
+```
+
+### Why This Works (Technical Explanation)
+
+1. **JPEG compression is optimal for photos**
+   - Lossy but perceptually lossless at quality 90
+   - 5-8× compression ratio on crops
+   - Hardware-accelerated encoding/decoding
+
+2. **LMDB is a true database**
+   - Memory-mapped B-tree (faster than file I/O)
+   - ACID transactions (crash-safe)
+   - O(1) random access by key
+   - Zero-copy reads
+   - Append-friendly (can add crops incrementally)
+
+3. **Separation of concerns**
+   - **Storage layer**: LMDB (raw JPEG bytes)
+   - **Metadata layer**: Python dict/pickle (person→keys mapping)
+   - **Compute layer**: cv2.imdecode only when needed
+
+4. **Natural fit for vision pipelines**
+   - This is how ImageNet, COCO, and other large datasets are stored
+   - Industry-proven pattern
+
+### Implementation Plan (TODOs)
+
+#### Phase 3A: LMDB Integration (Core Storage)
+
+**Stage 1 (Detection + Crop) - Major Changes:**
+- [ ] Add `import lmdb` with auto-install fallback
+- [ ] Replace pickle saving with LMDB creation
+- [ ] Encode crops to JPEG before storing
+- [ ] Key format: `{frame_id:06d}_{det_id:03d}`
+- [ ] Output: `crops_cache.lmdb` (~100 MB)
+- [ ] Timing sidecar update: separate "encode" and "write" times
+- [ ] Backward compatibility: Config flag `use_lmdb: true/false`
+
+**Stage 4b (Reorganize Crops) - Moderate Changes:**
+- [ ] Load LMDB environment (read-only)
+- [ ] Map canonical persons to LMDB keys (not actual crops)
+- [ ] Save metadata only: `crops_by_person_meta.pkl` (<1 MB)
+- [ ] Metadata structure:
+  ```python
+  {
+    person_id: {
+      'lmdb_keys': ['000123_002', ...],  # List of keys
+      'frame_numbers': [123, 124, ...],
+      'bboxes': [[x1,y1,x2,y2], ...],
+      'confidences': [0.92, ...]
+    }
+  }
+  ```
+- [ ] No crop copying/saving (just metadata!)
+
+**Stage 10b (WebP Generation) - Moderate Changes:**
+- [ ] Load LMDB environment (read-only)
+- [ ] Load metadata pickle
+- [ ] For each person, fetch crops by key from LMDB
+- [ ] Decode JPEG to NumPy array: `cv2.imdecode()`
+- [ ] Rest of logic unchanged
+
+**Configuration Changes:**
+- [ ] Add `global.use_lmdb: true` flag
+- [ ] Add `stage1.lmdb.map_size: 500MB` parameter
+- [ ] Add `stage1.jpeg_quality: 90` parameter
+- [ ] Keep pickle as fallback for backward compatibility
+
+#### Phase 3B: Optimization Refinements (Optional)
+
+**Advanced optimizations (if needed):**
+- [ ] **Batch JPEG encoding**: Use ThreadPoolExecutor for parallel encoding
+- [ ] **Smart quality selection**: Lower quality for smaller persons
+- [ ] **Selective storage**: Only store top 15 persons (hybrid approach)
+- [ ] **Two-tier storage**: LMDB for active, archive to TarFile for cold storage
+
+#### Phase 3C: Testing & Validation
+
+- [ ] Unit test: LMDB write/read cycle
+- [ ] Integration test: Full pipeline with LMDB
+- [ ] Performance benchmark: Compare with Phase 1 baseline
+- [ ] File size verification: Confirm 85-90% reduction
+- [ ] Visual quality check: Ensure JPEG quality 90 is acceptable
+- [ ] Crash recovery test: Verify LMDB transaction safety
+- [ ] Backward compatibility: Ensure pickle mode still works
+
+### Alternative Approaches Considered
+
+#### Option 1: Zarr + Blosc (LZ4/Zstd)
+**Pros:**
+- Chunked array storage
+- Parallel I/O
+- Better than HDF5+gzip
+
+**Cons:**
+- Still stores raw pixels (then compresses)
+- Less efficient than JPEG for photos
+- Less mature ecosystem than LMDB
+
+**Decision:** LMDB + JPEG is more aligned with the data (photos, not arrays)
+
+#### Option 2: All-Intra Video (MJPEG/ProRes)
+**Pros:**
+- Direct frame seeking
+- Used in film editing
+- No GOP decoding chains
+
+**Cons:**
+- Still requires video seeking (slower than key-value)
+- Harder to add/remove frames
+- File management complexity
+
+**Decision:** LMDB gives better random access
+
+#### Option 3: Simple Pickle Filtering (Your Original Idea)
+**Pros:**
+- Simplest implementation
+- No new dependencies
+- Reduces file to 180 MB
+
+**Cons:**
+- Still stores raw pixels (inefficient representation)
+- Not truly solving root cause
+- Less flexible than LMDB
+
+**Decision:** LMDB addresses root cause AND is more flexible
+
+### Design Principles Validated
+
+**What Phase 3 preserves from Phase 1:**
+✅ Pre-caching crops (still correct!)
+✅ Avoiding repeated video seeking (still correct!)
+✅ Pipeline order: detect → track → group → visualize (still correct!)
+✅ Separation of concerns (even better with LMDB)
+
+**What Phase 3 fixes from Phase 2:**
+❌ Storage format (raw pixels → JPEG bytes)
+❌ Access pattern (all-or-nothing → random access)
+❌ File representation (serialization → database)
+
+**Architectural insight:**
+> "Your algorithmic thinking is already mature. You've entered the systems engineering phase where optimization lives in data representation, not computation order."
+
+### Success Criteria
+
+**Phase 3 will be considered successful if:**
+1. ✅ File size: 812 MB → <150 MB (>80% reduction)
+2. ✅ Stage 1 save: 4.6s → <1.5s (>65% faster)
+3. ✅ Stage 4b total: 5.1s → <0.5s (>90% faster)
+4. ✅ Stage 10b load: 2.9s → <0.5s (>80% faster)
+5. ✅ Total pipeline: 74.7s → <67s (>10% faster)
+6. ✅ Visual quality: No perceivable degradation vs raw pixels
+7. ✅ Backward compatibility: Pickle mode still works
+
+### Risk Assessment
+
+**Low Risk:**
+- LMDB is mature (20+ years old)
+- JPEG encoding is standard (cv2 built-in)
+- No algorithmic changes
+- Can fallback to pickle mode
+
+**Moderate Risk:**
+- New dependency (lmdb-python)
+- Slightly more complex code
+- Need to test crash recovery
+
+**High Reward:**
+- 10+ seconds saved
+- 700 MB disk space saved
+- Better architecture for future scaling
+
+### Next Steps
+
+1. **Design Review** (This document)
+   - Review with stakeholders
+   - Discuss trade-offs
+   - Approve implementation plan
+
+2. **Proof of Concept** (1-2 hours)
+   - Small script: pickle → LMDB conversion
+   - Measure file size and speed
+   - Validate JPEG quality
+
+3. **Implementation** (4-6 hours)
+   - Stage 1 changes
+   - Stage 4b changes
+   - Stage 10b changes
+   - Config updates
+
+4. **Testing** (2-3 hours)
+   - Run full pipeline
+   - Validate performance
+   - Check visual quality
+
+**Total estimated time:** 8-12 hours implementation + testing
+
+### Open Questions for Discussion
+
+1. **JPEG quality setting?**
+   - Recommend: 90 (good balance)
+   - Could make configurable (85-95 range)
+
+2. **LMDB map_size?**
+   - Current need: ~100-150 MB
+   - Recommend: 500 MB (room to grow)
+   - Can resize if needed
+
+3. **Backward compatibility priority?**
+   - Keep pickle as fallback? (adds code complexity)
+   - Or deprecate pickle immediately? (simpler)
+
+4. **Should we combine with selective filtering?**
+   - Store all crops in LMDB (~100 MB)
+   - OR filter to top 15 persons (~30 MB)
+   - Recommendation: Store all (flexibility > 70 MB savings)
+
+---
