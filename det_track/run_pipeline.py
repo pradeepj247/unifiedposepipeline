@@ -3,6 +3,7 @@
 Unified Detection & Tracking Pipeline
 
 STAGE NUMBERING (Simple & Clear):
+  Stage 0:  Video Normalization & Validation (NEW - runs FIRST)
   Stage 1:  YOLO Detection
   Stage 2:  ByteTrack Tracking
   Stage 3:  Tracklet Analysis
@@ -16,8 +17,11 @@ STAGE NUMBERING (Simple & Clear):
   Stage 11: Generate Person WebPs
 
 USAGE EXAMPLES:
-  # Run all enabled stages
+  # Run all enabled stages (including Stage 0 normalization)
   python run_pipeline.py --config configs/pipeline_config.yaml
+  
+  # Run only normalization (test Stage 0)
+  python run_pipeline.py --config configs/pipeline_config.yaml --stages 0
   
   # Run specific stages (e.g., HTML + WebPs)
   python run_pipeline.py --config configs/pipeline_config.yaml --stages 10,11
@@ -25,7 +29,7 @@ USAGE EXAMPLES:
   # Run specific stages with --force (skip cache check)
   python run_pipeline.py --config configs/pipeline_config.yaml --stages 10,11 --force
   
-  # Run from detection through ranking
+  # Run from detection through ranking (skip normalization if already done)
   python run_pipeline.py --config configs/pipeline_config.yaml --stages 1,2,3,4,5,6,7
 """
 
@@ -166,6 +170,7 @@ def check_stage_outputs_exist(config, stage_key):
     """Check if stage output files already exist"""
     # Map stage keys to config section names
     stage_to_section = {
+        'stage0': 'stage0_normalize',
         'stage1': 'stage1',
         'stage2': 'stage2',
         'stage3': 'stage3',
@@ -210,11 +215,13 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     config = load_config(config_path)
     
     # Pipeline stages - SIMPLE NUMERIC IDs FOR CLEAR REFERENCING
-    # Usage: --stages 1,2,3  or  --stages 10,11
+    # Usage: --stages 0,1,2,3  or  --stages 10,11
+    # NOTE: Stage 0 runs FIRST - normalizes video before YOLO
     # NOTE: Stage 10b must run AFTER Stage 4b (uses reorganized crops)
     # NEW: Stages 3a, 3b, 3c are the reorganized analysis pipeline
     # NEW: Stages 4b, 10b are the optimized crop handling and visualization
     all_stages = [
+        ('Stage 0: Video Normalization', 'stage0_normalize_video.py', 'stage0'),
         ('Stage 1: YOLO Detection', 'stage1_detect.py', 'stage1'),
         ('Stage 2: ByteTrack Tracking', 'stage2_track.py', 'stage2'),
         ('Stage 3: Tracklet Analysis (OLD)', 'stage3_analyze_tracklets.py', 'stage3'),
@@ -645,6 +652,10 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     print(f"\n📦 Output Files:")
     
     stage_outputs = {
+        'stage0': [
+            config.get('stage0_normalize', {}).get('output', {}).get('canonical_video_file', 'N/A'),
+            config.get('stage0_normalize', {}).get('output', {}).get('timing_file', 'N/A')
+        ],
         'stage1': config['stage1']['output']['detections_file'],
         'stage2': config['stage2']['output']['tracklets_file'],
         'stage3': [

@@ -6,8 +6,8 @@
 # ============================================================================
 global:
   # Repository root - change this for different environments
-  repo_root: /content/unifiedposepipeline  # Colab
-  # repo_root: D:/trials/unifiedpipeline/newrepo  # Windows (uncomment for local)
+  # repo_root: /content/unifiedposepipeline  # Colab
+  repo_root: D:/trials/unifiedpipeline/newrepo  # Windows (uncomment for local)
   
   # Derived paths (use ${variable} syntax)
   models_dir: ${repo_root}/models
@@ -30,10 +30,12 @@ global:
 # Use ONLY the settings below to control pipeline execution.
 # ============================================================================
 pipeline:
-  # Stage execution control - SIMPLE NUMERIC IDs 1-11 - the ONLY place to enable/disable stages
+  # Stage execution control - SIMPLE NUMERIC IDs 0-11 - the ONLY place to enable/disable stages
+  # NOTE: Stage 0 runs FIRST - validates and normalizes video before YOLO
   # NOTE: Order matters! Stage 11 MUST run before Stage 10 (generate GIFs before embedding in HTML)
   # NEW: Stages 3a, 3b, 3c replace old stages 3, 5, 7 with optimized analysis chain
   stages:
+    stage0: true                           # Stage 0: Video normalization & validation (RUNS FIRST)
     stage1: true                           # Stage 1: YOLO detection
     stage2: true                           # Stage 2: ByteTrack offline tracking
     stage3: false                          # Stage 3: OLD - Tracklet statistics (REPLACED by 3a)
@@ -57,6 +59,42 @@ pipeline:
 
 
 # ============================================================================
+# Stage 0: Video Normalization & Validation
+# ============================================================================
+# This is the FIRST stage - runs BEFORE YOLO detection
+# Ensures all videos are in a consistent, optimal format
+stage0_normalize:
+  enabled: true  # Set false to skip normalization (use original video)
+  
+  # Video validation limits
+  limits:
+    max_duration_seconds: 120        # Max video length (2 minutes)
+    max_filesize_mb: 200             # Max file size (200 MB)
+    max_resolution: [1920, 1080]     # Max width and height
+  
+  # Normalization settings
+  normalization:
+    target_fps: 25                   # Constant FPS (matches current videos)
+    force_constant_fps: true         # Convert VFR to CFR
+  
+  # Encoding settings (canonical format)
+  encoding:
+    codec: libx264                   # H.264 codec
+    preset: veryfast                 # Encoding speed (ultrafast/veryfast/fast/medium)
+    profile: main                    # H.264 profile (baseline/main/high)
+    pix_fmt: yuv420p                 # Pixel format (universal compatibility)
+    keyframe_interval: 30            # GOP size (keyframe every 30 frames = 1.2s at 25fps)
+  
+  # Input/Output
+  input:
+    video_file: ${video_dir}${video_file}
+  
+  output:
+    canonical_video_file: ${outputs_dir}/${current_video}/canonical_video.mp4
+    timing_file: ${outputs_dir}/${current_video}/stage0_timing.json
+    symlink_if_canonical: true       # If already canonical, symlink instead of re-encoding
+
+# ============================================================================
 # Stage 1: YOLO Detection
 # ============================================================================
 stage1:
@@ -72,6 +110,8 @@ stage1:
     min_confidence: 0.3  # Minimum confidence threshold
   
   input:
+    # Use canonical video from Stage 0 (falls back to original if Stage 0 disabled)
+    video_file: ${outputs_dir}/${current_video}/canonical_video.mp4
     max_frames: 0  # 0 = all frames
   
   output:
@@ -205,16 +245,16 @@ stage4:
 # ============================================================================
 # Pre-organizes crops by person_id for efficient downstream access
 # Eliminates complex index conversion logic in visualization stages
-# Phase 2: HDF5 format for 60-70% size reduction and partial loading
+# Format: pickle (default - faster) or hdf5 (for >5GB datasets)
 stage4b:
   input:
     crops_cache_file: ${outputs_dir}/${current_video}/crops_cache.pkl
     canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
   
   output:
-    format: hdf5                                    # hdf5 (default) or pickle
-    crops_by_person_file: ${outputs_dir}/${current_video}/crops_by_person.h5
-    compression_level: 4                            # Gzip level 1-9 (4=balanced)
+    format: pickle                                  # pickle (faster) or hdf5 (large datasets)
+    crops_by_person_file: ${outputs_dir}/${current_video}/crops_by_person.pkl
+    compression_level: 4                            # Only for HDF5 (ignored for pickle)
 
 # ============================================================================
 # Stage 5: Canonical Person Grouping (OLD - LEGACY)
@@ -353,7 +393,7 @@ stage10b:
     quality: 80              # WebP quality (0-100, 80 is good balance)
   
   input:
-    crops_by_person_file: ${outputs_dir}/${current_video}/crops_by_person.h5
+    crops_by_person_file: ${outputs_dir}/${current_video}/crops_by_person.pkl
   
   output:
     webp_dir: ${outputs_dir}/${current_video}/webp
