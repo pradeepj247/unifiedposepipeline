@@ -139,27 +139,15 @@ def run_stage(stage_name, stage_script, config_path, verbose=False):
     # the stage script prints a compact, reconciled breakdown itself.
     elif 'ByteTrack' in stage_name or 'TRACKING' in stage_name.upper():
         print(f"  ✅ {stage_name} completed")
-    # For Stage 3, 3a, 3b, 3c, 4, 4b, 5, 6, 7, 10, 10b, completion message will be printed by orchestrator
-    elif 'Stage 3' in stage_name or 'Tracklet Analysis' in stage_name or 'Stage 3a' in stage_name:
+    # For Stage 3a, 3b, 3c, 4 - completion message will be printed by orchestrator
+    elif 'Stage 3a' in stage_name or 'Tracklet Analysis' in stage_name:
         pass  # Will print completion with breakdown below
-    elif 'Stage 3b' in stage_name or 'Enhanced Canonical Grouping' in stage_name:
+    elif 'Stage 3b' in stage_name or 'Enhanced Canonical Grouping' in stage_name or 'Canonical Grouping' in stage_name:
         pass  # Will print completion with breakdown below
     elif 'Stage 3c' in stage_name or 'Person Ranking' in stage_name:
         pass  # Will print completion with breakdown below
-    elif 'Stage 4' in stage_name or 'Load Crops Cache' in stage_name:
+    elif 'Stage 4' in stage_name or 'Generate HTML Viewer' in stage_name:
         pass  # Will print completion with breakdown below
-    elif 'Stage 4b' in stage_name or 'Reorganize Crops by Person' in stage_name:
-        pass  # Will print completion with breakdown below
-    elif 'Stage 5' in stage_name or 'Canonical Person Grouping' in stage_name:
-        pass  # Will print completion with breakdown below
-    elif 'Stage 6' in stage_name or 'Enrich Crops' in stage_name:
-        pass  # Will print completion below
-    elif 'Stage 7' in stage_name or 'Rank Persons' in stage_name:
-        pass  # Will print completion below
-    elif 'Stage 10' in stage_name or 'Generate Person Animated WebPs' in stage_name or 'Generate WebP Animations' in stage_name:
-        pass  # Will print completion below
-    elif 'Stage 11' in stage_name or 'HTML Selection Report' in stage_name:
-        pass  # Will print completion below
     else:
         print(f"✅ {stage_name} completed in {t_end - t_start:.2f}s")
     
