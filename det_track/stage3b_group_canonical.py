@@ -285,7 +285,7 @@ def merge_group(tracklets, group_indices):
 def run_enhanced_grouping(config):
     """Run Stage 3b: Enhanced Canonical Grouping"""
     
-    stage_config = config['stage3b']
+    stage_config = config['stage3b_group']
     verbose = stage_config.get('advanced', {}).get('verbose', False) or config.get('global', {}).get('verbose', False)
     
     logger = PipelineLogger("Stage 3b: Enhanced Canonical Grouping", verbose=verbose)

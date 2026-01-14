@@ -89,7 +89,7 @@ stage0_normalize:
 # ============================================================================
 # Stage 1: YOLO Detection
 # ============================================================================
-stage1:
+stage1_detect:
   detector:
     model_path: ${models_dir}/yolo/yolov8s.pt  # Use .engine for TensorRT (requires tensorrt package)
     confidence: 0.3
@@ -114,7 +114,7 @@ stage1:
 # Stage 2: ByteTrack Offline Tracking
 # ============================================================================
 # NOTE: Only ByteTrack is currently supported (hardcoded in stage2_track.py)
-stage2:
+stage2_track:
   params:
     track_thresh: 0.15     # Confidence threshold for tracking (lowered for better recall)
     track_buffer: 30       # Buffer size for lost tracks (frames)
@@ -154,7 +154,7 @@ stage3:
 # ============================================================================
 # Computes statistics once for reuse by Stage 3b
 # Includes motion features: velocity, jitter (used by enhanced grouping)
-stage3a:
+stage3a_analyze:
   input:
     tracklets_file: ${outputs_dir}/${current_video}/tracklets_raw.npz
   
@@ -169,7 +169,7 @@ stage3a:
 # ============================================================================
 # Enhanced grouping with 5 merge checks (3 existing + 2 NEW motion-based)
 # Loads pre-computed stats from Stage 3a (NO recomputation!)
-stage3b:
+stage3b_group:
   grouping:
     method: enhanced  # Enhanced heuristic with motion checks
     
@@ -198,7 +198,7 @@ stage3b:
 # Stage 3c: Person Ranking (NEW - Reorganized Pipeline)
 # ============================================================================
 # Ranks canonical persons and selects primary person for pose estimation
-stage3c:
+stage3c_rank:
   ranking:
     method: auto  # Options: auto (manual selection not yet implemented)
     

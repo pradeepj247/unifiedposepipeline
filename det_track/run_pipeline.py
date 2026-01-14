@@ -159,12 +159,11 @@ def check_stage_outputs_exist(config, stage_key):
     # Map stage keys to config section names
     stage_to_section = {
         'stage0': 'stage0_normalize',
-        'stage1': 'stage1',
-        'stage2': 'stage2',
-        'stage3': 'stage3',
-        'stage3a': 'stage3a',
-        'stage3b': 'stage3b',
-        'stage3c': 'stage3c',
+        'stage1': 'stage1_detect',
+        'stage2': 'stage2_track',
+        'stage3a': 'stage3a_analyze',
+        'stage3b': 'stage3b_group',
+        'stage3c': 'stage3c_rank',
         'stage4': 'stage4_generate_html',
     }
     
@@ -285,7 +284,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             import json
             # Stage 1: YOLO detection (already supported)
             if stage_key == 'stage1':
-                detections_file = config['stage1']['output'].get('detections_file')
+                detections_file = config['stage1_detect']['output'].get('detections_file')
                 if detections_file:
                     sidecar_path = Path(detections_file).parent / (Path(detections_file).name + '.timings.json')
                     if sidecar_path.exists():
@@ -359,7 +358,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
 
             # Stage 3a: Analysis (NEW)
             if stage_key == 'stage3a':
-                stats_file = config['stage3a']['output'].get('tracklet_stats_file')
+                stats_file = config['stage3a_analyze']['output'].get('tracklet_stats_file')
                 if stats_file:
                     sidecar_path = Path(stats_file).parent / (Path(stats_file).name + '.timings.json')
                     if sidecar_path.exists():
@@ -384,7 +383,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
 
             # Stage 3b: Enhanced grouping (NEW)
             if stage_key == 'stage3b':
-                canonical_file = config['stage3b']['output'].get('canonical_persons_file')
+                canonical_file = config['stage3b_group']['output'].get('canonical_persons_file')
                 if canonical_file:
                     sidecar_path = Path(canonical_file).parent / (Path(canonical_file).name + '.timings.json')
                     if sidecar_path.exists():
@@ -412,7 +411,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
 
             # Stage 3c: Ranking (NEW)
             if stage_key == 'stage3c':
-                primary_file = config['stage3c']['output'].get('primary_person_file')
+                primary_file = config['stage3c_rank']['output'].get('primary_person_file')
                 if primary_file:
                     sidecar_path = Path(primary_file).parent / (Path(primary_file).name + '.timings.json')
                     if sidecar_path.exists():
@@ -657,8 +656,8 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             config.get('stage0_normalize', {}).get('output', {}).get('canonical_video_file', 'N/A'),
             config.get('stage0_normalize', {}).get('output', {}).get('timing_file', 'N/A')
         ],
-        'stage1': config['stage1']['output']['detections_file'],
-        'stage2': config['stage2']['output']['tracklets_file'],
+        'stage1': config['stage1_detect']['output']['detections_file'],
+        'stage2': config['stage2_track']['output']['tracklets_file'],
         'stage3': [
             config['stage3']['output']['tracklet_stats_file'],
             config['stage3']['output']['candidates_file']

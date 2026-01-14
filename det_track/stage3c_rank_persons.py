@@ -163,7 +163,7 @@ def rank_persons_auto(persons, video_width, video_height, weights):
 def run_ranking(config):
     """Run Stage 3c: Person Ranking"""
     
-    stage_config = config['stage3c']
+    stage_config = config['stage3c_rank']
     verbose = stage_config.get('advanced', {}).get('verbose', False) or config.get('global', {}).get('verbose', False)
     
     logger = PipelineLogger("Stage 3c: Person Ranking", verbose=verbose)

@@ -157,7 +157,7 @@ def init_bytetrack_tracker(params, frame_rate, verbose=False):
 def run_tracking(config):
     """Run Stage 2: Tracking"""
     
-    stage_config = config['stage2']
+    stage_config = config['stage2_track']
     verbose = stage_config.get('advanced', {}).get('verbose', False)
     
     # Extract configuration

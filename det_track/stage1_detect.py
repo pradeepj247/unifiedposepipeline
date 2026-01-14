@@ -328,7 +328,7 @@ def extract_crop(frame, bbox):
 def run_detection(config):
     """Run Stage 1: Detection"""
     
-    stage_config = config['stage1']
+    stage_config = config['stage1_detect']
     verbose = stage_config.get('advanced', {}).get('verbose', False)
     
     # Extract configuration
@@ -546,6 +546,7 @@ def run_detection(config):
     
     return {
         'detections_file': str(output_path),
+        'crops_cache_file': str(crops_path),
         'num_frames': num_frames,
         'total_detections': total_detections
     }

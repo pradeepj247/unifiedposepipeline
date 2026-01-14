@@ -151,7 +151,7 @@ def compute_tracklet_statistics(tracklet):
 def run_analysis(config):
     """Run Stage 3a: Tracklet Analysis"""
     
-    stage_config = config['stage3a']
+    stage_config = config['stage3a_analyze']
     verbose = stage_config.get('advanced', {}).get('verbose', False) or config.get('global', {}).get('verbose', False)
     
     # Initialize logger
