@@ -131,18 +131,18 @@ def run_stage(stage_name, stage_script, config_path, verbose=False):
         print(f"❌ {stage_name} failed!")
         return False, t_end - t_start
 
-    # For YOLO detection stage, print a streamlined completion line with an extra leading space
-    if 'YOLO' in stage_name:
-        base = stage_name.split(':')[0]
-        print(f"  ✅ {base}:  Detection completed in {t_end - t_start:.2f}s")
-    # For ByteTrack (stage 2) we avoid printing the per-stage time here because
-    # the stage script prints a compact, reconciled breakdown itself.
-    elif 'ByteTrack' in stage_name or 'TRACKING' in stage_name.upper():
+    # Stage-specific completion messages
+    # Stage 0: No special handling needed (prints own completion)
+    # Stage 1: Detection - streamlined message
+    if 'Stage 1' in stage_name or 'Detection' in stage_name:
+        print(f"  ✅ Stage 1:  Detection completed in {t_end - t_start:.2f}s")
+    # Stage 2: Tracking - compact message (stage prints own breakdown)
+    elif 'Stage 2' in stage_name or 'Tracking' in stage_name:
         print(f"  ✅ {stage_name} completed")
-    # For Stage 3a, 3b, 3c, 4 - completion message will be printed by orchestrator
+    # Stage 3a, 3b, 3c, 4 - completion with breakdown printed by orchestrator
     elif 'Stage 3a' in stage_name or 'Tracklet Analysis' in stage_name:
         pass  # Will print completion with breakdown below
-    elif 'Stage 3b' in stage_name or 'Enhanced Canonical Grouping' in stage_name or 'Canonical Grouping' in stage_name:
+    elif 'Stage 3b' in stage_name or 'Canonical Grouping' in stage_name:
         pass  # Will print completion with breakdown below
     elif 'Stage 3c' in stage_name or 'Person Ranking' in stage_name:
         pass  # Will print completion with breakdown below
