@@ -98,37 +98,34 @@ def main():
     
     # Logging
     log_file = stage_config.get('log_file')
-    logger = PipelineLogger("Stage10b_OnDemandWebPs", log_file)
+    verbose = stage_config.get('advanced', {}).get('verbose', False) or config.get('global', {}).get('verbose', False)
+    logger = PipelineLogger("Stage 10b: On-Demand WebP Generation (Phase 3)", verbose=verbose)
     
-    logger.stage_start()
-    logger.log("=" * 70)
-    logger.log("[PHASE 3] ON-DEMAND CROP EXTRACTION + WEBP GENERATION")
-    logger.log("=" * 70)
-    logger.log(f"Video: {video_path}")
-    logger.log(f"Canonical persons: {canonical_persons_file}")
-    logger.log(f"Output directory: {output_dir}")
-    logger.log(f"Configuration:")
-    logger.log(f"  - Crops per person: {crops_per_person}")
-    logger.log(f"  - Top N persons: {top_n_persons}")
-    logger.log(f"  - Early appearance threshold: {max_first_appearance_ratio*100:.0f}% of video")
-    logger.log(f"  - Resize to: {resize_to}")
-    logger.log(f"  - WebP duration: {webp_duration_ms}ms")
-    logger.log("")
+    logger.header()
+    logger.info(f"Video: {video_path}")
+    logger.info(f"Canonical persons: {canonical_persons_file}")
+    logger.info(f"Output directory: {output_dir}")
+    logger.info(f"Configuration:")
+    logger.info(f"  - Crops per person: {crops_per_person}")
+    logger.info(f"  - Top N persons: {top_n_persons}")
+    logger.info(f"  - Early appearance threshold: {max_first_appearance_ratio*100:.0f}% of video")
+    logger.info(f"  - Resize to: {resize_to}")
+    logger.info(f"  - WebP duration: {webp_duration_ms}ms")
+    print()
     
     # Load canonical persons
-    logger.log("📂 Loading canonical persons...")
+    logger.step("Loading canonical persons...")
     try:
         data = np.load(canonical_persons_file, allow_pickle=True)
         persons = data['persons']
-        logger.log(f"   Loaded {len(persons)} persons from {Path(canonical_persons_file).name}")
+        logger.info(f"Loaded {len(persons)} persons from {Path(canonical_persons_file).name}")
     except Exception as e:
-        logger.log(f"❌ Error loading canonical persons: {e}", level='error')
-        logger.stage_end(success=False)
+        logger.error(f"Error loading canonical persons: {e}")
         return 1
     
     # Extract crops on-demand
-    logger.log("")
-    logger.log("🎬 Extracting crops on-demand from video...")
+    print()
+    logger.step("Extracting crops on-demand from video...")
     extraction_start = time.time()
     
     try:
@@ -140,17 +137,20 @@ def main():
             max_first_appearance_ratio=max_first_appearance_ratio
         )
         extraction_time = time.time() - extraction_start
-        logger.log(f"   ✓ Extraction complete in {extraction_time:.2f}s")
-        logger.log(f"   Extracted {sum(len(crops) for crops in person_buckets.values())} total crops")
-        logger.log(f"   Selected {len(person_buckets)} persons")
+        logger.timing("Extraction", extraction_time)
+        logger.info(f"Extracted {sum(len(crops) for crops in person_buckets.values())} total crops")
+        logger.info(f"Selected {len(person_buckets)} persons")
     except Exception as e:
-        logger.log(f"❌ Error during crop extraction: {e}", level='error')
-        logger.stage_end(success=False)
+        logger.error(f"Error during crop extraction: {e}")
         return 1
     
     # Generate WebP animations
     logger.log("")
     logger.log("🎨 Generating WebP animations...")
+    
+    # Generate WebPs
+    print()
+    logger.step("Generating WebP animations...")
     webp_start = time.time()
     
     try:
@@ -164,34 +164,48 @@ def main():
             duration_ms=webp_duration_ms
         )
         webp_time = time.time() - webp_start
-        logger.log(f"   ✓ WebP generation complete in {webp_time:.2f}s")
+        logger.timing("WebP generation", webp_time)
     except Exception as e:
-        logger.log(f"❌ Error during WebP generation: {e}", level='error')
-        logger.stage_end(success=False)
+        logger.error(f"Error during WebP generation: {e}")
         return 1
     
     # Summary
     total_time = extraction_time + webp_time
-    logger.log("")
-    logger.log("=" * 70)
-    logger.log("✅ STAGE 10B COMPLETE")
-    logger.log("=" * 70)
-    logger.log(f"Timing breakdown:")
-    logger.log(f"  - Crop extraction: {extraction_time:.2f}s")
-    logger.log(f"  - WebP generation: {webp_time:.2f}s")
-    logger.log(f"  - Total: {total_time:.2f}s")
-    logger.log(f"")
-    logger.log(f"Output:")
-    logger.log(f"  - WebP files: {output_path}")
-    logger.log(f"  - HTML viewer: {output_path / 'viewer.html'}")
-    logger.log(f"")
-    logger.log(f"Storage savings vs old approach:")
-    logger.log(f"  - Old: crops_by_person.pkl (~812 MB)")
-    logger.log(f"  - New: Direct extraction (0 MB intermediate)")
-    logger.log(f"  - Savings: ~812 MB")
-    logger.log("")
+    print()
+    print("=" * 70)
+    logger.info(f"Timing breakdown:")
+    logger.info(f"  - Crop extraction: {extraction_time:.2f}s")
+    logger.info(f"  - WebP generation: {webp_time:.2f}s")
+    logger.info(f"  - Total: {total_time:.2f}s")
+    print()
+    logger.info(f"Output:")
+    logger.info(f"  - WebP files: {output_path}")
+    logger.info(f"  - HTML viewer: {output_path / 'viewer.html'}")
+    print()
+    logger.verbose_info(f"Storage savings vs old approach:")
+    logger.verbose_info(f"  - Old: crops_by_person.pkl (~812 MB)")
+    logger.verbose_info(f"  - New: Direct extraction (0 MB intermediate)")
+    logger.verbose_info(f"  - Savings: ~812 MB")
+    print()
     
-    logger.stage_end(success=True)
+    logger.success()
+    
+    # Save timing sidecar for run_pipeline.py
+    try:
+        sidecar_data = {
+            'extraction_time': extraction_time,
+            'webp_generation_time': webp_time,
+            'total_time': total_time,
+            'num_webps_created': len(person_buckets),
+            'storage_saved_mb': 812
+        }
+        sidecar_path = output_path / 'ondemand_webp_timing.json'
+        with open(sidecar_path, 'w') as f:
+            import json
+            json.dump(sidecar_data, f, indent=2)
+    except Exception:
+        pass  # Non-fatal
+    
     return 0
 
 
