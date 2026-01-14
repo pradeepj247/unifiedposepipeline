@@ -118,7 +118,7 @@ stage1:
   
   output:
     detections_file: ${outputs_dir}/${current_video}/detections_raw.npz
-    crops_cache_file: ${outputs_dir}/${current_video}/crops_cache.pkl
+    # crops_cache_file REMOVED in Phase 3 (on-demand extraction replaces this)
 
 # ============================================================================
 # Stage 2: ByteTrack Offline Tracking
