@@ -33,7 +33,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 # Import the on-demand extraction module
-from ondemand_crop_extraction import generate_webp_animations
+from ondemand_crop_extraction import generate_webp_animations, cleanup_webp_files
 from crop_utils import load_final_crops
 
 # Import OSNet clustering
@@ -439,8 +439,18 @@ def main():
         if verbose:
             logger.info("Similarity matrix embedded in HTML viewer")
     
+    # ==================== Cleanup WebP files ====================
+    # WebP files are embedded as base64 in the HTML, so delete them to save disk space
+    cleanup_start = time.time()
+    if verbose:
+        logger.step("Cleaning up temporary WebP files...")
+    deleted_count = cleanup_webp_files(output_path, verbose=verbose)
+    cleanup_time = time.time() - cleanup_start
+    if verbose:
+        logger.info(f"[OK] Deleted {deleted_count} WebP file(s) ({cleanup_time:.2f}s)")
+    
     # ==================== Summary ====================
-    total_time = webp_time + clustering_time
+    total_time = webp_time + clustering_time + cleanup_time
     
     if verbose:
         print()
@@ -449,13 +459,14 @@ def main():
         logger.info(f"  - WebP generation: {webp_time:.2f}s")
         if clustering_enabled:
             logger.info(f"  - OSNet clustering: {clustering_time:.2f}s")
+        logger.info(f"  - WebP cleanup: {cleanup_time:.2f}s")
         logger.info(f"  - Total: {total_time:.2f}s")
         print()
         logger.info(f"Output:")
-        logger.info(f"  - WebP files: {output_path}")
         logger.info(f"  - HTML viewer: {output_path / 'viewer.html'}")
         if clustering_enabled:
             logger.info(f"  - Similarity matrix: {output_path / 'similarity_matrix.json'}")
+        logger.info(f"  - WebP files: Cleaned up (embedded in HTML as base64)")
         print()
         logger.verbose_info(f"Architecture improvement:")
         logger.verbose_info(f"  - Stage 3c: Extracts crops + saves final_crops.pkl")

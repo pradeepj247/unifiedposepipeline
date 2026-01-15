@@ -490,6 +490,38 @@ __PERSON_CARDS__
         f.write(html_content)
 
 
+def cleanup_webp_files(output_dir: Path, verbose: bool = False) -> int:
+    """
+    Delete WebP animation files after they've been embedded in the HTML.
+    
+    Since all WebP data is already base64-encoded and embedded in viewer.html,
+    the individual .webp files are redundant and just consume disk space.
+    
+    Args:
+        output_dir: Directory containing the .webp files
+        verbose: Print details
+        
+    Returns:
+        Number of files deleted
+    """
+    output_dir = Path(output_dir)
+    webp_files = list(output_dir.glob('person_*.webp'))
+    
+    deleted_count = 0
+    for webp_file in webp_files:
+        try:
+            file_size_mb = webp_file.stat().st_size / (1024 * 1024)
+            webp_file.unlink()
+            deleted_count += 1
+            if verbose:
+                print(f"  Deleted: {webp_file.name} ({file_size_mb:.2f} MB)")
+        except Exception as e:
+            if verbose:
+                print(f"  Error deleting {webp_file.name}: {e}")
+    
+    return deleted_count
+
+
 # ===== Example Usage =====
 if __name__ == '__main__':
     """
