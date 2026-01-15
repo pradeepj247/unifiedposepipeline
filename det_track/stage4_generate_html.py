@@ -85,6 +85,144 @@ def resolve_path_variables(config):
     return config
 
 
+def enhance_html_with_similarity(html_file: Path, clustering_result: dict, person_buckets: dict) -> None:
+    """
+    Enhance existing HTML viewer with similarity matrix heatmap visualization.
+    
+    Args:
+        html_file: Path to existing viewer.html
+        clustering_result: Dict from create_similarity_matrix() with 'similarity_matrix', 'person_ids', etc.
+        person_buckets: Dict of person_id -> crops
+    """
+    import json
+    
+    if not html_file.exists():
+        print(f"[ERROR] HTML file not found: {html_file}")
+        return
+    
+    # Read existing HTML
+    with open(html_file, 'r', encoding='utf-8') as f:
+        html_content = f.read()
+    
+    # Extract data from clustering result
+    similarity_matrix = clustering_result.get('similarity_matrix', [])
+    person_ids = clustering_result.get('person_ids', [])
+    high_pairs = clustering_result.get('high_similarity_pairs', [])
+    
+    if not person_ids or not len(similarity_matrix):
+        return  # No data to add
+    
+    # Create JavaScript code to embed similarity data
+    similarity_data_js = f"""
+    <script type="application/json" id="similarity-data">
+    {{
+        "person_ids": {json.dumps(person_ids)},
+        "similarity_matrix": {json.dumps(similarity_matrix.tolist() if hasattr(similarity_matrix, 'tolist') else similarity_matrix)},
+        "high_similarity_pairs": {json.dumps(high_pairs)}
+    }}
+    </script>
+    """
+    
+    # Create HTML section for similarity heatmap
+    heatmap_html = """
+    <div id="similarity-section" style="margin-top: 40px; padding: 20px; background: #2a2a2a; border-radius: 8px;">
+        <h2 style="color: #4CAF50; margin-top: 0;">🔍 Person Similarity Matrix (ReID)</h2>
+        <p style="color: #aaa; margin-bottom: 20px;">Cosine similarity between person embeddings. Higher values = more likely same person.</p>
+        
+        <div id="similarity-heatmap" style="overflow-x: auto; margin-bottom: 20px;">
+            <canvas id="heatmap-canvas" style="border: 1px solid #444; display: block; margin: 0 auto;"></canvas>
+        </div>
+        
+        <div id="high-similarity-pairs" style="background: #1a1a1a; padding: 15px; border-radius: 4px; margin-top: 20px;">
+            <h3 style="color: #4CAF50; margin-top: 0;">⚠️ High Similarity Pairs (potential duplicates)</h3>
+            <div id="pairs-list" style="color: #e0e0e0;"></div>
+        </div>
+    </div>
+    
+    <script>
+    // Parse similarity data
+    const simDataElement = document.getElementById('similarity-data');
+    if (simDataElement) {
+        const data = JSON.parse(simDataElement.textContent);
+        const personIds = data.person_ids;
+        const matrix = data.similarity_matrix;
+        const highPairs = data.high_similarity_pairs;
+        
+        // Draw heatmap
+        const canvas = document.getElementById('heatmap-canvas');
+        if (canvas && matrix.length > 0) {
+            const cellSize = Math.max(30, Math.min(80, 600 / matrix.length));
+            const size = personIds.length;
+            canvas.width = size * cellSize + 50;
+            canvas.height = size * cellSize + 50;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw cells
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    const value = matrix[i][j];
+                    const hue = (1 - value) * 120; // Red (0°) to Green (120°)
+                    ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+                    ctx.fillRect(50 + j * cellSize, 50 + i * cellSize, cellSize, cellSize);
+                    
+                    // Draw text for high values
+                    if (value > 0.7) {
+                        ctx.fillStyle = '#000';
+                        ctx.font = 'bold 10px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(value.toFixed(2), 50 + j * cellSize + cellSize/2, 50 + i * cellSize + cellSize/2);
+                    }
+                }
+            }
+            
+            // Draw labels
+            ctx.fillStyle = '#aaa';
+            ctx.font = '11px Arial';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let i = 0; i < size; i++) {
+                ctx.fillText(`P${personIds[i]}`, 45, 50 + i * cellSize + cellSize/2);
+                ctx.textAlign = 'center';
+                ctx.fillText(`P${personIds[i]}`, 50 + i * cellSize + cellSize/2, 40);
+            }
+        }
+        
+        // Display high similarity pairs
+        const pairsList = document.getElementById('pairs-list');
+        if (highPairs.length > 0) {
+            pairsList.innerHTML = highPairs.map(([p1, p2, score]) => 
+                `<div style="padding: 8px; margin: 5px 0; background: #333; border-left: 3px solid hsl(${(1-score)*120}, 100%, 50%); border-radius: 4px;">
+                    <strong>Person ${p1} ↔ Person ${p2}</strong>: ${(score*100).toFixed(1)}% similar
+                </div>`
+            ).join('');
+        } else {
+            pairsList.innerHTML = '<div style="color: #888;">No high-similarity pairs found (threshold > 0.70)</div>';
+        }
+    }
+    </script>
+    """
+    
+    # Insert before closing body tag
+    if '</body>' in html_content:
+        html_content = html_content.replace('</body>', heatmap_html + '\n</body>')
+    else:
+        html_content += heatmap_html
+    
+    # Insert similarity data script before closing head or at the start of body
+    if '</head>' in html_content:
+        html_content = html_content.replace('</head>', similarity_data_js + '\n</head>')
+    else:
+        html_content = similarity_data_js + html_content
+    
+    # Write updated HTML
+    with open(html_file, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+
+
 def main():
     parser = argparse.ArgumentParser(description='Stage 4: Generate HTML Viewer')
     parser.add_argument('--config', type=str, required=True, help='Path to pipeline config YAML')
@@ -245,6 +383,14 @@ def main():
                 output_dir=output_path,
                 verbose=verbose
             )
+            
+            # Enhance HTML with similarity heatmap
+            if verbose:
+                logger.step("Enhancing HTML with similarity matrix visualization...")
+            html_file = output_path / "viewer.html"
+            enhance_html_with_similarity(html_file, clustering_result, person_buckets)
+            if verbose:
+                logger.info("Similarity matrix embedded in HTML viewer")
             
             if verbose:
                 logger.timing("OSNet clustering", clustering_time)
