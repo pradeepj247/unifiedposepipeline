@@ -762,18 +762,10 @@ def save_similarity_results(results: Dict[str, Any],
     with open(output_dir / 'all_features.json', 'w') as f:
         json.dump(emb_json, f, indent=2)
     
-    # Also save binary format for efficiency
-    # Stack all features for each person
-    for pid in results['person_ids']:
-        if pid in all_features:
-            features_array = all_features[pid]
-            np.save(output_dir / f'features_person_{pid}.npy', features_array)
-    
     if verbose:
         print(f"[Save Results] Saved to {output_dir}:")
         print(f"  - similarity_matrix.npy/.json")
         print(f"  - all_features.json (per-crop features, no averaging)")
-        print(f"  - features_person_X.npy (binary format for each person)")
         for pid in results['person_ids']:
             if pid in all_features:
                 n_crops = all_features[pid].shape[0]
