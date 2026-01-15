@@ -101,9 +101,9 @@ def load_config(config_path):
     resolved_config = resolve_path_variables(config)
     
     # Debug: Print model_path after resolution (verbose only)
-    if resolved_config['stage1'].get('advanced', {}).get('verbose', False):
+    if resolved_config['stage1_detect'].get('advanced', {}).get('verbose', False):
         print(f"🔍 Debug - repo_root before resolution: {config['global'].get('repo_root', 'NOT FOUND')}")
-        model_path = resolved_config['stage1']['detector']['model_path']
+        model_path = resolved_config['stage1_detect']['detector']['model_path']
         print(f"🔍 Debug - model_path after resolution: {model_path}")
     
     return resolved_config
