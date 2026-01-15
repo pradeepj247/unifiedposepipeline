@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Stage 4: Generate HTML Viewer with On-Demand Crop Extraction
+Stage 4: Generate HTML Viewer with On-Demand Crop Extraction + OSNet Clustering
 
 Extracts person crops on-demand from video and generates WebP animations with HTML viewer.
+NEW: Also extracts OSNet embeddings for ReID-based duplicate detection.
 Replaces the old multi-stage approach (Stage 4→10→11).
 
 Key Improvements (Phase 3):
@@ -11,12 +12,19 @@ Key Improvements (Phase 3):
 - Better quality control (early appearance filter)
 - Simpler pipeline (no Stage 4a/4b/10/11 needed)
 
+NEW (Phase 4):
+- Integrated OSNet clustering (detect duplicate persons)
+- Similarity matrix output (JSON + NPY)
+- Enhanced HTML with heatmap visualization
+
 Algorithm:
 1. Load canonical_persons.npz (persons with bboxes)
 2. Apply early appearance filter (exclude late-appearing persons)
 3. Extract crops via single linear pass through video
-4. Generate WebP animations
-5. Create HTML viewer
+4. FORK INTO TWO PATHS:
+   PATH 1: Generate WebP animations (existing)
+   PATH 2: Extract OSNet embeddings and compute similarity matrix (NEW)
+5. Create unified HTML viewer with similarity heatmap
 
 Usage:
     python stage4_generate_html.py --config configs/pipeline_config.yaml
@@ -34,6 +42,14 @@ from datetime import datetime, timezone
 
 # Import the on-demand extraction module
 from ondemand_crop_extraction import extract_crops_from_video, generate_webp_animations
+
+# Import OSNet clustering (NEW Phase 4)
+try:
+    from osnet_clustering import create_similarity_matrix, save_similarity_results
+    OSNET_AVAILABLE = True
+except ImportError:
+    OSNET_AVAILABLE = False
+
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils.logger import PipelineLogger
@@ -103,6 +119,14 @@ def main():
     resize_to = tuple(stage_config.get('resize_to', [256, 256]))
     webp_duration_ms = stage_config.get('webp_duration_ms', 100)
     
+    # Clustering parameters (NEW Phase 4)
+    clustering_config = stage_config.get('clustering', {})
+    clustering_enabled = clustering_config.get('enabled', True)
+    osnet_model_path = clustering_config.get('osnet_model', None)
+    device = clustering_config.get('device', 'cuda')
+    num_best_crops = clustering_config.get('num_best_crops', 8)
+    similarity_threshold = clustering_config.get('similarity_threshold', 0.70)
+    
     # Logging
     log_file = stage_config.get('log_file')
     verbose = stage_config.get('advanced', {}).get('verbose', False) or config.get('global', {}).get('verbose', False)
@@ -119,6 +143,11 @@ def main():
         logger.info(f"  - Early appearance threshold: {max_first_appearance_ratio*100:.0f}% of video")
         logger.info(f"  - Resize to: {resize_to}")
         logger.info(f"  - WebP duration: {webp_duration_ms}ms")
+        logger.info(f"  - OSNet Clustering: {'ENABLED' if clustering_enabled and OSNET_AVAILABLE else 'DISABLED'}")
+        if clustering_enabled and OSNET_AVAILABLE:
+            logger.info(f"    - Best crops per person: {num_best_crops}")
+            logger.info(f"    - Similarity threshold: {similarity_threshold:.0%}")
+            logger.info(f"    - Device: {device}")
         print()
     
     # Load canonical persons
@@ -182,19 +211,65 @@ def main():
         logger.error(f"Error during WebP generation: {e}")
         return 1
     
+    # OSNet Clustering - NEW Phase 4
+    clustering_time = 0
+    clustering_result = None
+    if clustering_enabled and OSNET_AVAILABLE:
+        if verbose:
+            print()
+            logger.step("Extracting OSNet embeddings for ReID clustering...")
+        clustering_start = time.time()
+        
+        try:
+            clustering_result = create_similarity_matrix(
+                buckets=person_buckets,
+                osnet_model_path=osnet_model_path,
+                device=device,
+                num_best_crops=num_best_crops,
+                similarity_threshold=similarity_threshold,
+                verbose=verbose
+            )
+            clustering_time = time.time() - clustering_start
+            
+            # Save results
+            if verbose:
+                logger.step("Saving similarity matrix and embeddings...")
+            save_similarity_results(
+                results=clustering_result,
+                output_dir=output_path,
+                verbose=verbose
+            )
+            
+            if verbose:
+                logger.timing("OSNet clustering", clustering_time)
+                logger.info(f"High-similarity pairs (>{similarity_threshold}):")
+                for p1, p2, score in clustering_result['high_similarity_pairs'][:10]:
+                    logger.info(f"  - Person {p1} & {p2}: {score:.3f}")
+        except Exception as e:
+            logger.warning(f"OSNet clustering failed (non-fatal): {e}")
+            clustering_enabled = False
+    elif clustering_enabled and not OSNET_AVAILABLE:
+        logger.warning("OSNet clustering requested but module not available")
+        clustering_enabled = False
+    
     # Summary
-    total_time = extraction_time + webp_time
+    total_time = extraction_time + webp_time + clustering_time
     if verbose:
         print()
         print("=" * 70)
         logger.info(f"Timing breakdown:")
         logger.info(f"  - Crop extraction: {extraction_time:.2f}s")
         logger.info(f"  - WebP generation: {webp_time:.2f}s")
+        if clustering_enabled:
+            logger.info(f"  - OSNet clustering: {clustering_time:.2f}s")
         logger.info(f"  - Total: {total_time:.2f}s")
         print()
         logger.info(f"Output:")
         logger.info(f"  - WebP files: {output_path}")
         logger.info(f"  - HTML viewer: {output_path / 'viewer.html'}")
+        if clustering_enabled:
+            logger.info(f"  - Similarity matrix: {output_path / 'similarity_matrix.json'}")
+            logger.info(f"  - Embeddings: {output_path / 'embeddings.json'}")
         print()
         logger.verbose_info(f"Storage savings vs old approach:")
         logger.verbose_info(f"  - Old: crops_by_person.pkl (~812 MB)")
@@ -209,8 +284,11 @@ def main():
         sidecar_data = {
             'extraction_time': extraction_time,
             'webp_generation_time': webp_time,
+            'clustering_time': clustering_time if clustering_enabled else 0,
             'total_time': total_time,
             'num_webps_created': len(person_buckets),
+            'clustering_enabled': clustering_enabled,
+            'high_similarity_pairs': len(clustering_result['high_similarity_pairs']) if clustering_result else 0,
             'storage_saved_mb': 812
         }
         sidecar_path = output_path / 'ondemand_webp_timing.json'

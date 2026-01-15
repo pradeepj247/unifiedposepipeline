@@ -196,9 +196,10 @@ stage3c_rank:
     verbose: false  # Set true to see top 5 persons with scores
 
 # ============================================================================
-# Stage 4: Generate HTML Viewer (Phase 3)
+# Stage 4: Generate HTML Viewer (Phase 3) + OSNet Clustering (Phase 4)
 # ============================================================================
 # On-demand crop extraction from video - no intermediate storage
+# NEW: Integrated OSNet clustering for ReID-based duplicate detection
 # Replaces old approach that used crops_by_person.pkl (~812 MB)
 # 
 # Key improvements:
@@ -206,6 +207,11 @@ stage3c_rank:
 # - Faster execution (~6s vs ~11s old approach)
 # - Better quality control (early appearance filter)
 # - Simpler pipeline (no Stage 4/4b needed)
+# 
+# NEW Phase 4:
+# - OSNet embeddings extracted for similarity matrix
+# - Identifies duplicate canonical persons (same physical person, different time)
+# - HTML enhanced with similarity heatmap and recommendations
 stage4_generate_html:
   # Input files
   video_file: ${outputs_dir}/${current_video}/canonical_video.mp4
@@ -223,9 +229,22 @@ stage4_generate_html:
   resize_to: [256, 256]                   # Resize crops to this size (width, height)
   webp_duration_ms: 100                   # Frame duration in WebP (100ms = 10 FPS)
   
+  # OSNet Clustering Parameters (NEW Phase 4)
+  clustering:
+    enabled: true                         # Set false to disable clustering
+    osnet_model: ${models_dir}/osnet/osnet_x0_25_msmt17.pth
+    device: cuda                          # cuda or cpu
+    num_best_crops: 8                     # Select 8 best crops per person for embedding
+    similarity_threshold: 0.70            # Highlight pairs above this similarity (0-1)
+  
   # Logging
   log_file: ${outputs_dir}/${current_video}/stage4_generate_html.log
   
   # Output paths
   output:
     webp_dir: ${outputs_dir}/${current_video}/webp_viewer
+    html_file: ${outputs_dir}/${current_video}/webp_viewer/person_selection.html
+    similarity_matrix_json: ${outputs_dir}/${current_video}/similarity_matrix.json
+    similarity_matrix_npy: ${outputs_dir}/${current_video}/similarity_matrix.npy
+    embeddings_json: ${outputs_dir}/${current_video}/embeddings.json
+    embeddings_npy: ${outputs_dir}/${current_video}/embeddings.npy
