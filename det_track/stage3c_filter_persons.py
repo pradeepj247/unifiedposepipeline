@@ -331,6 +331,7 @@ def run_filter(config):
         t_crop_start = time.time()
         
         # Extract crops with quality metrics
+        logger.info(f"Extracting {len(selected_persons)} persons, {crops_per_person} crops each...")
         crops_with_quality = extract_crops_with_quality(
             video_path=str(video_path),
             persons=selected_persons,
@@ -386,7 +387,7 @@ def run_filter(config):
         if verbose:
             logger.verbose_info(f"Failed to write timings sidecar: {e}")
     
-    logger.success(f"Stage 3c complete: {len(all_persons)} → {top_n} → {len(selected_persons)} persons")
+    logger.success()
 
 
 def main():

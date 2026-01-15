@@ -531,7 +531,7 @@ def run_refine(config):
     with open(output_report_path, 'w') as f:
         json.dump(merging_report, f, indent=2)
     
-    logger.success(f"Stage 3d complete: 8 → {len(merged_persons_list)} persons (merged {num_merged} group(s))")
+    logger.success()
 
 
 def main():
