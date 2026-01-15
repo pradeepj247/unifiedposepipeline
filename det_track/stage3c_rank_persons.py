@@ -348,11 +348,11 @@ def run_ranking(config):
             sidecar['num_crops_per_person'] = crops_per_person
             with open(sidecar_path, 'w', encoding='utf-8') as sf:
                 json.dump(sidecar, sf, indent=2)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Could not update timing sidecar: {e}")
         
-    except ImportError:
-        logger.error("crop_utils module not found - cannot extract crops for Stage 4")
+    except ImportError as e:
+        logger.error(f"crop_utils module not found - cannot extract crops for Stage 4: {e}")
     except Exception as e:
         logger.error(f"Error during crop extraction: {e}")
         if verbose:

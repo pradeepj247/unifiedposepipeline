@@ -198,17 +198,7 @@ def extract_crops_with_quality(
     if verbose:
         print(f"[Crop Utils] Max area (p95): {max_area:.0f} pixels")
     
-    # Second pass: extract crops and their metadata
-    # Re-extract to maintain alignment
-    person_buckets, _ = extract_crops_from_video(
-        video_path=video_path,
-        persons=persons,
-        target_crops_per_person=target_crops_per_person,
-        top_n=top_n,
-        max_first_appearance_ratio=max_first_appearance_ratio,
-        verbose=False
-    )
-    
+    # NO SECOND PASS - compute metrics on already-extracted crops
     for person_id, crops in person_buckets.items():
         person = next((p for p in persons if int(p['person_id']) == person_id), None)
         if person is None:
