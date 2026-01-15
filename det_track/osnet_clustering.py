@@ -30,12 +30,25 @@ Usage:
 
 import numpy as np
 import cv2
-import torch
-import torch.nn as nn
 from typing import Dict, List, Tuple, Any, Optional
 from pathlib import Path
 import time
 import json
+
+# Try to import PyTorch
+try:
+    import torch
+    import torch.nn as nn
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+
+# Try to import ONNX Runtime
+try:
+    import onnxruntime as ort
+    ONNX_AVAILABLE = True
+except ImportError:
+    ONNX_AVAILABLE = False
 
 
 class OSNetModel(nn.Module):
@@ -127,45 +140,70 @@ class ResBlock(nn.Module):
 
 
 def load_osnet_model(model_path: Optional[str] = None, 
-                     device: str = 'cuda') -> Tuple[nn.Module, str]:
+                     device: str = 'cuda') -> Tuple[Any, str, str]:
     """
-    Load OSNet model. Falls back to pretrained if model_path not found.
+    Load OSNet model (ONNX or PyTorch).
+    
+    Supports:
+    1. ONNX models (.onnx) - recommended for production, fast inference
+    2. PyTorch models (.pth) - fallback if ONNX not available
+    3. Randomly initialized - fallback if weights not found
     
     Args:
-        model_path: Path to OSNet weights
+        model_path: Path to OSNet model (.onnx or .pth)
         device: 'cuda' or 'cpu'
     
     Returns:
-        (model, device_str): Loaded model and device string
+        (model, device_str, model_type): Loaded model, device, and model type
+        - model_type: 'onnx', 'pytorch', or 'random'
     """
     # Ensure device is available
-    if device == 'cuda' and not torch.cuda.is_available():
+    if device == 'cuda' and not torch.cuda.is_available() if TORCH_AVAILABLE else True:
         print("[OSNet] CUDA not available, falling back to CPU")
         device = 'cpu'
     
-    device_obj = torch.device(device)
+    # Try ONNX first (preferred)
+    if model_path and Path(model_path).exists() and str(model_path).endswith('.onnx'):
+        if ONNX_AVAILABLE:
+            try:
+                # Use GPU or CPU based on device argument
+                providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if device == 'cuda' else ['CPUExecutionProvider']
+                session = ort.InferenceSession(str(model_path), providers=providers)
+                print(f"[OSNet] Loaded ONNX model from {model_path}")
+                print(f"[OSNet] Execution providers: {session.get_providers()}")
+                return session, device, 'onnx'
+            except Exception as e:
+                print(f"[OSNet] Warning: Could not load ONNX model: {e}")
+        else:
+            print("[OSNet] ONNX Runtime not installed, install with: pip install onnxruntime")
     
-    # Create model
-    model = OSNetModel(feature_dim=256)
+    # Fallback to PyTorch
+    if TORCH_AVAILABLE:
+        device_obj = torch.device(device)
+        model = OSNetModel(feature_dim=256)
+        
+        if model_path and Path(model_path).exists() and str(model_path).endswith('.pth'):
+            try:
+                state_dict = torch.load(model_path, map_location=device_obj)
+                model.load_state_dict(state_dict, strict=False)
+                print(f"[OSNet] Loaded PyTorch weights from {model_path}")
+                model.eval()
+                model.to(device_obj)
+                return model, device, 'pytorch'
+            except Exception as e:
+                print(f"[OSNet] Warning: Could not load PyTorch weights: {e}")
+        
+        print("[OSNet] Using randomly initialized PyTorch model")
+        model.eval()
+        model.to(device_obj)
+        return model, device, 'pytorch'
     
-    # Try to load weights
-    if model_path and Path(model_path).exists():
-        try:
-            state_dict = torch.load(model_path, map_location=device_obj)
-            model.load_state_dict(state_dict, strict=False)
-            print(f"[OSNet] Loaded weights from {model_path}")
-        except Exception as e:
-            print(f"[OSNet] Warning: Could not load weights from {model_path}: {e}")
-            print(f"[OSNet] Using randomly initialized model")
-    else:
-        if model_path:
-            print(f"[OSNet] Model path not found: {model_path}")
-        print("[OSNet] Using randomly initialized model")
-    
-    model.eval()
-    model.to(device_obj)
-    
-    return model, device
+    # No suitable backend found
+    print("[OSNet] ERROR: Neither ONNX nor PyTorch available!")
+    print("[OSNet] Install one of:")
+    print("  - pip install onnxruntime  (recommended)")
+    print("  - pip install torch  (fallback)")
+    raise RuntimeError("No OSNet backend available")
 
 
 def select_best_crops(crops: List[np.ndarray], 
@@ -258,35 +296,49 @@ def preprocess_crops(crops: List[np.ndarray],
 
 
 def extract_osnet_features(crops: List[np.ndarray],
-                          model: nn.Module,
+                          model: Any,
                           device: str = 'cuda',
+                          model_type: str = 'onnx',
                           batch_size: int = 8,
                           verbose: bool = False) -> np.ndarray:
     """
-    Extract OSNet embeddings from crops.
+    Extract OSNet embeddings from crops (ONNX or PyTorch).
     
     Args:
         crops: List of crop images (H, W, 3) BGR
-        model: Loaded OSNet model
+        model: Loaded OSNet model (onnx session or pytorch model)
         device: 'cuda' or 'cpu'
+        model_type: 'onnx' or 'pytorch'
         batch_size: Batch size for inference
         verbose: Print extraction details
     
     Returns:
         Features (N, 256) array
     """
-    device_obj = torch.device(device)
-    
     # Preprocess
     batch_tensor, _ = preprocess_crops(crops, target_size=(256, 128), verbose=verbose)
     
     # Forward pass
     features_list = []
-    with torch.no_grad():
+    
+    if model_type == 'onnx':
+        # ONNX Runtime inference
         for i in range(0, len(batch_tensor), batch_size):
-            batch = batch_tensor[i:i+batch_size].to(device_obj)
-            feat = model(batch)
-            features_list.append(feat.cpu().numpy())
+            batch = batch_tensor[i:i+batch_size].numpy()  # Convert to numpy for ONNX
+            input_name = model.get_inputs()[0].name
+            feat = model.run(None, {input_name: batch})
+            features_list.append(feat[0])  # ONNX returns list of outputs
+    else:
+        # PyTorch inference
+        if not TORCH_AVAILABLE:
+            raise RuntimeError("PyTorch not available")
+        
+        device_obj = torch.device(device)
+        with torch.no_grad():
+            for i in range(0, len(batch_tensor), batch_size):
+                batch = batch_tensor[i:i+batch_size].to(device_obj)
+                feat = model(batch)
+                features_list.append(feat.cpu().numpy())
     
     features = np.vstack(features_list)
     
@@ -392,11 +444,11 @@ def create_similarity_matrix(buckets: Dict[int, List[np.ndarray]],
     """
     Main function: Extract OSNet embeddings and compute similarity matrix.
     
-    This is the entry point for Stage 4 clustering.
+    This is the entry point for Stage 4 clustering. Handles both ONNX and PyTorch models.
     
     Args:
         buckets: Dict[person_id: [crop1, crop2, ..., crop50]]
-        osnet_model_path: Path to OSNet weights
+        osnet_model_path: Path to OSNet model (.onnx or .pth)
         device: 'cuda' or 'cpu'
         num_best_crops: Number of crops to use per person (default: 8)
         similarity_threshold: Highlight pairs above this (default: 0.70)
@@ -421,10 +473,15 @@ def create_similarity_matrix(buckets: Dict[int, List[np.ndarray]],
     
     # Load model
     start = time.time()
-    model, device_str = load_osnet_model(osnet_model_path, device)
+    try:
+        model, device_str, model_type = load_osnet_model(osnet_model_path, device)
+    except RuntimeError as e:
+        print(f"[OSNet] Critical error: {e}")
+        raise
+    
     time_load = time.time() - start
     if verbose:
-        print(f"Model loaded: {time_load:.2f}s")
+        print(f"Model loaded ({model_type}): {time_load:.2f}s")
     
     # Select best crops per person
     start = time.time()
@@ -442,12 +499,12 @@ def create_similarity_matrix(buckets: Dict[int, List[np.ndarray]],
     start = time.time()
     embeddings_dict = {}
     for person_id, crops in best_crops_dict.items():
-        features = extract_osnet_features(crops, model, device_str, batch_size=8, verbose=False)
+        features = extract_osnet_features(crops, model, device_str, model_type, batch_size=8, verbose=False)
         embedding = compute_embedding(features, verbose=False)
         embeddings_dict[person_id] = embedding
     time_extract = time.time() - start
     if verbose:
-        print(f"Feature extraction: {time_extract:.2f}s")
+        print(f"Feature extraction ({model_type}): {time_extract:.2f}s")
     
     # Compute similarity
     start = time.time()
@@ -472,6 +529,7 @@ def create_similarity_matrix(buckets: Dict[int, List[np.ndarray]],
         'embeddings': embeddings_dict,
         'person_ids': similarity_result['person_ids'],
         'high_similarity_pairs': similarity_result['high_similarity_pairs'],
+        'model_type': model_type,  # NEW: track which backend was used
         'timing': {
             'load_model': time_load,
             'select_crops': time_select,
@@ -510,6 +568,7 @@ def save_similarity_results(results: Dict[str, Any],
         'matrix': results['similarity_matrix'].tolist(),
         'person_ids': results['person_ids'],
         'high_similarity_pairs': results['high_similarity_pairs'],
+        'model_type': results.get('model_type', 'unknown'),  # Track which backend
         'similarity_threshold': 0.70,
         'timestamp': results['timestamp']
     }
