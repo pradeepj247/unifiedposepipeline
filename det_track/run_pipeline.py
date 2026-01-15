@@ -2,28 +2,29 @@
 """
 Unified Detection & Tracking Pipeline
 
-SIMPLIFIED 5-STAGE ARCHITECTURE:
+PIPELINE ARCHITECTURE (PHASE 4):
   Stage 0:  Video Normalization & Validation (runs FIRST)
   Stage 1:  Detection (YOLO)
   Stage 2:  Tracking (ByteTrack)
-  Stage 3:  Analysis & Ranking:
+  Stage 3:  Analysis & Refinement:
             - Stage 3a: Tracklet Analysis
             - Stage 3b: Canonical Grouping
-            - Stage 3c: Person Ranking
-  Stage 4:  HTML Viewer Generation (with on-demand crop extraction)
+            - Stage 3c: Filter Persons & Extract Crops (40+ → 8)
+            - Stage 3d: Visual Refinement via OSNet (8 → 6, ReID-based merging)
+  Stage 4:  HTML Viewer Generation (visualization only)
 
 USAGE EXAMPLES:
   # Run all enabled stages
   python run_pipeline.py --config configs/pipeline_config.yaml
   
   # Run specific stages (e.g., Stage 3 analysis sub-stages)
-  python run_pipeline.py --config configs/pipeline_config.yaml --stages 3a,3b,3c
+  python run_pipeline.py --config configs/pipeline_config.yaml --stages 3a,3b,3c,3d
   
   # Run with --force to skip cache checks
   python run_pipeline.py --config configs/pipeline_config.yaml --stages 4 --force
   
-  # Run detection through ranking (skip normalization if already done)
-  python run_pipeline.py --config configs/pipeline_config.yaml --stages 1,2,3a,3b,3c
+  # Run detection through refinement (skip normalization if already done)
+  python run_pipeline.py --config configs/pipeline_config.yaml --stages 1,2,3a,3b,3c,3d
 """
 
 import argparse
@@ -186,15 +187,16 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     config = load_config(config_path)
     
     # Simplified 5-stage pipeline: 0→1→2→3→4
-    # Stage 3 splits into 3a (analyze) → 3b (group) → 3c (rank)
-    # Usage: --stages 0,1,2,3a,3b,3c,4  or  --stages stage0,stage1,stage4
+    # Stage 3 splits into 3a (analyze) → 3b (group) → 3c (filter) → 3d (refine)
+    # Usage: --stages 0,1,2,3a,3b,3c,3d,4  or  --stages stage0,stage1,stage4
     all_stages = [
         ('Stage 0: Video Normalization', 'stage0_normalize_video.py', 'stage0'),
         ('Stage 1: Detection', 'stage1_detect.py', 'stage1'),
         ('Stage 2: Tracking', 'stage2_track.py', 'stage2'),
         ('Stage 3a: Tracklet Analysis', 'stage3a_analyze_tracklets.py', 'stage3a'),
         ('Stage 3b: Canonical Grouping', 'stage3b_group_canonical.py', 'stage3b'),
-        ('Stage 3c: Person Ranking', 'stage3c_rank_persons.py', 'stage3c'),
+        ('Stage 3c: Filter Persons & Extract Crops', 'stage3c_filter_persons.py', 'stage3c'),
+        ('Stage 3d: Visual Refinement (OSNet)', 'stage3d_refine_visual.py', 'stage3d'),
         ('Stage 4: Generate HTML Viewer', 'stage4_generate_html.py', 'stage4'),
     ]
     
@@ -245,16 +247,16 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     stage_times = []  # Track timing for each stage
     
     for stage_name, stage_script, stage_key in stages:
-        # DEPENDENCY CHECK: Stage 4 requires Stage 3c output (final_crops.pkl)
+        # DEPENDENCY CHECK: Stage 4 requires Stage 3d output (final_crops.pkl)
         if stage_key == 'stage4':
-            # Get the output directory from stage3c's primary_person file location
-            # (same logic as stage3c_rank_persons.py uses)
-            primary_file = config.get('stage3c_rank', {}).get('output', {}).get('primary_person_file', '')
-            if primary_file:
-                output_dir = Path(primary_file).parent
-                final_crops_path = output_dir / 'final_crops.pkl'
+            # Get the output directory from stage3d's final_crops_merged_file location
+            # (same as where final_crops.pkl is saved after Stage 3d)
+            final_crops_file = config.get('stage3d_refine', {}).get('output', {}).get('final_crops_merged_file', '')
+            if final_crops_file:
+                output_dir = Path(final_crops_file).parent
+                final_crops_path = Path(final_crops_file)
             else:
-                # Fallback to global output_dir if primary_person_file not configured
+                # Fallback to canonical output_dir if not configured
                 output_dir = config.get('global', {}).get('output_dir', '')
                 final_crops_path = Path(output_dir) / 'final_crops.pkl'
             

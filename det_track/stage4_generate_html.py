@@ -243,14 +243,18 @@ def main():
     canonical_persons_file = stage_config.get('canonical_persons_file')
     output_dir = stage_config.get('output_dir')
     
-    # Load final_crops.pkl from Stage 3c (NEW Phase 5)
-    # Stage 3c saves to its own output directory (where primary_person.npz is), not to stage4's output_dir
-    primary_person_file = config.get('stage3c_rank', {}).get('output', {}).get('primary_person_file', '')
-    if primary_person_file:
-        stage3c_output_dir = Path(primary_person_file).parent
-        final_crops_path = stage3c_output_dir / 'final_crops.pkl'
+    # Load final_crops.pkl from Stage 3d (after ReID merging)
+    # Stage 3d outputs to same filenames as Stage 3c, so just use final_crops_file from config
+    final_crops_file = stage_config.get('final_crops_file')
+    
+    if not final_crops_file:
+        # Fallback: use stage3d_refine output path
+        final_crops_file = config.get('stage3d_refine', {}).get('output', {}).get('final_crops_merged_file')
+    
+    if final_crops_file:
+        final_crops_path = Path(final_crops_file)
     else:
-        # Fallback: use stage4's output_dir
+        # Last resort: compute from output_dir
         final_crops_path = Path(output_dir) / 'final_crops.pkl'
     
     # Parameters

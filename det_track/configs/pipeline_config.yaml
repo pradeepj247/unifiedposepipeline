@@ -40,8 +40,9 @@ pipeline:
     stage2: true                           # Stage 2: ByteTrack tracking
     stage3a: true                          # Stage 3a: Tracklet analysis
     stage3b: true                          # Stage 3b: Canonical grouping
-    stage3c: true                          # Stage 3c: Person ranking
-    stage4: true                           # Stage 4: Generate HTML viewer (on-demand extraction)
+    stage3c: true                          # Stage 3c: Filter persons (top 8) & crop extraction
+    stage3d: true                          # Stage 3d: OSNet-based visual refinement (ReID merging)
+    stage4: true                           # Stage 4: Generate HTML viewer
   
   # Global settings inherited by all stages (can be overridden per-stage if needed)
   advanced:
@@ -171,81 +172,106 @@ stage3b_group:
     verbose: false  # Set true to see merge criteria and sample merges
 
 # ============================================================================
-# Stage 3c: Person Ranking
+# Stage 3c: Person Filtering & Crop Extraction
 # ============================================================================
-# Ranks canonical persons and selects primary person for pose estimation
-stage3c_rank:
-  ranking:
-    method: auto  # Options: auto (manual selection not yet implemented)
+# Filters canonical persons to TOP 10 based on ranking scores.
+# Applies late-appearance penalty to top 10 (may reduce to ~8).
+# Extracts crops for each selected person.
+#
+# Input: canonical_persons.npz (40+ persons from Stage 3b)
+# Output: canonical_persons_filtered.npz (8-10 persons), final_crops.pkl (8-10 persons with crops)
+#
+# Two-step filtering:
+# 1. Select TOP 10 by ranking score (duration, coverage, center, smoothness)
+# 2. Apply late-appearance penalty to top 10
+#    - Persons starting after 50% of video get penalized
+#    - Penalty threshold (default 0.7) removes heavily penalized persons
+#    - Result: typically 8-10 persons remain
+stage3c_filter:
+  filtering:
+    top_n: 10                              # First, select top 10 persons
+    penalty_threshold: 0.7                 # Then, remove if penalty < this (0.7 = allows up to 30% penalty)
+    crops_per_person: 50                   # Extract 50 crops per person
     
-    # Auto-ranking weights
+    # Ranking weights (must sum to 1.0)
     weights:
-      duration: 0.4       # Longest presence in video
-      coverage: 0.3       # Percentage of frames covered
-      center: 0.2         # Proximity to frame center
-      smoothness: 0.1     # Motion stability (less jitter)
+      duration: 0.4                        # Longest presence
+      coverage: 0.3                        # Best frame coverage
+      center: 0.2                          # Center alignment
+      smoothness: 0.1                      # Motion stability
+      max_appearance_ratio: 0.5            # Penalty starts after 50% of video
   
   input:
     canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
   
   output:
-    primary_person_file: ${outputs_dir}/${current_video}/primary_person.npz
-    ranking_report_file: ${outputs_dir}/${current_video}/ranking_report.json
+    canonical_persons_filtered_file: ${outputs_dir}/${current_video}/canonical_persons_filtered.npz
+    final_crops_file: ${outputs_dir}/${current_video}/final_crops.pkl
   
   advanced:
-    verbose: false  # Set true to see top 5 persons with scores
+    verbose: false  # Set true to see top persons with scores and penalties
 
 # ============================================================================
-# Stage 4: Generate HTML Viewer (Phase 3) + OSNet Clustering (Phase 4)
+# Stage 3d: Visual Refinement (OSNet ReID-based Person Merging)
 # ============================================================================
-# On-demand crop extraction from video - no intermediate storage
-# NEW: Integrated OSNet clustering for ReID-based duplicate detection
-# Replaces old approach that used crops_by_person.pkl (~812 MB)
-# 
-# Key improvements:
-# - 808 MB storage savings (no crops_by_person.pkl)
-# - Faster execution (~6s vs ~11s old approach)
-# - Better quality control (early appearance filter)
-# - Simpler pipeline (no Stage 4/4b needed)
-# 
-# NEW Phase 4:
-# - OSNet embeddings extracted for similarity matrix
-# - Identifies duplicate canonical persons (same physical person, different time)
-# - HTML enhanced with similarity heatmap and recommendations
-stage4_generate_html:
+# Uses OSNet embeddings to identify and merge split detections of the same person.
+# Input: canonical_persons_filtered.npz + final_crops.pkl from Stage 3c (8-10 persons)
+# Output: Same filenames, potentially fewer persons (if merges found)
+#
+# Algorithm:
+# - Extract OSNet features from crops (averaged per person)
+# - Find non-overlapping temporal pairs
+# - Compute cosine similarity for all pairs
+# - Build connected components (Union-Find) for same-person chains
+# - Merge crops and canonical person records
+#
+# Note: Output file names are IDENTICAL to Stage 3c.
+# Stage 3d overwrites Stage 3c outputs with refined (potentially merged) data.
+# If no merges found: outputs are same as 3c inputs
+# If merges found: outputs are reduced (e.g., 8 → 6)
+stage3d_refine:
+  osnet:
+    model_path: ${models_dir}/reid/osnet_x0_25_msmt17.onnx  # Recommended: x0_25 (better discrimination)
+    device: cuda
+    num_crops_per_person: 16               # Use top 16 crops for feature extraction
+  
+  merging:
+    temporal_gap_max: 60                   # Max frames between persons (gap > this = separate persons)
+    temporal_overlap_tolerance: 15         # Allow up to 15 frames of overlap
+    similarity_threshold: 0.60             # Cosine similarity threshold (0-1)
+  
+  input:
+    final_crops_file: ${outputs_dir}/${current_video}/final_crops.pkl
+    canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons_filtered.npz
+  
+  output:
+    final_crops_merged_file: ${outputs_dir}/${current_video}/final_crops.pkl  # SAME NAME as 3c
+    canonical_persons_merged_file: ${outputs_dir}/${current_video}/canonical_persons_filtered.npz  # SAME NAME as 3c
+    merging_report_file: ${outputs_dir}/${current_video}/merging_report.json
+  
+  advanced:
+    verbose: false  # Set true to see person chains and similarity scores
+
+# ============================================================================
+# Stage 4: Generate HTML Viewer
+# ============================================================================
+# Reads final_crops.pkl (after Stage 3d merging) and generates WebP gallery + HTML viewer.
+# No additional filtering or OSNet processing - just visualization.
+#
   # Input files
   video_file: ${outputs_dir}/${current_video}/canonical_video.mp4
-  canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
+  final_crops_file: ${outputs_dir}/${current_video}/final_crops.pkl
   
   # Output directory
   output_dir: ${outputs_dir}/${current_video}/webp_viewer
-  
-  # Extraction parameters
-  crops_per_person: 50                    # Number of crops to extract per person
-  top_n_persons: 10                       # Consider top N persons by frame count
-  max_first_appearance_ratio: 0.5         # Exclude persons appearing after 50% of video
   
   # WebP generation parameters
   resize_to: [256, 256]                   # Resize crops to this size (width, height)
   webp_duration_ms: 100                   # Frame duration in WebP (100ms = 10 FPS)
   
-  # OSNet Clustering Parameters (NEW Phase 4)
-  clustering:
-    enabled: true                         # Set false to disable clustering
-    osnet_model: ${models_dir}/reid/osnet_x1_0_msmt17.pt  # Primary: x1_0 (stronger), fallback to x0_25 if not found
-    osnet_model_fallback: ${models_dir}/reid/osnet_x0_25_msmt17.onnx  # Fallback model if primary not found
-    device: cuda                          # cuda or cpu
-    num_best_crops: 16                    # Select 16 best crops per person for embedding
-    similarity_threshold: 0.70            # Highlight pairs above this similarity (0-1)
-  
   # Logging
   log_file: ${outputs_dir}/${current_video}/stage4_generate_html.log
   
-  # Output paths
   output:
     webp_dir: ${outputs_dir}/${current_video}/webp_viewer
     html_file: ${outputs_dir}/${current_video}/webp_viewer/person_selection.html
-    similarity_matrix_json: ${outputs_dir}/${current_video}/similarity_matrix.json
-    similarity_matrix_npy: ${outputs_dir}/${current_video}/similarity_matrix.npy
-    embeddings_json: ${outputs_dir}/${current_video}/embeddings.json
-    embeddings_npy: ${outputs_dir}/${current_video}/embeddings.npy
