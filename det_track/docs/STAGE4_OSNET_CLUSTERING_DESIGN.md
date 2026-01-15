@@ -340,9 +340,9 @@ stage4_generate_html:
   # OSNet clustering parameters
   clustering:
     enabled: true                     # Toggle on/off
-    osnet_model: ${models_dir}/osnet/osnet_x0_25_msmt17.pth
+    osnet_model: ${models_dir}/reid/osnet_x0_25_msmt17.onnx  # ONNX format (preferred)
     device: cuda                      # cuda or cpu
-    num_best_crops: 8                 # Select 8 best from 50
+    num_best_crops: 16                # Select 16 best from 50 (matches ONNX model batch size)
     similarity_threshold: 0.70        # Highlight similar pairs
     
   # Logging
@@ -366,9 +366,9 @@ stage4_generate_html:
 ### Performance Considerations
 
 1. **Video Reading:** Sequential, on-demand extraction (already optimized)
-2. **OSNet Batch Size:** Fixed at 8 (matches num_best_crops)
-3. **Clustering:** Minimal overhead (~1-2 seconds for 10 persons)
-4. **Total Stage 4 Time:** ~6-8 seconds (vs ~6s without clustering)
+2. **OSNet Batch Size:** Fixed at 16 (matches num_best_crops, required by ONNX model)
+3. **Clustering:** Minimal overhead (~2-3 seconds for 10 persons with 16 crops each)
+4. **Total Stage 4 Time:** ~8-10 seconds (vs ~6s without clustering)
 
 ### Error Handling
 

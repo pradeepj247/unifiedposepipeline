@@ -68,16 +68,21 @@ def load_osnet_model(model_path, device='cuda') -> (model, device_str, model_typ
 The `extract_osnet_features()` function handles both backends:
 
 ```python
-def extract_osnet_features(crops, model, device, model_type, batch_size=8):
+def extract_osnet_features(crops, model, device, model_type, batch_size=16):
     """
     Args:
         model_type: 'onnx' or 'pytorch'
+        batch_size: MUST be 16 for ONNX model (fixed batch dimension)
     
     Handles:
     - ONNX: Batch via numpy arrays, get inputs/outputs dynamically
     - PyTorch: Batch via torch tensors, .to(device)
     """
 ```
+
+**Important:** The ONNX model has a fixed batch dimension of **16**. 
+Configuration must use `num_best_crops: 16` to match this requirement.
+If you have fewer than 16 crops, they will be padded with zeros internally.
 
 ---
 
