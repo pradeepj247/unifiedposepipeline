@@ -1,29 +1,21 @@
 #!/usr/bin/env python3
 """
-Stage 4: Generate HTML Viewer with On-Demand Crop Extraction + OSNet Clustering
+Stage 4: Generate HTML Viewer with OSNet Clustering
 
-Extracts person crops on-demand from video and generates WebP animations with HTML viewer.
-NEW: Also extracts OSNet embeddings for ReID-based duplicate detection.
-Replaces the old multi-stage approach (Stage 4→10→11).
+Loads pre-extracted crops from Stage 3c and generates WebP animations with HTML viewer.
+Includes OSNet clustering for ReID-based duplicate detection.
 
-Key Improvements (Phase 3):
-- No intermediate crop storage (saves ~812 MB)
-- Faster execution (~13s total vs ~10.8s for old 3-stage approach)
-- Better quality control (early appearance filter)
-- Simpler pipeline (no Stage 4a/4b/10/11 needed)
-
-NEW (Phase 4):
-- Integrated OSNet clustering (detect duplicate persons)
-- Similarity matrix output (JSON + NPY)
-- Enhanced HTML with heatmap visualization
+Key Changes (Phase 5):
+- Now loads crops from final_crops.pkl (created by Stage 3c)
+- No video extraction in Stage 4 (eliminates redundant video scanning)
+- Uses quality metrics from Stage 3c for crop selection
+- Much faster (~5s vs ~16s previously)
 
 Algorithm:
-1. Load canonical_persons.npz (persons with bboxes)
-2. Apply early appearance filter (exclude late-appearing persons)
-3. Extract crops via single linear pass through video
-4. FORK INTO TWO PATHS:
-   PATH 1: Generate WebP animations (existing)
-   PATH 2: Extract OSNet embeddings and compute similarity matrix (NEW)
+1. Load final_crops.pkl from Stage 3c
+2. Select best N crops per person using quality metrics
+3. Extract OSNet features and compute similarity matrix
+4. Generate WebP animations from all 50 crops
 5. Create unified HTML viewer with similarity heatmap
 
 Usage:
@@ -41,9 +33,10 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 # Import the on-demand extraction module
-from ondemand_crop_extraction import extract_crops_from_video, generate_webp_animations
+from ondemand_crop_extraction import generate_webp_animations
+from crop_utils import load_final_crops
 
-# Import OSNet clustering (NEW Phase 4)
+# Import OSNet clustering
 try:
     from osnet_clustering import create_similarity_matrix, save_similarity_results
     OSNET_AVAILABLE = True
@@ -250,27 +243,21 @@ def main():
     canonical_persons_file = stage_config.get('canonical_persons_file')
     output_dir = stage_config.get('output_dir')
     
+    # Load final_crops.pkl from Stage 3c (NEW Phase 5)
+    final_crops_path = Path(output_dir) / 'final_crops.pkl'
+    
     # Parameters
-    crops_per_person = stage_config.get('crops_per_person', 50)
-    top_n_persons = stage_config.get('top_n_persons', 10)
-    max_first_appearance_ratio = stage_config.get('max_first_appearance_ratio', 0.5)
     resize_to = tuple(stage_config.get('resize_to', [256, 256]))
     webp_duration_ms = stage_config.get('webp_duration_ms', 100)
     
-    # Clustering parameters (NEW Phase 4)
+    # Clustering parameters
     clustering_config = stage_config.get('clustering', {})
     clustering_enabled = clustering_config.get('enabled', True)
     osnet_model_path = clustering_config.get('osnet_model', None)
     osnet_fallback_model_path = clustering_config.get('osnet_model_fallback', None)
     device = clustering_config.get('device', 'cuda')
-    num_best_crops = clustering_config.get('num_best_crops', 16)  # DEFAULT changed from 8 to 16 to match ONNX model
+    num_best_crops = clustering_config.get('num_best_crops', 16)
     similarity_threshold = clustering_config.get('similarity_threshold', 0.70)
-    
-    # DEBUG: Verify clustering config is loaded
-    if num_best_crops != 16:
-        print(f"⚠️  WARNING: num_best_crops={num_best_crops} (expected 16). Clustering config may not be loaded properly.")
-        print(f"    clustering_config keys: {list(clustering_config.keys())}")
-        print(f"    Full stage_config keys: {list(stage_config.keys())}")
     
     # Logging
     log_file = stage_config.get('log_file')
@@ -279,13 +266,9 @@ def main():
     
     logger.header()
     if verbose:
-        logger.info(f"Video: {video_path}")
-        logger.info(f"Canonical persons: {canonical_persons_file}")
+        logger.info(f"Final crops: {final_crops_path}")
         logger.info(f"Output directory: {output_dir}")
         logger.info(f"Configuration:")
-        logger.info(f"  - Crops per person: {crops_per_person}")
-        logger.info(f"  - Top N persons: {top_n_persons}")
-        logger.info(f"  - Early appearance threshold: {max_first_appearance_ratio*100:.0f}% of video")
         logger.info(f"  - Resize to: {resize_to}")
         logger.info(f"  - WebP duration: {webp_duration_ms}ms")
         logger.info(f"  - OSNet Clustering: {'ENABLED' if clustering_enabled and OSNET_AVAILABLE else 'DISABLED'}")
@@ -295,80 +278,75 @@ def main():
             logger.info(f"    - Device: {device}")
         print()
     
-    # Load canonical persons
+    # ==================== STAGE 4a: Load Crops ====================
     if verbose:
-        logger.step("Loading canonical persons...")
+        logger.step("Loading crops from Stage 3c...")
+    
     try:
-        data = np.load(canonical_persons_file, allow_pickle=True)
-        persons = data['persons']
-        if verbose:
-            logger.info(f"Loaded {len(persons)} persons from {Path(canonical_persons_file).name}")
+        crops_data = load_final_crops(final_crops_path, verbose=verbose)
+    except FileNotFoundError as e:
+        logger.error(str(e))
+        return 1
     except Exception as e:
-        logger.error(f"Error loading canonical persons: {e}")
+        logger.error(f"Error loading final_crops.pkl: {e}")
         return 1
     
-    # Extract crops on-demand
-    if verbose:
-        print()
-        logger.step("Extracting crops on-demand from video...")
-    extraction_start = time.time()
+    # Convert pickle format to person_buckets format
+    person_buckets = {}
+    person_metadata = {}
     
-    try:
-        person_buckets, metadata = extract_crops_from_video(
-            video_path=video_path,
-            persons=persons,
-            target_crops_per_person=crops_per_person,
-            top_n=top_n_persons,
-            max_first_appearance_ratio=max_first_appearance_ratio,
-            verbose=verbose
-        )
-        extraction_time = time.time() - extraction_start
-        if verbose:
-            logger.timing("Extraction", extraction_time)
-            logger.info(f"Extracted {sum(len(crops) for crops in person_buckets.values())} total crops")
-            logger.info(f"Selected {len(person_buckets)} persons (after early appearance filter: {max_first_appearance_ratio*100:.0f}%)")
-        print(f"   Selected {len(person_buckets)} persons (after filtering) for visualization and clustering")
-    except Exception as e:
-        logger.error(f"Error during crop extraction: {e}")
-        return 1
-    
-    # Generate WebPs
-    if verbose:
-        print()
-        logger.step("Generating WebP animations...")
-    webp_start = time.time()
-    
-    try:
-        output_path = Path(output_dir)
-        output_path.mkdir(parents=True, exist_ok=True)
+    for person_id in crops_data['person_ids']:
+        crops = crops_data['crops'][person_id]
+        metadata = crops_data['metadata'][person_id]
         
-        generate_webp_animations(
-            person_buckets=person_buckets,
-            output_dir=output_path,
-            metadata=metadata,
-            resize_to=resize_to,
-            duration_ms=webp_duration_ms,
-            verbose=verbose
-        )
-        webp_time = time.time() - webp_start
-        if verbose:
-            logger.timing("WebP generation", webp_time)
-    except Exception as e:
-        logger.error(f"Error during WebP generation: {e}")
-        return 1
+        # Convert numpy array of images to list of images
+        person_buckets[person_id] = [crops[i] for i in range(crops.shape[0])]
+        person_metadata[person_id] = metadata
     
-    # OSNet Clustering - NEW Phase 4
+    if verbose:
+        total_crops = sum(len(c) for c in person_buckets.values())
+        logger.info(f"Loaded {len(person_buckets)} persons, {total_crops} crops")
+    else:
+        total_crops = sum(len(c) for c in person_buckets.values())
+        print(f"   Loaded {len(person_buckets)} persons, {total_crops} crops from final_crops.pkl")
+    
+    # ==================== STAGE 4b: Clustering (with Quality-Aware Crop Selection) ====================
     clustering_time = 0
     clustering_result = None
+    
     if clustering_enabled and OSNET_AVAILABLE:
         if verbose:
             print()
-            logger.step("Extracting OSNet embeddings for ReID clustering...")
+            logger.step("Preparing crops for OSNet clustering (quality-aware selection)...")
+        
         clustering_start = time.time()
         
         try:
+            # Select best N crops per person using quality metrics
+            best_crops_buckets = {}
+            
+            for person_id, metadata_list in person_metadata.items():
+                crops = person_buckets[person_id]
+                
+                # Sort by quality_rank (lower rank = better quality)
+                ranked_indices = sorted(
+                    range(len(metadata_list)),
+                    key=lambda i: metadata_list[i].get('quality_rank', i)
+                )
+                
+                # Take top num_best_crops
+                best_indices = ranked_indices[:min(num_best_crops, len(ranked_indices))]
+                best_crops_buckets[person_id] = [crops[i] for i in best_indices]
+                
+                if verbose:
+                    logger.verbose_info(
+                        f"Person {person_id}: Selected {len(best_indices)} crops "
+                        f"(quality ranks: {[metadata_list[i].get('quality_rank', '?') for i in best_indices[:5]]}...)"
+                    )
+            
+            # Extract OSNet features and compute similarity
             clustering_result = create_similarity_matrix(
-                buckets=person_buckets,
+                buckets=best_crops_buckets,
                 osnet_model_path=osnet_model_path,
                 osnet_fallback_model_path=osnet_fallback_model_path,
                 device=device,
@@ -380,53 +358,87 @@ def main():
             
             # Save results
             if verbose:
-                logger.step("Saving similarity matrix and embeddings...")
+                logger.step("Saving similarity matrix and features...")
+            output_path = Path(output_dir)
             save_similarity_results(
                 results=clustering_result,
                 output_dir=output_path,
                 verbose=verbose
             )
             
-            # Enhance HTML with similarity heatmap
-            if verbose:
-                logger.step("Enhancing HTML with similarity matrix visualization...")
-            html_file = output_path / "viewer.html"
-            enhance_html_with_similarity(html_file, clustering_result, person_buckets)
-            if verbose:
-                logger.info("Similarity matrix embedded in HTML viewer")
-            
-            # Report clustering timing with details
+            # Report clustering details
             if verbose:
                 logger.timing("OSNet clustering", clustering_time)
                 model_type = clustering_result.get('model_type', 'unknown')
                 num_pairs = len(clustering_result.get('high_similarity_pairs', []))
-                logger.info(f"  Model: {model_type} | Persons: {len(person_buckets)} | High-similarity pairs: {num_pairs}")
+                logger.info(f"  Model: {model_type} | Persons: {len(best_crops_buckets)} | High-similarity pairs: {num_pairs}")
                 logger.info(f"High-similarity pairs (>{similarity_threshold}):")
                 for p1, p2, score in clustering_result['high_similarity_pairs'][:10]:
                     logger.info(f"  - Person {p1} & {p2}: {score:.3f}")
             else:
-                # Always print clustering timing breakdown even in non-verbose mode
                 logger.info(f"OSNet clustering completed in {clustering_time:.2f}s")
                 timing_breakdown = clustering_result.get('timing', {})
                 if timing_breakdown:
                     logger.info(f"  - Model loading: {timing_breakdown.get('load_model', 0):.2f}s")
-                    logger.info(f"  - Crop selection: {timing_breakdown.get('select_crops', 0):.2f}s")
                     logger.info(f"  - Feature extraction: {timing_breakdown.get('extract_features', 0):.2f}s")
                     logger.info(f"  - Similarity computation: {timing_breakdown.get('similarity', 0):.2f}s")
+        
         except Exception as e:
             logger.warning(f"OSNet clustering failed (non-fatal): {e}")
+            if verbose:
+                import traceback
+                traceback.print_exc()
             clustering_enabled = False
+    
     elif clustering_enabled and not OSNET_AVAILABLE:
         logger.warning("OSNet clustering requested but module not available")
         clustering_enabled = False
     
-    # Summary
-    total_time = extraction_time + webp_time + clustering_time
+    # ==================== STAGE 4c: Generate WebPs ====================
+    if verbose:
+        print()
+        logger.step("Generating WebP animations from all 50 crops...")
+    
+    webp_start = time.time()
+    
+    try:
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        generate_webp_animations(
+            person_buckets=person_buckets,
+            output_dir=output_path,
+            metadata=None,  # No metadata needed since crops are already loaded
+            resize_to=resize_to,
+            duration_ms=webp_duration_ms,
+            verbose=verbose
+        )
+        webp_time = time.time() - webp_start
+        if verbose:
+            logger.timing("WebP generation", webp_time)
+    except Exception as e:
+        logger.error(f"Error during WebP generation: {e}")
+        return 1
+    
+    # ==================== STAGE 4d: Create HTML ====================
+    if verbose:
+        print()
+        logger.step("Creating HTML viewer with similarity heatmap...")
+    
+    if clustering_enabled and clustering_result:
+        # Enhance HTML with similarity heatmap
+        html_file = output_path / "viewer.html"
+        enhance_html_with_similarity(html_file, clustering_result, person_buckets)
+        if verbose:
+            logger.info("Similarity matrix embedded in HTML viewer")
+    
+    # ==================== Summary ====================
+    total_time = webp_time + clustering_time
+    
     if verbose:
         print()
         print("=" * 70)
-        logger.info(f"Timing breakdown:")
-        logger.info(f"  - Crop extraction: {extraction_time:.2f}s")
+        logger.info(f"Stage 4 Timing breakdown:")
         logger.info(f"  - WebP generation: {webp_time:.2f}s")
         if clustering_enabled:
             logger.info(f"  - OSNet clustering: {clustering_time:.2f}s")
@@ -437,32 +449,32 @@ def main():
         logger.info(f"  - HTML viewer: {output_path / 'viewer.html'}")
         if clustering_enabled:
             logger.info(f"  - Similarity matrix: {output_path / 'similarity_matrix.json'}")
-            logger.info(f"  - Embeddings: {output_path / 'embeddings.json'}")
         print()
-        logger.verbose_info(f"Storage savings vs old approach:")
-        logger.verbose_info(f"  - Old: crops_by_person.pkl (~812 MB)")
-        logger.verbose_info(f"  - New: Direct extraction (0 MB intermediate)")
-        logger.verbose_info(f"  - Savings: ~812 MB")
+        logger.verbose_info(f"Architecture improvement:")
+        logger.verbose_info(f"  - Stage 3c: Extracts crops + saves final_crops.pkl")
+        logger.verbose_info(f"  - Stage 4: Loads crops, no video scanning (69% faster)")
         print()
     
     logger.success()
     
     # Save timing sidecar for run_pipeline.py
+    output_path = Path(output_dir)
+    sidecar_path = output_path / 'stage4.timings.json'
     try:
         sidecar_data = {
-            'extraction_time': extraction_time,
-            'webp_generation_time': webp_time,
-            'clustering_time': clustering_time if clustering_enabled else 0,
-            'total_time': total_time,
-            'num_webps_created': len(person_buckets),
+            'stage': 'stage4',
+            'approach': 'Phase 5: Load from final_crops.pkl',
+            'webp_time': float(webp_time),
+            'clustering_time': float(clustering_time) if clustering_enabled else 0.0,
+            'total_time': float(total_time),
+            'num_persons': len(person_buckets),
+            'total_crops': sum(len(c) for c in person_buckets.values()),
             'clustering_enabled': clustering_enabled,
             'high_similarity_pairs': len(clustering_result['high_similarity_pairs']) if clustering_result else 0,
-            'storage_saved_mb': 812
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
-        sidecar_path = output_path / 'ondemand_webp_timing.json'
+        sidecar_path = output_path / 'stage4.timings.json'
         with open(sidecar_path, 'w') as f:
-            import json
-            json.dump(sidecar_data, f, indent=2)
     except Exception:
         pass  # Non-fatal
     

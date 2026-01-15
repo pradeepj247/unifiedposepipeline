@@ -245,6 +245,18 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     stage_times = []  # Track timing for each stage
     
     for stage_name, stage_script, stage_key in stages:
+        # DEPENDENCY CHECK: Stage 4 requires Stage 3c output (final_crops.pkl)
+        if stage_key == 'stage4':
+            output_dir = config.get('global', {}).get('output_dir', '')
+            final_crops_path = Path(output_dir) / 'final_crops.pkl'
+            
+            if not final_crops_path.exists():
+                print(f"\n❌ DEPENDENCY ERROR: Stage 4 requires final_crops.pkl from Stage 3c")
+                print(f"   Missing file: {final_crops_path}")
+                print(f"   Run Stage 3c first: python run_pipeline.py --config ... --stages 3c")
+                print(f"   Or run the full pipeline: python run_pipeline.py --config ...")
+                return False
+        
         # Check if stage outputs already exist (skip unless --force is used)
         if not force and check_stage_outputs_exist(config, stage_key):
             print(f"\n⏭️  Skipping {stage_name} (outputs already exist)")
@@ -392,32 +404,31 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                     else:
                         print(f"   ✅ Stage 3c: Person Ranking completed in {stage_duration:.2f}s")
 
-            # Stage 4: Generate HTML Viewer (with on-demand crop extraction)
+            # Stage 4: Generate HTML Viewer (loads from final_crops.pkl - Phase 5)
             if stage_key == 'stage4':
-                webp_dir = config['stage4_generate_html']['output'].get('webp_dir')
-                if webp_dir:
-                    sidecar_path = Path(webp_dir) / 'ondemand_webp_timing.json'
-                    if sidecar_path.exists():
-                        with open(sidecar_path, 'r', encoding='utf-8') as sf:
-                            data = json.load(sf)
+                output_dir = config.get('global', {}).get('output_dir', '')
+                sidecar_path = Path(output_dir) / 'stage4.timings.json'
+                if sidecar_path.exists():
+                    with open(sidecar_path, 'r', encoding='utf-8') as sf:
+                        data = json.load(sf)
 
-                        extraction_time = float(data.get('extraction_time', 0.0))
-                        webp_time = float(data.get('webp_generation_time', 0.0))
-                        num_webps = int(data.get('num_webps_created', 0))
-                        storage_saved = int(data.get('storage_saved_mb', 0))
+                        webp_time = float(data.get('webp_time', 0.0))
+                        clustering_time = float(data.get('clustering_time', 0.0))
+                        num_persons = int(data.get('num_persons', 0))
+                        total_crops = int(data.get('total_crops', 0))
 
-                        other_overhead = stage_duration - extraction_time - webp_time
+                        other_overhead = stage_duration - webp_time - clustering_time
                         if other_overhead < 0 and abs(other_overhead) < 0.05:
                             other_overhead = 0.0
 
                         print(f"  ✅ Stage 4: Generate HTML Viewer completed in {stage_duration:.2f}s")
                         print(f"      Breakdown (stage parts):")
-                        print(f"       crop extraction: {extraction_time:.2f}s")
                         print(f"       webp generation: {webp_time:.2f}s")
+                        if clustering_time > 0:
+                            print(f"       clustering: {clustering_time:.2f}s")
                         print(f"       other overheads: {other_overhead:.2f}s")
                         if verbose:
-                            print(f"      Created {num_webps} WebP animations")
-                            print(f"      Storage saved: {storage_saved} MB (vs old approach)")
+                            print(f"      Processed {num_persons} persons, {total_crops} total crops")
                         print(f"{'='*70}")
                     else:
                         print(f"  ✅ Stage 4: Generate HTML Viewer completed in {stage_duration:.2f}s")

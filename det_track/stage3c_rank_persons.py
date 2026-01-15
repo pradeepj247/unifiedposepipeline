@@ -280,6 +280,72 @@ def run_ranking(config):
     except Exception:
         if verbose:
             logger.verbose_info("Failed to write timings sidecar")
+    
+    # ==================== NEW: Stage 3c Extension: Crop Extraction ====================
+    # Extract crops for all ranked persons (for Stage 4 visualization)
+    print()
+    logger.step("Extracting crops from video (Stage 3c Extension)...")
+    
+    # Get configuration for crop extraction
+    stage4_config = config.get('stage4_html', {})
+    video_path = config.get('global', {}).get('video_file', '')
+    output_dir = config.get('global', {}).get('output_dir', '')
+    
+    crops_per_person = stage4_config.get('crops_per_person', 50)
+    top_n_persons = len(persons)  # Use all ranked persons, not just top 10
+    max_first_appearance_ratio = stage4_config.get('max_first_appearance_ratio', 0.5)
+    
+    if not video_path or not output_dir:
+        logger.error("Cannot extract crops: video_file or output_dir not configured")
+        return
+    
+    try:
+        from crop_utils import extract_crops_with_quality, save_final_crops
+        
+        t_crop_start = time.time()
+        
+        # Extract crops with quality metrics
+        crops_with_quality = extract_crops_with_quality(
+            video_path=video_path,
+            persons=persons,
+            target_crops_per_person=crops_per_person,
+            top_n=top_n_persons,
+            max_first_appearance_ratio=max_first_appearance_ratio,
+            verbose=verbose
+        )
+        
+        # Save to final_crops.pkl
+        final_crops_path = Path(output_dir) / 'final_crops.pkl'
+        save_final_crops(
+            crops_with_quality=crops_with_quality,
+            output_path=final_crops_path,
+            video_source=video_path,
+            verbose=verbose
+        )
+        
+        t_crop_elapsed = time.time() - t_crop_start
+        
+        logger.info(f"✓ Extracted {len(crops_with_quality)} persons for Stage 4")
+        logger.timing("Crop extraction & save", t_crop_elapsed)
+        
+        # Update timing sidecar with crop extraction time
+        try:
+            sidecar['crop_extraction_time'] = float(t_crop_elapsed)
+            sidecar['final_crops_path'] = str(final_crops_path)
+            sidecar['num_crops_per_person'] = crops_per_person
+            with open(sidecar_path, 'w', encoding='utf-8') as sf:
+                json.dump(sidecar, sf, indent=2)
+        except Exception:
+            pass
+        
+    except ImportError:
+        logger.error("crop_utils module not found - cannot extract crops for Stage 4")
+    except Exception as e:
+        logger.error(f"Error during crop extraction: {e}")
+        if verbose:
+            import traceback
+            traceback.print_exc()
+    # ==================== END: Stage 3c Extension ====================
 
 
 def main():
