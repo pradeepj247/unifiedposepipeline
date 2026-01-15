@@ -124,8 +124,14 @@ def main():
     clustering_enabled = clustering_config.get('enabled', True)
     osnet_model_path = clustering_config.get('osnet_model', None)
     device = clustering_config.get('device', 'cuda')
-    num_best_crops = clustering_config.get('num_best_crops', 8)
+    num_best_crops = clustering_config.get('num_best_crops', 16)  # DEFAULT changed from 8 to 16 to match ONNX model
     similarity_threshold = clustering_config.get('similarity_threshold', 0.70)
+    
+    # DEBUG: Verify clustering config is loaded
+    if num_best_crops != 16:
+        print(f"⚠️  WARNING: num_best_crops={num_best_crops} (expected 16). Clustering config may not be loaded properly.")
+        print(f"    clustering_config keys: {list(clustering_config.keys())}")
+        print(f"    Full stage_config keys: {list(stage_config.keys())}")
     
     # Logging
     log_file = stage_config.get('log_file')
