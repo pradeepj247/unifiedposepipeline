@@ -290,9 +290,21 @@ def save_final_crops(
     total_crops = 0
     
     for person_id, data in crops_with_quality.items():
-        crops = np.array(data['crops'])  # (num_crops, H, W, 3)
+        crops_list = data['crops']
         metadata = data['metadata']
         max_area = data['max_area']
+        
+        # Resize all crops to fixed size (256x256) to ensure homogeneous array
+        fixed_size = (256, 256)
+        crops_resized = []
+        for crop in crops_list:
+            if crop.shape[:2] != fixed_size:
+                crop_resized = cv2.resize(crop, (fixed_size[1], fixed_size[0]), interpolation=cv2.INTER_LINEAR)
+            else:
+                crop_resized = crop
+            crops_resized.append(crop_resized)
+        
+        crops = np.array(crops_resized)  # (num_crops, 256, 256, 3) - now homogeneous
         
         # Compute quality ranks for this person
         quality_ranks = []
