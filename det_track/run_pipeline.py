@@ -430,9 +430,9 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                         if verbose:
                             print(f"      Processed {num_persons} persons, {total_crops} total crops")
                         print(f"{'='*70}")
-                    else:
-                        print(f"  ✅ Stage 4: Generate HTML Viewer completed in {stage_duration:.2f}s")
-                        print(f"{'='*70}")
+                else:
+                    print(f"  ✅ Stage 4: Generate HTML Viewer completed in {stage_duration:.2f}s")
+                    print(f"{'='*70}")
 
         except Exception:
             if verbose:

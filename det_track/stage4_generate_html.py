@@ -473,8 +473,8 @@ def main():
             'high_similarity_pairs': len(clustering_result['high_similarity_pairs']) if clustering_result else 0,
             'timestamp': datetime.now(timezone.utc).isoformat()
         }
-        sidecar_path = output_path / 'stage4.timings.json'
         with open(sidecar_path, 'w') as f:
+            json.dump(sidecar_data, f, indent=2)
     except Exception:
         pass  # Non-fatal
     
