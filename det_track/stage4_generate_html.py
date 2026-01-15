@@ -325,7 +325,8 @@ def main():
         if verbose:
             logger.timing("Extraction", extraction_time)
             logger.info(f"Extracted {sum(len(crops) for crops in person_buckets.values())} total crops")
-            logger.info(f"Selected {len(person_buckets)} persons")
+            logger.info(f"Selected {len(person_buckets)} persons (after early appearance filter: {max_first_appearance_ratio*100:.0f}%)")
+        print(f"   Selected {len(person_buckets)} persons (after filtering) for visualization and clustering")
     except Exception as e:
         logger.error(f"Error during crop extraction: {e}")
         return 1
@@ -392,8 +393,12 @@ def main():
             if verbose:
                 logger.info("Similarity matrix embedded in HTML viewer")
             
+            # Report clustering timing with details
             if verbose:
                 logger.timing("OSNet clustering", clustering_time)
+                model_type = clustering_result.get('model_type', 'unknown')
+                num_pairs = len(clustering_result.get('high_similarity_pairs', []))
+                logger.info(f"  Model: {model_type} | Persons: {len(person_buckets)} | High-similarity pairs: {num_pairs}")
                 logger.info(f"High-similarity pairs (>{similarity_threshold}):")
                 for p1, p2, score in clustering_result['high_similarity_pairs'][:10]:
                     logger.info(f"  - Person {p1} & {p2}: {score:.3f}")

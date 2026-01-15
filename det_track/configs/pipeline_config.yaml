@@ -232,9 +232,9 @@ stage4_generate_html:
   # OSNet Clustering Parameters (NEW Phase 4)
   clustering:
     enabled: true                         # Set false to disable clustering
-    osnet_model: ${models_dir}/reid/osnet_x0_25_msmt17.onnx  # ONNX format (preferred), falls back to PyTorch
+    osnet_model: ${models_dir}/reid/osnet_x1_0_msmt17.pt  # UPGRADED: Stronger model (x1_0 instead of x0_25)
     device: cuda                          # cuda or cpu
-    num_best_crops: 16                    # Select 16 best crops per person for embedding (matches ONNX model batch size)
+    num_best_crops: 16                    # Select 16 best crops per person for embedding
     similarity_threshold: 0.70            # Highlight pairs above this similarity (0-1)
   
   # Logging
