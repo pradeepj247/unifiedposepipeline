@@ -288,11 +288,13 @@ def run_ranking(config):
     
     # Get configuration for crop extraction
     stage4_config = config.get('stage4_generate_html', {})  # Note: stage4_generate_html, not stage4_html
-    output_dir = config.get('global', {}).get('output_dir', '')
+    
+    # Use output directory from primary_file path (same as where primary_person.npz is saved)
+    output_dir = Path(primary_file).parent
     
     # Use canonical video from Stage 0 (symlinked in output_dir)
     video_name = config.get('global', {}).get('current_video', 'canonical_video')
-    video_path = Path(output_dir) / video_name / 'canonical_video.mp4'
+    video_path = output_dir.parent / video_name / 'canonical_video.mp4'
     
     # Fallback: use original video_file if canonical not found
     if not video_path.exists():

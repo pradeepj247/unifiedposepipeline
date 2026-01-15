@@ -645,11 +645,18 @@ def create_similarity_matrix(buckets: Dict[int, List[np.ndarray]],
         # Store all features (no averaging!)
         # features shape: (num_crops, 256)
         all_features_dict[person_id] = features
+        if verbose:
+            print(f"  Person {person_id}: {features.shape} array stored")
     time_extract = time.time() - start
     if verbose:
         print(f"Feature extraction ({model_type}): {time_extract:.2f}s")
         total_features = sum(f.shape[0] for f in all_features_dict.values())
         print(f"  Total features stored: {total_features} (no averaging)")
+    else:
+        # Always log feature count for debugging
+        total_features = sum(f.shape[0] for f in all_features_dict.values())
+        total_dims = sum(f.shape[1] if f.ndim > 1 else 1 for f in all_features_dict.values())
+        print(f"✓ Per-crop features stored: {len(all_features_dict)} persons, {total_features} total features")
     
     # Compute similarity using per-crop features (not averaged embeddings)
     start = time.time()
