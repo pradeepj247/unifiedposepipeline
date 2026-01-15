@@ -287,16 +287,27 @@ def run_ranking(config):
     logger.step("Extracting crops from video (Stage 3c Extension)...")
     
     # Get configuration for crop extraction
-    stage4_config = config.get('stage4_html', {})
-    video_path = config.get('global', {}).get('video_file', '')
+    stage4_config = config.get('stage4_generate_html', {})  # Note: stage4_generate_html, not stage4_html
     output_dir = config.get('global', {}).get('output_dir', '')
+    
+    # Use canonical video from Stage 0 (symlinked in output_dir)
+    video_name = config.get('global', {}).get('current_video', 'canonical_video')
+    video_path = Path(output_dir) / video_name / 'canonical_video.mp4'
+    
+    # Fallback: use original video_file if canonical not found
+    if not video_path.exists():
+        video_path = config.get('global', {}).get('video_file', '')
     
     crops_per_person = stage4_config.get('crops_per_person', 50)
     top_n_persons = len(persons)  # Use all ranked persons, not just top 10
     max_first_appearance_ratio = stage4_config.get('max_first_appearance_ratio', 0.5)
     
-    if not video_path or not output_dir:
-        logger.error("Cannot extract crops: video_file or output_dir not configured")
+    if not video_path or not str(video_path).strip():
+        logger.error("Cannot extract crops: video_path not configured or found")
+        return
+    
+    if not output_dir or not str(output_dir).strip():
+        logger.error("Cannot extract crops: output_dir not configured")
         return
     
     try:
@@ -306,7 +317,7 @@ def run_ranking(config):
         
         # Extract crops with quality metrics
         crops_with_quality = extract_crops_with_quality(
-            video_path=video_path,
+            video_path=str(video_path),  # Convert Path to string
             persons=persons,
             target_crops_per_person=crops_per_person,
             top_n=top_n_persons,
@@ -319,7 +330,7 @@ def run_ranking(config):
         save_final_crops(
             crops_with_quality=crops_with_quality,
             output_path=final_crops_path,
-            video_source=video_path,
+            video_source=str(video_path),
             verbose=verbose
         )
         
