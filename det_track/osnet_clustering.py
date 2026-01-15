@@ -424,6 +424,87 @@ def compute_embedding(features: np.ndarray,
     return embedding
 
 
+def compute_similarity_matrix_from_features(features_dict: Dict[int, np.ndarray],
+                                           person_ids: Optional[List[int]] = None,
+                                           threshold: float = 0.70,
+                                           verbose: bool = False) -> Dict[str, Any]:
+    """
+    Compute similarity matrix from per-crop features (NO AVERAGING).
+    
+    NEW APPROACH: Instead of averaging crops into 1 embedding per person,
+    keep all crop features and compute similarities between sets of features.
+    
+    Similarity between Person A and Person B = Mean similarity between their crops
+    
+    Args:
+        features_dict: Dict[person_id: (num_crops, 256) feature array]
+        person_ids: Optional list of person IDs (for ordering). If None, use sorted keys.
+        threshold: Highlight pairs above this
+        verbose: Print details
+    
+    Returns:
+        {
+            'similarity_matrix': (N, N) array of mean similarities,
+            'person_ids': [sorted person IDs],
+            'high_similarity_pairs': [[id1, id2, score], ...],
+            'timestamp': ISO timestamp
+        }
+    """
+    if person_ids is None:
+        person_ids = sorted(features_dict.keys())
+    
+    n_persons = len(person_ids)
+    similarity_matrix = np.zeros((n_persons, n_persons))
+    
+    # For each pair of persons, compute mean similarity between their crops
+    for i, pid1 in enumerate(person_ids):
+        for j, pid2 in enumerate(person_ids):
+            if i == j:
+                # Self-similarity should be high
+                similarity_matrix[i, j] = 1.0
+            else:
+                # Compute similarities between all crops of person i and person j
+                features1 = features_dict[pid1]  # (num_crops1, 256)
+                features2 = features_dict[pid2]  # (num_crops2, 256)
+                
+                # Normalize each feature vector
+                features1_norm = features1 / (np.linalg.norm(features1, axis=1, keepdims=True) + 1e-8)
+                features2_norm = features2 / (np.linalg.norm(features2, axis=1, keepdims=True) + 1e-8)
+                
+                # Compute pairwise similarities: (num_crops1, num_crops2)
+                pairwise_sims = np.dot(features1_norm, features2_norm.T)
+                
+                # Use MEAN of all pairwise similarities
+                mean_sim = pairwise_sims.mean()
+                similarity_matrix[i, j] = mean_sim
+    
+    # Find high-similarity pairs
+    high_pairs = []
+    for i in range(len(person_ids)):
+        for j in range(i+1, len(person_ids)):
+            score = float(similarity_matrix[i, j])
+            if score > threshold:
+                high_pairs.append([int(person_ids[i]), int(person_ids[j]), score])
+    
+    # Sort by similarity descending
+    high_pairs.sort(key=lambda x: x[2], reverse=True)
+    
+    if verbose:
+        print(f"[Similarity Matrix] Shape: {similarity_matrix.shape}")
+        print(f"[Similarity Matrix] Diagonal (should be 1.0): {np.diag(similarity_matrix)}")
+        print(f"[Similarity Matrix] High-similarity pairs (>{threshold}):")
+        for p1, p2, score in high_pairs:
+            print(f"  Person {p1} & {p2}: {score:.3f}")
+    
+    return {
+        'similarity_matrix': similarity_matrix.astype(np.float32),
+        'person_ids': person_ids,
+        'high_similarity_pairs': high_pairs,
+        'timestamp': __import__('datetime').datetime.now(
+            __import__('datetime').timezone.utc).isoformat()
+    }
+
+
 def compute_similarity_matrix(embeddings_dict: Dict[int, np.ndarray],
                              threshold: float = 0.70,
                              verbose: bool = False) -> Dict[str, Any]:
@@ -548,22 +629,34 @@ def create_similarity_matrix(buckets: Dict[int, List[np.ndarray]],
         total_crops = sum(len(c) for c in best_crops_dict.values())
         print(f"  Selected {total_crops} crops from {sum(len(c) for c in buckets.values())} total")
     
-    # Extract features
+    # Extract features (NO AVERAGING - keep all per-crop features)
     start = time.time()
-    embeddings_dict = {}
+    all_features_dict = {}  # person_id: (num_crops, 256) array
     for person_id, crops in best_crops_dict.items():
-        features = extract_osnet_features(crops, model, device_str, model_type, batch_size=16 if model_type == 'onnx' else 8, verbose=False)
-        embedding = compute_embedding(features, verbose=False)
-        embeddings_dict[person_id] = embedding
+        # Extract features for each crop individually
+        features = extract_osnet_features(
+            crops, 
+            model, 
+            device_str, 
+            model_type, 
+            batch_size=8,  # Use batch_size=8 for PyTorch x1_0
+            verbose=False
+        )
+        # Store all features (no averaging!)
+        # features shape: (num_crops, 256)
+        all_features_dict[person_id] = features
     time_extract = time.time() - start
     if verbose:
         print(f"Feature extraction ({model_type}): {time_extract:.2f}s")
+        total_features = sum(f.shape[0] for f in all_features_dict.values())
+        print(f"  Total features stored: {total_features} (no averaging)")
     
-    # Compute similarity
+    # Compute similarity using per-crop features (not averaged embeddings)
     start = time.time()
-    similarity_result = compute_similarity_matrix(
-        embeddings_dict, 
-        threshold=similarity_threshold, 
+    similarity_result = compute_similarity_matrix_from_features(
+        all_features_dict,
+        person_ids=sorted(all_features_dict.keys()),
+        threshold=similarity_threshold,
         verbose=verbose
     )
     time_similarity = time.time() - start
@@ -579,10 +672,10 @@ def create_similarity_matrix(buckets: Dict[int, List[np.ndarray]],
     # Return all results
     return {
         'similarity_matrix': similarity_result['similarity_matrix'],
-        'embeddings': embeddings_dict,
+        'all_features': all_features_dict,  # Per-crop features (for clustering)
         'person_ids': similarity_result['person_ids'],
         'high_similarity_pairs': similarity_result['high_similarity_pairs'],
-        'model_type': model_type,  # NEW: track which backend was used
+        'model_type': model_type,  # Track which backend was used
         'timing': {
             'load_model': time_load,
             'select_crops': time_select,
@@ -598,13 +691,16 @@ def save_similarity_results(results: Dict[str, Any],
                            output_dir: Path,
                            verbose: bool = False) -> None:
     """
-    Save similarity matrix and embeddings to disk.
+    Save similarity matrix and per-crop features to disk.
+    
+    NEW APPROACH: Instead of saving averaged embeddings, save all per-crop features
+    for later clustering and analysis.
     
     Creates:
     - similarity_matrix.npy (binary)
     - similarity_matrix.json (human-readable with metadata)
-    - embeddings.npy (binary)
-    - embeddings.json (human-readable)
+    - all_features.npy (binary - all crops stacked)
+    - all_features.json (human-readable with person_ids and crop counts)
     
     Args:
         results: Output from create_similarity_matrix()
@@ -623,32 +719,59 @@ def save_similarity_results(results: Dict[str, Any],
         'high_similarity_pairs': results['high_similarity_pairs'],
         'model_type': results.get('model_type', 'unknown'),  # Track which backend
         'similarity_threshold': 0.70,
+        'approach': 'per-crop features (no averaging)',  # NEW: track approach
         'timestamp': results['timestamp']
     }
     with open(output_dir / 'similarity_matrix.json', 'w') as f:
         json.dump(sim_json, f, indent=2)
     
-    # Save embeddings
-    embeddings_array = np.array([results['embeddings'][pid] for pid in results['person_ids']])
-    np.save(output_dir / 'embeddings.npy', embeddings_array)
+    # Save all per-crop features
+    all_features = results.get('all_features', {})
     
-    emb_json = {
-        'embeddings': {str(pid): results['embeddings'][pid].tolist() 
-                      for pid in results['person_ids']},
+    # Create a flattened version with person ID tracking
+    feature_info = {
         'person_ids': results['person_ids'],
         'feature_dimension': 256,
-        'model': 'OSNet x0.25',
+        'num_crops_per_person': {},
+        'model': results.get('model_type', 'unknown'),
+        'approach': 'per-crop features (all 16 crops kept)',
         'timestamp': results['timestamp']
     }
-    with open(output_dir / 'embeddings.json', 'w') as f:
+    
+    # For each person, save their features
+    all_features_json = {}
+    for pid in results['person_ids']:
+        if pid in all_features:
+            features_array = all_features[pid]  # (num_crops, 256)
+            feature_info['num_crops_per_person'][str(pid)] = features_array.shape[0]
+            # Save as list for JSON
+            all_features_json[str(pid)] = features_array.tolist()
+    
+    # Save features as JSON
+    emb_json = {
+        **feature_info,
+        'all_features': all_features_json
+    }
+    with open(output_dir / 'all_features.json', 'w') as f:
         json.dump(emb_json, f, indent=2)
+    
+    # Also save binary format for efficiency
+    # Stack all features for each person
+    for pid in results['person_ids']:
+        if pid in all_features:
+            features_array = all_features[pid]
+            np.save(output_dir / f'features_person_{pid}.npy', features_array)
     
     if verbose:
         print(f"[Save Results] Saved to {output_dir}:")
-        print(f"  - similarity_matrix.npy")
-        print(f"  - similarity_matrix.json")
-        print(f"  - embeddings.npy")
-        print(f"  - embeddings.json")
+        print(f"  - similarity_matrix.npy/.json")
+        print(f"  - all_features.json (per-crop features, no averaging)")
+        print(f"  - features_person_X.npy (binary format for each person)")
+        for pid in results['person_ids']:
+            if pid in all_features:
+                n_crops = all_features[pid].shape[0]
+                print(f"    Person {pid}: {n_crops} crops × 256 dims")
+
 
 
 if __name__ == '__main__':
