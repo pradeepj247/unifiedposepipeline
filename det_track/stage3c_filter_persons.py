@@ -331,7 +331,6 @@ def run_filter(config):
         t_crop_start = time.time()
         
         # Extract crops with quality metrics
-        logger.info(f"Extracting {len(selected_persons)} persons, {crops_per_person} crops each...")
         crops_with_quality = extract_crops_with_quality(
             video_path=str(video_path),
             persons=selected_persons,

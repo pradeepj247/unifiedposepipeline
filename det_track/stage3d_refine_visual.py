@@ -347,9 +347,10 @@ def run_refine(config):
     crops_file = input_config['final_crops_file']
     canonical_file = input_config['canonical_persons_file']
     
-    output_crops_file = output_config['final_crops_merged_file']
-    output_canonical_file = output_config['canonical_persons_merged_file']
-    output_report_file = output_config['merging_report_file']
+    # Get output files with fallbacks
+    output_crops_file = output_config.get('final_crops_merged_file', crops_file)  # Default to same name as input
+    output_canonical_file = output_config.get('canonical_persons_merged_file', canonical_file)  # Default to same name
+    output_report_file = output_config.get('merging_report_file', str(Path(canonical_file).parent / 'merging_report.json'))
     
     # Load crops and canonical persons
     logger.info(f"Loading crops: {Path(crops_file).name}")

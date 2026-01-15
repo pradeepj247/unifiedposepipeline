@@ -94,7 +94,7 @@ def extract_crops_from_video(
                 print(f"     Person {pid}: starts at frame {first_frame} ({first_frame/total_frames*100:.1f}%), {frame_count} frames")
         print(f"   Selected {len(top_persons)} persons for extraction (no backfill)")
     else:
-        print(f"   Extracting {len(top_persons)} persons, {target_crops_per_person} crops each...")
+        print(f"   ✅ Extracting {len(top_persons)} persons, {target_crops_per_person} crops each...")
     
     # Phase 1: Build extraction plan
     # Maps frame_number -> [(person_id, bbox), ...]
