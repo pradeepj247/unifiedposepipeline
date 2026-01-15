@@ -157,7 +157,8 @@ def check_stage_outputs_exist(config, stage_key):
         'stage2': 'stage2_track',
         'stage3a': 'stage3a_analyze',
         'stage3b': 'stage3b_group',
-        'stage3c': 'stage3c_rank',
+        'stage3c': 'stage3c_filter',
+        'stage3d': 'stage3d_refine',
         'stage4': 'stage4_generate_html',
     }
     
@@ -222,9 +223,10 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                     stages.append(all_stages[stage_num - 1])
                     stage_nums.append(str(stage_num))
             except ValueError:
-                # Try as stage key (e.g., "stage9_generate_gifs")
+                # Try as stage key - handle shorthand (3c, 3d) or full key (stage3c, stage3d)
+                search_key = spec if spec.startswith('stage') else f'stage{spec}'
                 for idx, (name, script, key) in enumerate(all_stages):
-                    if key == spec:
+                    if key == search_key:
                         stages.append((name, script, key))
                         stage_nums.append(f"{idx+1}")
                         break
