@@ -704,9 +704,7 @@ def save_similarity_results(results: Dict[str, Any],
     for later clustering and analysis.
     
     Creates:
-    - similarity_matrix.npy (binary)
-    - similarity_matrix.json (human-readable with metadata)
-    - all_features.npy (binary - all crops stacked)
+    - similarity_matrix.json (human-readable with metadata and matrix)
     - all_features.json (human-readable with person_ids and crop counts)
     
     Args:
@@ -717,9 +715,7 @@ def save_similarity_results(results: Dict[str, Any],
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Save similarity matrix
-    np.save(output_dir / 'similarity_matrix.npy', results['similarity_matrix'])
-    
+    # Save similarity matrix as JSON (human-readable, used by HTML viewer)
     sim_json = {
         'matrix': results['similarity_matrix'].tolist(),
         'person_ids': results['person_ids'],
@@ -764,7 +760,7 @@ def save_similarity_results(results: Dict[str, Any],
     
     if verbose:
         print(f"[Save Results] Saved to {output_dir}:")
-        print(f"  - similarity_matrix.npy/.json")
+        print(f"  - similarity_matrix.json (used by HTML viewer)")
         print(f"  - all_features.json (per-crop features, no averaging)")
         for pid in results['person_ids']:
             if pid in all_features:
