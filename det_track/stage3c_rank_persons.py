@@ -301,7 +301,7 @@ def run_ranking(config):
         video_path = config.get('global', {}).get('video_file', '')
     
     crops_per_person = stage4_config.get('crops_per_person', 50)
-    top_n_persons = min(10, len(persons))  # Top 10 persons only (per user requirement)
+    top_n_persons = stage4_config.get('top_n_persons', 10)  # Read from config with default of 10 (original logic)
     max_first_appearance_ratio = stage4_config.get('max_first_appearance_ratio', 0.5)
     
     if not video_path or not str(video_path).strip():
