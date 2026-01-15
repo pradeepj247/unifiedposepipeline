@@ -299,17 +299,20 @@ def extract_osnet_features(crops: List[np.ndarray],
                           model: Any,
                           device: str = 'cuda',
                           model_type: str = 'onnx',
-                          batch_size: int = 8,
+                          batch_size: int = 16,
                           verbose: bool = False) -> np.ndarray:
     """
     Extract OSNet embeddings from crops (ONNX or PyTorch).
+    
+    IMPORTANT for ONNX: The model has a fixed batch size of 16.
+    This function will pad crops to 16 if needed.
     
     Args:
         crops: List of crop images (H, W, 3) BGR
         model: Loaded OSNet model (onnx session or pytorch model)
         device: 'cuda' or 'cpu'
         model_type: 'onnx' or 'pytorch'
-        batch_size: Batch size for inference
+        batch_size: Batch size for inference (ONNX MUST be 16, default: 16)
         verbose: Print extraction details
     
     Returns:
@@ -318,18 +321,27 @@ def extract_osnet_features(crops: List[np.ndarray],
     # Preprocess
     batch_tensor, _ = preprocess_crops(crops, target_size=(256, 128), verbose=verbose)
     
+    # For ONNX: Must use fixed batch size of 16 (pad if needed)
+    if model_type == 'onnx':
+        if len(batch_tensor) != 16:
+            # Pad with zeros to match ONNX model batch size
+            padding = torch.zeros((16 - len(batch_tensor), 3, 256, 128), dtype=torch.float32)
+            batch_tensor = torch.cat([batch_tensor, padding], dim=0)
+            original_len = len(crops)
+        else:
+            original_len = len(crops)
+    
     # Forward pass
     features_list = []
     
     if model_type == 'onnx':
-        # ONNX Runtime inference
-        for i in range(0, len(batch_tensor), batch_size):
-            batch = batch_tensor[i:i+batch_size].numpy()  # Convert to numpy for ONNX
-            input_name = model.get_inputs()[0].name
-            feat = model.run(None, {input_name: batch})
-            features_list.append(feat[0])  # ONNX returns list of outputs
+        # ONNX Runtime inference - must pass all 16 at once
+        batch = batch_tensor.numpy()  # Convert to numpy for ONNX
+        input_name = model.get_inputs()[0].name
+        feat = model.run(None, {input_name: batch})
+        features_list.append(feat[0][:original_len])  # Only keep features for original crops
     else:
-        # PyTorch inference
+        # PyTorch inference - can use variable batch size
         if not TORCH_AVAILABLE:
             raise RuntimeError("PyTorch not available")
         
@@ -438,7 +450,7 @@ def compute_similarity_matrix(embeddings_dict: Dict[int, np.ndarray],
 def create_similarity_matrix(buckets: Dict[int, List[np.ndarray]],
                             osnet_model_path: Optional[str] = None,
                             device: str = 'cuda',
-                            num_best_crops: int = 8,
+                            num_best_crops: int = 16,
                             similarity_threshold: float = 0.70,
                             verbose: bool = False) -> Dict[str, Any]:
     """
@@ -450,7 +462,7 @@ def create_similarity_matrix(buckets: Dict[int, List[np.ndarray]],
         buckets: Dict[person_id: [crop1, crop2, ..., crop50]]
         osnet_model_path: Path to OSNet model (.onnx or .pth)
         device: 'cuda' or 'cpu'
-        num_best_crops: Number of crops to use per person (default: 8)
+        num_best_crops: Number of crops to use per person (default: 16, MUST match ONNX model batch size)
         similarity_threshold: Highlight pairs above this (default: 0.70)
         verbose: Print progress
     
@@ -499,7 +511,7 @@ def create_similarity_matrix(buckets: Dict[int, List[np.ndarray]],
     start = time.time()
     embeddings_dict = {}
     for person_id, crops in best_crops_dict.items():
-        features = extract_osnet_features(crops, model, device_str, model_type, batch_size=8, verbose=False)
+        features = extract_osnet_features(crops, model, device_str, model_type, batch_size=16 if model_type == 'onnx' else 8, verbose=False)
         embedding = compute_embedding(features, verbose=False)
         embeddings_dict[person_id] = embedding
     time_extract = time.time() - start
