@@ -402,6 +402,15 @@ def main():
                 logger.info(f"High-similarity pairs (>{similarity_threshold}):")
                 for p1, p2, score in clustering_result['high_similarity_pairs'][:10]:
                     logger.info(f"  - Person {p1} & {p2}: {score:.3f}")
+            else:
+                # Always print clustering timing breakdown even in non-verbose mode
+                logger.info(f"OSNet clustering completed in {clustering_time:.2f}s")
+                timing_breakdown = clustering_result.get('timing', {})
+                if timing_breakdown:
+                    logger.info(f"  - Model loading: {timing_breakdown.get('load_model', 0):.2f}s")
+                    logger.info(f"  - Crop selection: {timing_breakdown.get('select_crops', 0):.2f}s")
+                    logger.info(f"  - Feature extraction: {timing_breakdown.get('extract_features', 0):.2f}s")
+                    logger.info(f"  - Similarity computation: {timing_breakdown.get('similarity', 0):.2f}s")
         except Exception as e:
             logger.warning(f"OSNet clustering failed (non-fatal): {e}")
             clustering_enabled = False

@@ -192,6 +192,8 @@ def load_osnet_model(model_path: Optional[str] = None,
                 return model, device, 'pytorch'
             except Exception as e:
                 print(f"[OSNet] Warning: Could not load PyTorch weights: {e}")
+        elif model_path:
+            print(f"[OSNet] PyTorch model path provided but file not found or wrong extension: {model_path}")
         
         print("[OSNet] Using randomly initialized PyTorch model")
         model.eval()
