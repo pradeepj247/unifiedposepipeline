@@ -140,65 +140,92 @@ class ResBlock(nn.Module):
 
 
 def load_osnet_model(model_path: Optional[str] = None, 
-                     device: str = 'cuda') -> Tuple[Any, str, str]:
+                     fallback_model_path: Optional[str] = None,
+                     device: str = 'cuda') -> Tuple[Any, str, str, str]:
     """
-    Load OSNet model (ONNX or PyTorch).
+    Load OSNet model with fallback support. Priority: ONNX → PyTorch → fallback ONNX → fallback PyTorch → random init
     
     Supports:
     1. ONNX models (.onnx) - recommended for production, fast inference
-    2. PyTorch models (.pth) - fallback if ONNX not available
-    3. Randomly initialized - fallback if weights not found
+    2. PyTorch models (.pt, .pth) - fallback if ONNX not available
+    3. Fallback model path - used if primary model not found
+    4. Randomly initialized - fallback if all models missing
     
     Args:
-        model_path: Path to OSNet model (.onnx or .pth)
+        model_path: Primary model path (.onnx or .pt/.pth)
+        fallback_model_path: Secondary model path if primary not found
         device: 'cuda' or 'cpu'
     
     Returns:
-        (model, device_str, model_type): Loaded model, device, and model type
-        - model_type: 'onnx', 'pytorch', or 'random'
+        (model, device_str, model_type, actual_path): Loaded model, device, model type, and actual path loaded
+        - model_type: 'onnx', 'pytorch', 'random'
+        - actual_path: Path that was actually loaded, or 'random_init'
     """
     # Ensure device is available
     if device == 'cuda' and not torch.cuda.is_available() if TORCH_AVAILABLE else True:
         print("[OSNet] CUDA not available, falling back to CPU")
         device = 'cpu'
     
-    # Try ONNX first (preferred)
-    if model_path and Path(model_path).exists() and str(model_path).endswith('.onnx'):
-        if ONNX_AVAILABLE:
-            try:
-                # Use GPU or CPU based on device argument
-                providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if device == 'cuda' else ['CPUExecutionProvider']
-                session = ort.InferenceSession(str(model_path), providers=providers)
-                print(f"[OSNet] Loaded ONNX model from {model_path}")
-                print(f"[OSNet] Execution providers: {session.get_providers()}")
-                return session, device, 'onnx'
-            except Exception as e:
-                print(f"[OSNet] Warning: Could not load ONNX model: {e}")
-        else:
-            print("[OSNet] ONNX Runtime not installed, install with: pip install onnxruntime")
+    # Try paths in priority order
+    paths_to_try = []
+    if model_path:
+        paths_to_try.append(('primary', model_path))
+    if fallback_model_path:
+        paths_to_try.append(('fallback', fallback_model_path))
     
-    # Fallback to PyTorch
+    # Attempt each path
+    for priority_name, path in paths_to_try:
+        if not path:
+            continue
+            
+        # Try ONNX if ends with .onnx
+        if Path(path).exists() and str(path).endswith('.onnx'):
+            if ONNX_AVAILABLE:
+                try:
+                    providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if device == 'cuda' else ['CPUExecutionProvider']
+                    session = ort.InferenceSession(str(path), providers=providers)
+                    print(f"[OSNet] ✓ Loaded ONNX model ({priority_name})")
+                    print(f"[OSNet]   Path: {path}")
+                    print(f"[OSNet]   Providers: {session.get_providers()}")
+                    return session, device, 'onnx', str(path)
+                except Exception as e:
+                    print(f"[OSNet] ✗ Failed to load ONNX model ({priority_name}): {e}")
+            else:
+                print(f"[OSNet] ✗ ONNX Runtime not available for ({priority_name}) model")
+        
+        # Try PyTorch if ends with .pt or .pth
+        elif Path(path).exists() and str(path).endswith(('.pt', '.pth')):
+            if TORCH_AVAILABLE:
+                try:
+                    device_obj = torch.device(device)
+                    model = OSNetModel(feature_dim=256)
+                    state_dict = torch.load(path, map_location=device_obj)
+                    model.load_state_dict(state_dict, strict=False)
+                    print(f"[OSNet] ✓ Loaded PyTorch model ({priority_name})")
+                    print(f"[OSNet]   Path: {path}")
+                    print(f"[OSNet]   Device: {device}")
+                    model.eval()
+                    model.to(device_obj)
+                    return model, device, 'pytorch', str(path)
+                except Exception as e:
+                    print(f"[OSNet] ✗ Failed to load PyTorch model ({priority_name}): {e}")
+            else:
+                print(f"[OSNet] ✗ PyTorch not available for ({priority_name}) model")
+        else:
+            print(f"[OSNet] ✗ ({priority_name}) path not found or unsupported format: {path}")
+    
+    # All paths failed, fall back to random initialization
     if TORCH_AVAILABLE:
+        print("[OSNet]")
+        print("[OSNet] ⚠️  WARNING: Using RANDOMLY INITIALIZED PyTorch model")
+        print("[OSNet] ⚠️  All model paths failed to load!")
+        print("[OSNet] ⚠️  Clustering similarity scores will be UNRELIABLE and MEANINGLESS")
+        print("[OSNet]")
         device_obj = torch.device(device)
         model = OSNetModel(feature_dim=256)
-        
-        if model_path and Path(model_path).exists() and str(model_path).endswith('.pth'):
-            try:
-                state_dict = torch.load(model_path, map_location=device_obj)
-                model.load_state_dict(state_dict, strict=False)
-                print(f"[OSNet] Loaded PyTorch weights from {model_path}")
-                model.eval()
-                model.to(device_obj)
-                return model, device, 'pytorch'
-            except Exception as e:
-                print(f"[OSNet] Warning: Could not load PyTorch weights: {e}")
-        elif model_path:
-            print(f"[OSNet] PyTorch model path provided but file not found or wrong extension: {model_path}")
-        
-        print("[OSNet] Using randomly initialized PyTorch model")
         model.eval()
         model.to(device_obj)
-        return model, device, 'pytorch'
+        return model, device, 'random', 'random_init'
     
     # No suitable backend found
     print("[OSNet] ERROR: Neither ONNX nor PyTorch available!")
@@ -451,6 +478,7 @@ def compute_similarity_matrix(embeddings_dict: Dict[int, np.ndarray],
 
 def create_similarity_matrix(buckets: Dict[int, List[np.ndarray]],
                             osnet_model_path: Optional[str] = None,
+                            osnet_fallback_model_path: Optional[str] = None,
                             device: str = 'cuda',
                             num_best_crops: int = 16,
                             similarity_threshold: float = 0.70,
@@ -458,11 +486,12 @@ def create_similarity_matrix(buckets: Dict[int, List[np.ndarray]],
     """
     Main function: Extract OSNet embeddings and compute similarity matrix.
     
-    This is the entry point for Stage 4 clustering. Handles both ONNX and PyTorch models.
+    This is the entry point for Stage 4 clustering. Handles both ONNX and PyTorch models with fallback support.
     
     Args:
         buckets: Dict[person_id: [crop1, crop2, ..., crop50]]
-        osnet_model_path: Path to OSNet model (.onnx or .pth)
+        osnet_model_path: Path to OSNet model (.onnx or .pt/.pth) - primary
+        osnet_fallback_model_path: Path to fallback model if primary not found
         device: 'cuda' or 'cpu'
         num_best_crops: Number of crops to use per person (default: 16, MUST match ONNX model batch size)
         similarity_threshold: Highlight pairs above this (default: 0.70)
@@ -488,7 +517,11 @@ def create_similarity_matrix(buckets: Dict[int, List[np.ndarray]],
     # Load model
     start = time.time()
     try:
-        model, device_str, model_type = load_osnet_model(osnet_model_path, device)
+        model, device_str, model_type, actual_model_path = load_osnet_model(
+            osnet_model_path, 
+            osnet_fallback_model_path, 
+            device
+        )
     except RuntimeError as e:
         print(f"[OSNet] Critical error: {e}")
         raise
@@ -496,6 +529,12 @@ def create_similarity_matrix(buckets: Dict[int, List[np.ndarray]],
     time_load = time.time() - start
     if verbose:
         print(f"Model loaded ({model_type}): {time_load:.2f}s")
+        if model_type == 'random':
+            print("  ⚠️  WARNING: Using random initialization - results unreliable!")
+        else:
+            print(f"  Path: {actual_model_path}")
+    else:
+        print(f"[OSNet] Model: {model_type} ({actual_model_path})")
     
     # Select best crops per person
     start = time.time()

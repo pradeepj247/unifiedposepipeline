@@ -261,6 +261,7 @@ def main():
     clustering_config = stage_config.get('clustering', {})
     clustering_enabled = clustering_config.get('enabled', True)
     osnet_model_path = clustering_config.get('osnet_model', None)
+    osnet_fallback_model_path = clustering_config.get('osnet_model_fallback', None)
     device = clustering_config.get('device', 'cuda')
     num_best_crops = clustering_config.get('num_best_crops', 16)  # DEFAULT changed from 8 to 16 to match ONNX model
     similarity_threshold = clustering_config.get('similarity_threshold', 0.70)
@@ -369,6 +370,7 @@ def main():
             clustering_result = create_similarity_matrix(
                 buckets=person_buckets,
                 osnet_model_path=osnet_model_path,
+                osnet_fallback_model_path=osnet_fallback_model_path,
                 device=device,
                 num_best_crops=num_best_crops,
                 similarity_threshold=similarity_threshold,
