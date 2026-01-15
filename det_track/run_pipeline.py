@@ -247,8 +247,16 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     for stage_name, stage_script, stage_key in stages:
         # DEPENDENCY CHECK: Stage 4 requires Stage 3c output (final_crops.pkl)
         if stage_key == 'stage4':
-            output_dir = config.get('global', {}).get('output_dir', '')
-            final_crops_path = Path(output_dir) / 'final_crops.pkl'
+            # Get the output directory from stage3c's primary_person file location
+            # (same logic as stage3c_rank_persons.py uses)
+            primary_file = config.get('stage3c_rank', {}).get('output', {}).get('primary_person_file', '')
+            if primary_file:
+                output_dir = Path(primary_file).parent
+                final_crops_path = output_dir / 'final_crops.pkl'
+            else:
+                # Fallback to global output_dir if primary_person_file not configured
+                output_dir = config.get('global', {}).get('output_dir', '')
+                final_crops_path = Path(output_dir) / 'final_crops.pkl'
             
             if not final_crops_path.exists():
                 print(f"\n❌ DEPENDENCY ERROR: Stage 4 requires final_crops.pkl from Stage 3c")
