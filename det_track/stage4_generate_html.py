@@ -243,7 +243,15 @@ def main():
                 canonical_3c_data = np.load(canonical_3c_path, allow_pickle=True)
                 canonical_3c_persons = canonical_3c_data['persons']
                 
-                person_buckets_3c = {pid: crops_3c_data['crops'][pid] for pid in crops_3c_data['person_ids']}
+                # Handle new Phase 4 format: crops_with_quality list
+                if 'crops_with_quality' in crops_3c_data:
+                    person_buckets_3c = {}
+                    for person_data in crops_3c_data['crops_with_quality']:
+                        person_id = person_data['person_id']
+                        person_buckets_3c[person_id] = person_data['crops']
+                else:
+                    # Legacy format
+                    person_buckets_3c = {pid: crops_3c_data['crops'][pid] for pid in crops_3c_data['person_ids']}
                 
                 for person in canonical_3c_persons:
                     person_id = person['person_id']
