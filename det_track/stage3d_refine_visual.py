@@ -519,7 +519,7 @@ def run_refine(config):
     
     merged_crops_dict = {}
     merged_persons_list = []
-    merging_report = []
+    merge_operations = []  # List of merge operations
     
     for component in components:
         component.sort()
@@ -533,9 +533,9 @@ def run_refine(config):
             merged_persons_list.append(merged_person)
             
             # Record merge info
-            merging_report.append({
+            merge_operations.append({
                 'merged_persons': component,
-                'merged_into_id': component[0],
+                'result_person_id': component[0],  # Changed from merged_into_id to match Stage 4
                 'similarity_scores': {
                     f"{id1}-{id2}": float(pair_similarities.get((min(id1, id2), max(id1, id2)), -1))
                     for id1, id2 in combinations(component, 2)
@@ -603,6 +603,7 @@ def run_refine(config):
     output_report_path = Path(output_report_file)
     output_report_path.parent.mkdir(parents=True, exist_ok=True)
     
+    merging_report = {'merges': merge_operations}  # Wrap in dict for Stage 4
     with open(output_report_path, 'w') as f:
         json.dump(merging_report, f, indent=2)
     

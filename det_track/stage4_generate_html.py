@@ -452,7 +452,7 @@ def create_dual_row_html_viewer(
         <div class="person-card person-card-3c" data-person-id="{person_id}" style="{border_style}">
             {badge_html}
             <div class="person-header">
-                <h3>Person {person_id}</h3>
+                <h3>ID #{person_id}</h3>
                 <span class="person-info">Frames: {start_frame}-{end_frame} ({presence_pct:.1f}%)</span>
             </div>
             <div class="person-animation">
