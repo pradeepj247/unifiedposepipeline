@@ -215,21 +215,34 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         stages = []
         stage_nums = []
         
+        print(f"   DEBUG: Parsing stage specs: {stage_specs}")
+        
         for spec in stage_specs:
+            matched = False
+            print(f"   DEBUG: Processing spec: '{spec}'")
+            
             try:
                 # Try as number first
                 stage_num = int(spec)
                 if 1 <= stage_num <= len(all_stages):
                     stages.append(all_stages[stage_num - 1])
                     stage_nums.append(str(stage_num))
+                    matched = True
+                    print(f"   DEBUG: Matched as number {stage_num} → {all_stages[stage_num - 1][0]}")
             except ValueError:
                 # Try as stage key - handle shorthand (3c, 3d) or full key (stage3c, stage3d)
                 search_key = spec if spec.startswith('stage') else f'stage{spec}'
+                print(f"   DEBUG: Not a number, trying as key: '{search_key}'")
                 for idx, (name, script, key) in enumerate(all_stages):
                     if key == search_key:
                         stages.append((name, script, key))
                         stage_nums.append(f"{idx+1}")
+                        matched = True
+                        print(f"   DEBUG: Matched key '{search_key}' → stage {idx+1}: {name}")
                         break
+            
+            if not matched:
+                print(f"   WARNING: Could not match spec '{spec}'")
         
         print(f"   Running pipeline stages: {', '.join(stage_nums)}")
     else:
