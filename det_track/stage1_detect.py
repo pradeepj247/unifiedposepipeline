@@ -411,13 +411,17 @@ def run_detection(config):
             
             if x2 > x1 and y2 > y1:
                 crop = frame[y1:y2, x1:x2].copy()
+                
+                # Resize to standard size to save space (256x256 is enough for quality scoring later)
+                crop_resized = cv2.resize(crop, (256, 256))
+                
                 all_crops.append({
                     'detection_idx': detection_global_idx,  # NEW: Link to detection
                     'frame_idx': frame_idx,
                     'bbox': [x1, y1, x2, y2],
                     'confidence': detections[i, 4],
                     'class_id': classes[i],
-                    'crop': crop
+                    'crop': crop_resized  # Store resized version
                 })
             
             # Increment global detection counter
