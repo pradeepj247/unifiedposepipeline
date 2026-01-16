@@ -310,8 +310,8 @@ def main():
         crops = crops_data['crops'][person_id]
         metadata = crops_data['metadata'][person_id]
         
-        # Convert numpy array of images to list of images
-        person_buckets[person_id] = [crops[i] for i in range(crops.shape[0])]
+        # Crops are already a list
+        person_buckets[person_id] = crops
         person_metadata[person_id] = metadata
     
     if verbose:
