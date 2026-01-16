@@ -124,11 +124,8 @@ def main():
     
     # Print configuration
     if not verbose:
-        print(f"   Loaded config: {args.config}")
         print(f"   Input 3c: {crops_3c_path.name}, {canonical_3c_path.name}")
         print(f"   Input 3d: {crops_3d_path.name}, {canonical_3d_path.name}")
-        print(f"   Output: {output_dir}")
-        print(f"   WebP: {resize_to[0]}×{resize_to[1]}, {webp_duration_ms}ms per frame")
         print()
     
     # ==================== Load Stage 3c Data ====================
@@ -208,8 +205,6 @@ def main():
             with open(merging_report_path, 'r') as f:
                 merge_report = json.load(f)
             merge_info = merge_report.get('merges', [])
-            if not verbose:
-                print(f"   ✅ Loaded merge report: {len(merge_info)} merge operations")
         except Exception as e:
             if verbose:
                 logger.warning(f"Could not load merge report: {e}")
@@ -312,8 +307,6 @@ def main():
         )
         if verbose:
             logger.info(f"HTML viewer created: {html_file}")
-        else:
-            print(f"   ✅ HTML viewer: {html_file.name}")
     except Exception as e:
         logger.error(f"Error creating HTML viewer: {e}")
         import traceback

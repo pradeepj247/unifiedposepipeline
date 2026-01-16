@@ -486,9 +486,9 @@ def run_refine(config):
     
     # Print final summary only (detailed groups already shown in HIGH SIMILARITY section)
     if num_merged == 0:
-        print(f"\n   Final: {len(components)} persons (same as input)\n")
+        print(f"\n   ✅ Final: {len(components)} persons (same as input)\n")
     else:
-        print(f"\n   Final: {len(components)} persons ({len(components) - num_merged} singles + {num_merged} merged)\n")
+        print(f"\n   ✅ Final: {len(components)} persons ({len(components) - num_merged} singles + {num_merged} merged)\n")
     
     # Merge crops and persons
     logger.info(f"Merging crops and canonical persons...")

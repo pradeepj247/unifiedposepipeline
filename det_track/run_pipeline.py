@@ -277,7 +277,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                 print(f"   Or run the full pipeline: python run_pipeline.py --config ...")
                 return False
             else:
-                print(f"   ✓ Dependency check passed: {final_crops_path.name} exists")
+                print(f"   ✅ Dependency check passed: {final_crops_path.name} exists")
         
         # Check if stage outputs already exist (skip unless --force is used)
         if not force and check_stage_outputs_exist(config, stage_key):
@@ -443,7 +443,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                         if other_overhead < 0 and abs(other_overhead) < 0.05:
                             other_overhead = 0.0
 
-                        print(f"  ✅ Stage 4: Generate HTML Viewer completed in {stage_duration:.2f}s")
+                        print(f"   ✅ Stage 4: Generate HTML Viewer completed in {stage_duration:.2f}s")
                         print(f"      Breakdown (stage parts):")
                         print(f"       webp generation: {webp_time:.2f}s")
                         if clustering_time > 0:
@@ -453,7 +453,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                             print(f"      Processed {num_persons} persons, {total_crops} total crops")
                         print(f"{'='*70}")
                 else:
-                    print(f"  ✅ Stage 4: Generate HTML Viewer completed in {stage_duration:.2f}s")
+                    print(f"   ✅ Stage 4: Generate HTML Viewer completed in {stage_duration:.2f}s")
                     print(f"{'='*70}")
 
         except Exception:

@@ -188,4 +188,4 @@ class PipelineLogger:
         """Print completion message with elapsed time. Uses success emoji #1."""
         success_emoji = self._get_emoji('success')
         elapsed = time.time() - self._stage_start_time
-        print(f"\n{success_emoji} {self.stage_name} completed in {elapsed:.2f}s")
+        print(f"\n   {success_emoji} {self.stage_name} completed in {elapsed:.2f}s")
