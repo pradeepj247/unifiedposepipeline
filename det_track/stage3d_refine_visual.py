@@ -431,10 +431,35 @@ def run_refine(config):
         
         if similarity >= similarity_threshold:
             connections.append((id1, id2))
-            if verbose:
-                logger.verbose_info(f"  person_{id1} ↔ person_{id2}: {similarity:.4f} ✓")
     
     t_pair_elapsed = time.time() - t_pair_start
+    
+    # Print similarity results
+    if len(pair_similarities) > 0:
+        print(f"\n   === REID SIMILARITY ANALYSIS ===")
+        print(f"   Threshold: {similarity_threshold:.3f}")
+        print(f"   Analyzed {len(pair_similarities)} pairs:")
+        
+        # Sort by similarity descending
+        sorted_pairs = sorted(pair_similarities.items(), key=lambda x: x[1], reverse=True)
+        
+        high_sim = [p for p in sorted_pairs if p[1] >= similarity_threshold]
+        low_sim = [p for p in sorted_pairs if p[1] < similarity_threshold]
+        
+        if high_sim:
+            print(f"\n   HIGH SIMILARITY (>= {similarity_threshold:.3f}) - {len(high_sim)} pairs:")
+            for (id1, id2), sim in high_sim:
+                print(f"      person_{id1} ↔ person_{id2}: {sim:.4f} ✓ MERGE")
+        
+        if low_sim and verbose:
+            print(f"\n   LOW SIMILARITY (< {similarity_threshold:.3f}) - {len(low_sim)} pairs (top 5):")
+            for (id1, id2), sim in low_sim[:5]:
+                print(f"      person_{id1} ↔ person_{id2}: {sim:.4f} ✗ no merge")
+        print()
+    else:
+        print(f"\n   === REID SIMILARITY ANALYSIS ===")
+        print(f"   No candidate pairs found (all persons overlap temporally)\n")
+    
     logger.stat("High-similarity pairs", len(connections))
     logger.timing("Similarity computation", t_pair_elapsed)
     
@@ -448,13 +473,32 @@ def run_refine(config):
     components.sort(key=lambda x: min(x))
     
     num_merged = sum(1 for c in components if len(c) > 1)
-    logger.found(f"{num_merged} person group(s) identified (merges needed)")
     
-    if verbose:
+    # Print merge groups
+    print(f"   === MERGE GROUPS ===")
+    if num_merged == 0:
+        print(f"   ✓ No merges needed - all persons are distinct")
+        print(f"   Final: {len(components)} persons (same as input)\n")
+    else:
+        print(f"   Found {num_merged} group(s) to merge:")
         for group_idx, component in enumerate(components, 1):
-            component.sort()
-            if len(component) > 1:
-                logger.verbose_info(f"  Group {group_idx}: {[f'person_{p}' for p in component]}")
+            component_sorted = sorted(component)
+            if len(component_sorted) > 1:
+                print(f"\n      Group {group_idx}: {len(component_sorted)} persons merged")
+                print(f"         IDs: {', '.join([f'person_{p}' for p in component_sorted])}")
+                print(f"         → Merged into: person_{component_sorted[0]}")
+                
+                # Show pairwise similarities within this group
+                pairs_in_group = [(min(id1, id2), max(id1, id2)) for id1, id2 in combinations(component_sorted, 2)]
+                print(f"         Similarities:")
+                for pair in pairs_in_group:
+                    sim = pair_similarities.get(pair, -1)
+                    if sim >= 0:
+                        print(f"            person_{pair[0]} ↔ person_{pair[1]}: {sim:.4f}")
+        
+        print(f"\n   Final: {len(components)} persons ({len(components) - num_merged} singles + {num_merged} merged)\n")
+    
+    logger.found(f"{num_merged} person group(s) identified (merges needed)")
     
     # Merge crops and persons
     logger.info(f"Merging crops and canonical persons...")

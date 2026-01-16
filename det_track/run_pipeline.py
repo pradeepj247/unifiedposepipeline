@@ -257,23 +257,30 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     for stage_name, stage_script, stage_key in stages:
         # DEPENDENCY CHECK: Stage 4 requires Stage 3d output (final_crops.pkl)
         if stage_key == 'stage4':
-            # Get the output directory from stage3d's final_crops_merged_file location
-            # (same as where final_crops.pkl is saved after Stage 3d)
+            # Stage 3d saves final_crops.pkl (overwrites stage3c output with same name)
+            # Get path from stage3d config (which uses same filename as stage3c)
             final_crops_file = config.get('stage3d_refine', {}).get('output', {}).get('final_crops_merged_file', '')
+            if not final_crops_file:
+                # Fallback: try stage3c_filter config
+                final_crops_file = config.get('stage3c_filter', {}).get('output', {}).get('final_crops_file', '')
+            
             if final_crops_file:
-                output_dir = Path(final_crops_file).parent
                 final_crops_path = Path(final_crops_file)
             else:
-                # Fallback to canonical output_dir if not configured
-                output_dir = config.get('global', {}).get('output_dir', '')
-                final_crops_path = Path(output_dir) / 'final_crops.pkl'
+                # Last resort fallback
+                output_dir = config.get('global', {}).get('outputs_dir', '')
+                current_video = config.get('global', {}).get('current_video', '')
+                final_crops_path = Path(output_dir) / current_video / 'final_crops.pkl'
             
             if not final_crops_path.exists():
-                print(f"\n❌ DEPENDENCY ERROR: Stage 4 requires final_crops.pkl from Stage 3c")
+                print(f"\n❌ DEPENDENCY ERROR: Stage 4 requires final_crops.pkl from Stage 3d (or 3c)")
                 print(f"   Missing file: {final_crops_path}")
-                print(f"   Run Stage 3c first: python run_pipeline.py --config ... --stages 3c")
+                print(f"   Absolute path: {final_crops_path.absolute()}")
+                print(f"   Run Stage 3d first: python run_pipeline.py --config ... --stages 3d")
                 print(f"   Or run the full pipeline: python run_pipeline.py --config ...")
                 return False
+            else:
+                print(f"   ✓ Dependency check passed: {final_crops_path.name} exists")
         
         # Check if stage outputs already exist (skip unless --force is used)
         if not force and check_stage_outputs_exist(config, stage_key):
