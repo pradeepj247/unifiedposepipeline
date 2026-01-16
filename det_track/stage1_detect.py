@@ -464,13 +464,16 @@ def run_detection(config):
     processing_fps = num_frames / t_total if t_total > 0 else 0
     
     crops_cache_size_mb = crops_cache_path.stat().st_size / (1024 * 1024)
+    avg_detections_per_frame = total_detections / num_frames if num_frames > 0 else 0
     
     # Clean output: show only 4 key metrics
     print(f"\n  ✅ Detection + Crop Extraction: {t_detect_extract_time:.2f}s")
     print(f"  ✅ Saving (NPZ + crops cache): {t_save_time:.2f}s")
     print(f"  ✅ Total time: {t_total:.2f}s")
     print(f"  ✅ FPS: {processing_fps:.1f}")
-    print(f"\n  📊 {total_detections} detections, {len(all_crops)} crops extracted")
+    print(f"\n  📊 Total detections: {total_detections}")
+    print(f"  📊 Avg detections/frame: {avg_detections_per_frame:.1f}")
+    print(f"  📊 Total crops extracted: {len(all_crops)}")
     print(f"  💾 crops_cache.pkl: {crops_cache_size_mb:.1f} MB")
     print()
 
