@@ -260,9 +260,7 @@ def run_filter(config):
     
     if removed_by_duration:
         logger.info(f"Step 0: Filtering by minimum duration ({min_duration_frames} frames)...")
-        print(f"   DEBUG: Removed {len(removed_by_duration)} persons with <{min_duration_frames} frames")
-        for p in removed_by_duration:
-            print(f"      - person_{p['person_id']}: {len(p['frame_numbers'])} frames")
+        # Summary only - details in sidecar JSON later
     
     logger.stat("After min_duration filter", f"{len(filtered_by_duration)} persons (threshold: {min_duration_frames} frames)")
     
@@ -299,8 +297,6 @@ def run_filter(config):
     
     # Step 2: Apply late-appearance penalty to top N
     logger.info(f"Step 2: Applying late-appearance penalty to top {len(top_persons)}...")
-    print(f"   DEBUG: total_frames={total_frames}, max_appearance_ratio={weights.get('max_appearance_ratio', 0.5)}, penalty_threshold={filter_config.get('penalty_threshold', 0.75)}")
-    print(f"\n   === TOP 10 SCORING BREAKDOWN ===")
     
     penalized_persons = []
     penalized_scores = []
@@ -319,39 +315,33 @@ def run_filter(config):
         max_appearance_ratio = weights.get('max_appearance_ratio', 0.5)
         penalty = score_dict['late_appearance_penalty']
         
-        # Print detailed breakdown
-        print(f"\n   {rank}. PERSON {person['person_id']}:")
-        print(f"      Duration: {score_dict['duration']} frames")
-        print(f"      Coverage: {score_dict['coverage']:.1%} (detected in {score_dict['coverage']:.1%} of timespan)")
-        print(f"      Center dist: {score_dict['center_distance']:.1f} pixels")
-        print(f"      Appearance: frame {start_frame}/{total_frames} (ratio={appearance_ratio:.3f})")
-        
+        # No verbose printing - evaluate silently
         if appearance_ratio > max_appearance_ratio:
             # Person appeared late
-            print(f"      ⚠️  LATE: ratio {appearance_ratio:.3f} > {max_appearance_ratio} → penalty={penalty:.3f}")
             penalized_persons.append((person, penalty))
             if penalty < filter_config.get('penalty_threshold', 0.75):
-                print(f"      ❌ REMOVED: penalty {penalty:.3f} < threshold {filter_config.get('penalty_threshold', 0.75)}")
                 removed_persons.append((person, penalty))
             else:
-                print(f"      ✓  KEPT: penalty {penalty:.3f} >= threshold {filter_config.get('penalty_threshold', 0.75)}")
                 penalized_persons[-1] = (person, penalty)  # Mark as kept
         else:
             # Person appeared early (no penalty)
-            print(f"      ✓  EARLY: ratio {appearance_ratio:.3f} <= {max_appearance_ratio} → no penalty")
             penalized_persons.append((person, 1.0))
-        
-        print(f"      Final score: {score_dict['final_score']:.4f}")
     
     # Filter: keep persons with penalty >= threshold
     penalty_threshold = filter_config.get('penalty_threshold', 0.75)
     selected_persons = [p for p, penalty in penalized_persons if penalty >= penalty_threshold]
     
-    print(f"\n   === FILTERING RESULT ===")
-    print(f"   DEBUG: After filtering - KEEP: {len(selected_persons)}, REMOVE: {len(removed_persons)}")
-    if removed_persons:
-        print(f"   DEBUG: Removed persons: {[p['person_id'] for p, _ in removed_persons]}")
-    print()
+    # Print concise summary with 💡 emoji
+    total_input = len(canonical_persons_list)
+    total_removed = total_input - len(selected_persons)
+    top_person = selected_persons[0] if selected_persons else None
+    if top_person:
+        top_idx = filtered_by_duration.index(top_person)
+        top_score = scores[top_idx]
+        print(f"   💡 Filtered: {total_input} → {len(selected_persons)} persons (removed {total_removed} below threshold)")
+        print(f"   💡 Top ranked: person_{top_person['person_id']} ({top_score['coverage']:.1%} coverage, score {top_score['final_score']:.2f})")
+    else:
+        print(f"   💡 Filtered: {total_input} → {len(selected_persons)} persons (removed {total_removed} below threshold)")
     
     logger.found(f"After penalty filtering: {len(selected_persons)} persons (threshold: {penalty_threshold:.1f})")
     
@@ -373,6 +363,59 @@ def run_filter(config):
     
     logger.info(f"Saved filtered persons: {output_path.name}")
     logger.stat("Output file", str(output_path))
+    
+    # ==================== Save Filtering Details to JSON Sidecar ====================
+    filtering_details = {
+        "stage": "stage3c",
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "input": {
+            "total_persons": len(canonical_persons_list),
+            "min_duration_threshold": min_duration_frames
+        },
+        "removed_by_duration": [
+            {
+                "person_id": int(p['person_id']),
+                "frames": len(p['frame_numbers']),
+                "reason": "below_min_duration"
+            }
+            for p in removed_by_duration
+        ],
+        "top_10_scoring": [
+            {
+                "rank": rank,
+                "person_id": int(person['person_id']),
+                "duration_frames": int(scores[filtered_by_duration.index(person)]['duration']),
+                "coverage": float(scores[filtered_by_duration.index(person)]['coverage']),
+                "center_distance": float(scores[filtered_by_duration.index(person)]['center_distance']),
+                "appearance_frame": int(person['frame_numbers'][0]),
+                "appearance_ratio": float(scores[filtered_by_duration.index(person)]['appearance_ratio']),
+                "late_appearance_penalty": float(scores[filtered_by_duration.index(person)]['late_appearance_penalty']),
+                "final_score": float(scores[filtered_by_duration.index(person)]['final_score'])
+            }
+            for rank, person in enumerate(top_persons, 1)
+        ],
+        "filtering_result": {
+            "penalty_threshold": float(penalty_threshold),
+            "kept": len(selected_persons),
+            "removed_by_penalty": len(removed_persons),
+            "removed_person_ids": [int(p['person_id']) for p, _ in removed_persons]
+        },
+        "output": {
+            "selected_persons": len(selected_persons),
+            "npz_file": output_path.name
+        },
+        "timing": {
+            "ranking_time": float(ranking_time),
+            "npz_save_time": float(npz_save_time)
+        }
+    }
+    
+    sidecar_path = output_path.parent / 'stage3c_filtering.json'
+    with open(sidecar_path, 'w', encoding='utf-8') as f:
+        json.dump(filtering_details, f, indent=2)
+    
+    if verbose:
+        logger.verbose_info(f"Saved filtering details: {sidecar_path.name}")
     
     # ==================== Extract Crops ====================
     logger.step("Extracting crops from video...")
