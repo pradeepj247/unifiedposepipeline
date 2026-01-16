@@ -547,7 +547,7 @@ def run_refine(config):
     output_crops_path.parent.mkdir(parents=True, exist_ok=True)
     
     # Load original crops data to preserve metadata structure
-    with open(input_crops_file, 'rb') as f:
+    with open(crops_file, 'rb') as f:
         original_crops_data = pickle.load(f)
     
     # Build metadata dict - preserve per-person crop quality metadata
