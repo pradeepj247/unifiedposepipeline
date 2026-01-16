@@ -455,13 +455,12 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
             overflow-x: auto;
             padding: 20px;
             scroll-behavior: smooth;
-            background: #f5f5f5;
         }}
         
         .person-card {{
             flex: 0 0 180px;
             min-width: 180px;
-            background: white;
+            background: rgba(255,255,255,0.05);
             border: 2px solid #ddd;
             border-radius: 8px;
             overflow: hidden;
