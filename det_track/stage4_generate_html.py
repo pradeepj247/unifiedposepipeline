@@ -362,7 +362,7 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
         data_uri = f"data:image/webp;base64,{webp_base64}"
         
         card_html = f"""
-        <div class="person-card" data-person-id="{person_id}" data-rank="{rank}">
+        <div class="person-card" data-person-id="{person_id}" data-rank="{rank}" onclick="selectPerson({person_id})">
             <div class="person-header">
                 <h3>Person {rank} (ID #{person_id})</h3>
                 <span class="person-info">Frames: {start_frame}-{end_frame} ({presence_pct:.1f}%)</span>
@@ -370,7 +370,10 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
             <div class="person-animation">
                 <img src="{data_uri}" alt="Person {person_id}" class="webp-animation">
             </div>
-            <button class="select-btn" onclick="selectPerson({person_id})">Select This Person</button>
+            <div class="select-radio">
+                <input type="radio" name="person-select" id="radio-{person_id}" value="{person_id}">
+                <label for="radio-{person_id}">Select</label>
+            </div>
         </div>
         """
         person_cards.append(card_html)
@@ -438,12 +441,6 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
             margin-bottom: 5px;
         }}
         
-        .stat-item .value {{
-            font-size: 1.8em;
-            color: #4CAF50;
-            font-weight: bold;
-        }}
-        
         .gallery {{
             display: flex;
             gap: 15px;
@@ -504,55 +501,29 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
             border-radius: 4px;
         }}
         
-        .select-btn {{
-            width: 100%;
+        .select-radio {{
             padding: 10px;
-            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-            color: white;
-            border: none;
+            text-align: center;
+            background: rgba(76, 175, 80, 0.2);
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }}
+        
+        .select-radio input[type="radio"] {{
+            margin-right: 8px;
+            cursor: pointer;
+        }}
+        
+        .select-radio label {{
+            color: #4CAF50;
             font-size: 14px;
             font-weight: bold;
             cursor: pointer;
-            transition: all 0.3s ease;
-        }}
-        
-        .select-btn:hover {{
-            background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
-            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
-        }}
-        
-        .select-btn:active {{
-            transform: scale(0.98);
         }}
         
         .selected {{
             border-color: #FFD700 !important;
+            border-width: 3px !important;
             box-shadow: 0 0 20px rgba(255, 215, 0, 0.5) !important;
-        }}
-        
-        #selection-info {{
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(76, 175, 80, 0.95);
-            color: white;
-            padding: 20px 30px;
-            border-radius: 12px;
-            font-size: 1.2em;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            display: none;
-            animation: slideIn 0.3s ease;
-        }}
-        
-        @keyframes slideIn {{
-            from {{
-                transform: translateX(400px);
-                opacity: 0;
-            }}
-            to {{
-                transform: translateX(0);
-                opacity: 1;
-            }}
         }}
     </style>
 </head>
@@ -560,24 +531,10 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
     <div class="header">
         <h1>🎯 Person Selection Viewer</h1>
         <p>Select a person from the gallery below to continue with pose estimation</p>
-        <div class="stats">
-            <div class="stat-item">
-                <div class="label">Total Persons</div>
-                <div class="value">{len(person_buckets)}</div>
-            </div>
-            <div class="stat-item">
-                <div class="label">Total Crops</div>
-                <div class="value">{sum(len(c) for c in person_buckets.values())}</div>
-            </div>
-        </div>
     </div>
     
     <div class="gallery">
         {''.join(person_cards)}
-    </div>
-    
-    <div id="selection-info">
-        ✓ Selected Person <span id="selected-person-id"></span>
     </div>
     
     <script>
@@ -593,10 +550,12 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
             const card = document.querySelector(`[data-person-id="${{personId}}"]`);
             card.classList.add('selected');
             
-            // Update selection info
+            // Check radio button
+            const radio = document.getElementById(`radio-${{personId}}`);
+            if (radio) radio.checked = true;
+            
+            // Update selection
             selectedPersonId = personId;
-            document.getElementById('selected-person-id').textContent = personId;
-            document.getElementById('selection-info').style.display = 'block';
             
             // Log selection (for automation/scripting)
             console.log(`SELECTED_PERSON: ${{personId}}`);
