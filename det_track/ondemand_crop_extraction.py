@@ -275,7 +275,7 @@ def generate_webp_animations(
     start_time = time.time()
     
     for person_id, crops in sorted(person_buckets.items()):
-        if not crops:
+        if crops is None or len(crops) == 0:
             continue
         
         # Resize all crops to same size
