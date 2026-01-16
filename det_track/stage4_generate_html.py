@@ -85,6 +85,9 @@ def main():
     """Stage 4: Generate HTML Viewer"""
     parser = argparse.ArgumentParser(description='Stage 4: Generate HTML Viewer')
     parser.add_argument('--config', type=str, required=True, help='Path to pipeline config YAML')
+    parser.add_argument('--dual-row', type=lambda x: x.lower() in ['true', '1', 'yes'],
+                       default=None,
+                       help='Enable dual-row mode (shows Stage 3C and 3D comparison). Overrides config.')
     args = parser.parse_args()
     
     # Load and resolve config
