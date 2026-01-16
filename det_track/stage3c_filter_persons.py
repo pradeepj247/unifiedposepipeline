@@ -259,9 +259,11 @@ def run_filter(config):
     
     # Step 2: Apply late-appearance penalty to top N
     logger.info(f"Step 2: Applying late-appearance penalty to top {len(top_persons)}...")
+    print(f"   DEBUG: total_frames={total_frames}, max_appearance_ratio={weights.get('max_appearance_ratio', 0.5)}, penalty_threshold={filter_config.get('penalty_threshold', 0.7)}")
     
     penalized_persons = []
     penalized_scores = []
+    removed_persons = []
     
     for person in top_persons:
         frames = person['frame_numbers']
@@ -277,15 +279,20 @@ def run_filter(config):
             penalty = 1.0 - (penalty_factor * 0.3)
             
             penalized_persons.append((person, penalty))
-            if verbose:
-                logger.verbose_info(f"  Person {person['person_id']}: appearance_ratio={appearance_ratio:.2f}, penalty={penalty:.2f}")
+            print(f"   PENALTY: person_{person['person_id']} @ frame {start_frame}/{total_frames} (ratio={appearance_ratio:.3f}) → penalty={penalty:.3f}")
         else:
             # No penalty
             penalized_persons.append((person, 1.0))
+            print(f"   OK: person_{person['person_id']} @ frame {start_frame}/{total_frames} (ratio={appearance_ratio:.3f}) → no penalty")
     
     # Filter: keep persons with penalty > threshold (e.g., 0.8 = only 20% penalty)
     penalty_threshold = filter_config.get('penalty_threshold', 0.7)
     selected_persons = [p for p, penalty in penalized_persons if penalty >= penalty_threshold]
+    removed_persons = [p for p, penalty in penalized_persons if penalty < penalty_threshold]
+    
+    print(f"   DEBUG: After filtering - KEEP: {len(selected_persons)}, REMOVE: {len(removed_persons)}")
+    if removed_persons:
+        print(f"   DEBUG: Removed persons: {[p['person_id'] for p, _ in removed_persons]}")
     
     logger.found(f"After penalty filtering: {len(selected_persons)} persons (threshold: {penalty_threshold:.1f})")
     

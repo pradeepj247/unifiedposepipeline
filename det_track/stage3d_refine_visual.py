@@ -151,10 +151,10 @@ def preprocess_crops(crops: List[np.ndarray], target_size: Tuple[int, int] = (25
     for crop in resized:
         rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
         rgb = rgb.astype(np.float32) / 255.0
-        rgb = (rgb - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
+        rgb = (rgb - np.array([0.485, 0.456, 0.406], dtype=np.float32)) / np.array([0.229, 0.224, 0.225], dtype=np.float32)
         rgb = np.transpose(rgb, (2, 0, 1))
-        batch_list.append(rgb)
-    return np.stack(batch_list), resized
+        batch_list.append(rgb.astype(np.float32))  # Explicit float32
+    return np.stack(batch_list).astype(np.float32), resized  # Ensure result is float32
 
 
 def extract_osnet_features(crops: List[np.ndarray], model, device: str = 'cuda', model_type: str = 'onnx'):
@@ -163,12 +163,13 @@ def extract_osnet_features(crops: List[np.ndarray], model, device: str = 'cuda',
         return np.array([]).reshape(0, 256)
     
     batch_array, _ = preprocess_crops(crops, target_size=(256, 128))
+    batch_array = batch_array.astype(np.float32)  # Ensure float32
     
     if model_type == 'onnx':
         # Pad to 16 crops if needed
         if len(batch_array) != 16:
             padding = np.zeros((16 - len(batch_array), 3, 256, 128), dtype=np.float32)
-            batch_array = np.concatenate([batch_array, padding], axis=0)
+            batch_array = np.concatenate([batch_array, padding], axis=0).astype(np.float32)
             original_len = len(crops)
         else:
             original_len = len(crops)
