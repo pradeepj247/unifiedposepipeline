@@ -107,8 +107,17 @@ def main():
     
     verbose = config.get('global', {}).get('verbose', False)
     
+    # Check if dual-row mode is enabled (default: True for backward compatibility)
+    dual_row_mode = config.get('stage4_html', {}).get('dual_row', True)
+    
     logger = PipelineLogger("Stage 4: Generate HTML Viewer", verbose=verbose)
     logger.header()
+    
+    # Log mode
+    if dual_row_mode:
+        logger.info("Dual-row mode: ✅ Enabled (shows both Stage 3c and 3d)")
+    else:
+        logger.info("Dual-row mode: ❌ Disabled (shows only Stage 3d - single row)")
     
     # Extract configuration (both 3c and 3d inputs)
     crops_3c_path = Path(stage_config['final_crops_3c_file'])
@@ -129,39 +138,47 @@ def main():
         print()
     
     # ==================== Load Stage 3c Data ====================
-    if verbose:
-        logger.step("Loading Stage 3c data (before merge)...")
+    person_buckets_3c = {}
+    person_frame_info_3c = {}
+    total_frames_3c = 0
     
-    try:
-        crops_3c_data = load_final_crops(crops_3c_path, verbose=verbose)
-        canonical_3c_data = np.load(canonical_3c_path, allow_pickle=True)
-        canonical_3c_persons = canonical_3c_data['persons']
+    if dual_row_mode:
+        if verbose:
+            logger.step("Loading Stage 3c data (before merge)...")
         
-        person_buckets_3c = {pid: crops_3c_data['crops'][pid] for pid in crops_3c_data['person_ids']}
-        person_frame_info_3c = {}
-        total_frames_3c = 0
-        
-        for person in canonical_3c_persons:
-            person_id = person['person_id']
-            frame_numbers = person['frame_numbers']
-            person_frame_info_3c[person_id] = {
-                'start_frame': int(frame_numbers[0]),
-                'end_frame': int(frame_numbers[-1]),
-                'num_frames': len(frame_numbers),
-            }
-            total_frames_3c = max(total_frames_3c, int(frame_numbers[-1]) + 1)
-        
-        if not verbose:
-            print(f"   ✅ Stage 3c: {len(person_buckets_3c)} persons")
+        try:
+            crops_3c_data = load_final_crops(crops_3c_path, verbose=verbose)
+            canonical_3c_data = np.load(canonical_3c_path, allow_pickle=True)
+            canonical_3c_persons = canonical_3c_data['persons']
             
-    except FileNotFoundError as e:
-        logger.error(str(e))
-        return 1
-    except Exception as e:
-        logger.error(f"Error loading Stage 3c data: {e}")
-        import traceback
-        traceback.print_exc()
-        return 1
+            person_buckets_3c = {pid: crops_3c_data['crops'][pid] for pid in crops_3c_data['person_ids']}
+            
+            for person in canonical_3c_persons:
+                person_id = person['person_id']
+                frame_numbers = person['frame_numbers']
+                person_frame_info_3c[person_id] = {
+                    'start_frame': int(frame_numbers[0]),
+                    'end_frame': int(frame_numbers[-1]),
+                    'num_frames': len(frame_numbers),
+                }
+                total_frames_3c = max(total_frames_3c, int(frame_numbers[-1]) + 1)
+            
+            if not verbose:
+                print(f"   ✅ Stage 3c: {len(person_buckets_3c)} persons")
+                
+        except FileNotFoundError as e:
+            logger.error(str(e))
+            return 1
+        except Exception as e:
+            logger.error(f"Error loading Stage 3c data: {e}")
+            import traceback
+            traceback.print_exc()
+            return 1
+    else:
+        if verbose:
+            logger.info("⏭️  Skipping Stage 3c data (single-row mode)")
+        else:
+            print(f"   ⏭️  Stage 3c: Skipped (single-row mode)")
     
     # ==================== Load Stage 3d Data ====================
     if verbose:
@@ -229,29 +246,33 @@ def main():
         webp_base64_dict_3c = {}  # Store base64 encoded WebPs for 3c
         webp_base64_dict_3d = {}  # Store base64 encoded WebPs for 3d
         
-        # Generate WebPs for Stage 3c (limit to 50 crops per person)
-        for person_id, crops in sorted(person_buckets_3c.items()):
-            if crops is None or len(crops) == 0:
-                continue
-            
-            crops_to_use = crops[:50] if len(crops) > 50 else crops
-            
-            resized = []
-            for crop in crops_to_use:
-                resized_crop = cv2.resize(crop, resize_to)
-                resized_crop = cv2.cvtColor(resized_crop, cv2.COLOR_BGR2RGB)
-                resized.append(resized_crop)
-            
-            output_file = output_dir / f"person_3c_{person_id}.webp"
-            imageio.mimsave(output_file, resized, format='WEBP', duration=webp_duration_ms, loop=0)
-            
-            with open(output_file, 'rb') as f:
-                webp_data = f.read()
-            webp_base64_dict_3c[person_id] = base64.b64encode(webp_data).decode('utf-8')
-            
+        # Generate WebPs for Stage 3c (only if dual-row mode enabled)
+        if dual_row_mode:
+            for person_id, crops in sorted(person_buckets_3c.items()):
+                if crops is None or len(crops) == 0:
+                    continue
+                
+                crops_to_use = crops[:50] if len(crops) > 50 else crops
+                
+                resized = []
+                for crop in crops_to_use:
+                    resized_crop = cv2.resize(crop, resize_to)
+                    resized_crop = cv2.cvtColor(resized_crop, cv2.COLOR_BGR2RGB)
+                    resized.append(resized_crop)
+                
+                output_file = output_dir / f"person_3c_{person_id}.webp"
+                imageio.mimsave(output_file, resized, format='WEBP', duration=webp_duration_ms, loop=0)
+                
+                with open(output_file, 'rb') as f:
+                    webp_data = f.read()
+                webp_base64_dict_3c[person_id] = base64.b64encode(webp_data).decode('utf-8')
+                
+                if verbose:
+                    file_size_kb = output_file.stat().st_size / 1024
+                    logger.info(f"3c Person {person_id}: {len(crops_to_use)}/{len(crops)} crops → {output_file.name} ({file_size_kb:.0f} KB)")
+        else:
             if verbose:
-                file_size_kb = output_file.stat().st_size / 1024
-                logger.info(f"3c Person {person_id}: {len(crops_to_use)}/{len(crops)} crops → {output_file.name} ({file_size_kb:.0f} KB)")
+                logger.info("⏭️  Skipping Stage 3c WebP generation (single-row mode)")
         
         # Generate WebPs for Stage 3d (limit to 50 crops per person)
         for person_id, crops in sorted(person_buckets_3d.items()):
@@ -412,17 +433,18 @@ def create_dual_row_html_viewer(
             if result_id:
                 person_to_color[result_id] = color
     
-    # Build 3c person cards (sorted chronologically)
+    # Build 3c person cards (sorted chronologically) - Only if dual-row mode
     person_cards_3c = []
-    sorted_person_ids_3c = sorted(
-        person_buckets_3c.keys(),
-        key=lambda pid: (
-            person_frame_info_3c.get(pid, {}).get('start_frame', 999999),  # Start frame ascending (chronological)
-            -person_frame_info_3c.get(pid, {}).get('num_frames', 0)  # Duration descending (if same start)
+    if dual_row_mode:
+        sorted_person_ids_3c = sorted(
+            person_buckets_3c.keys(),
+            key=lambda pid: (
+                person_frame_info_3c.get(pid, {}).get('start_frame', 999999),  # Start frame ascending (chronological)
+                -person_frame_info_3c.get(pid, {}).get('num_frames', 0)  # Duration descending (if same start)
+            )
         )
-    )
-    
-    for person_id in sorted_person_ids_3c:
+        
+        for person_id in sorted_person_ids_3c:
         # Build 3c cards (no radio buttons, for comparison only)
         num_crops = len(person_buckets_3c[person_id])
         frame_info = person_frame_info_3c.get(person_id, {})
@@ -734,18 +756,19 @@ def create_dual_row_html_viewer(
 </head>
 <body>
     <div class="header">
-        <h1>🔍 Person Selection Viewer - Debug Mode</h1>
-        <p>Comparing Stage 3c (before merge) vs Stage 3d (after merge)</p>
+        <h1>🔍 Person Selection Viewer{' - Debug Mode' if dual_row_mode else ''}</h1>
+        <p>{'Comparing Stage 3c (before merge) vs Stage 3d (after merge)' if dual_row_mode else 'Stage 3d Outputs (after merge)'}</p>
     </div>
     
-    <h2 class="section-title">Stage 3C Outputs ({len(person_buckets_3c)} persons) - Before Merge</h2>
+    {f'''<h2 class="section-title">Stage 3C Outputs ({len(person_buckets_3c)} persons) - Before Merge</h2>
     <div class="gallery">
         {''.join(person_cards_3c)}
     </div>
     
     {merge_panel_html}
+    ''' if dual_row_mode else ''}
     
-    <h2 class="section-title">Stage 3D Outputs ({len(person_buckets_3d)} persons) - After Merge</h2>
+    <h2 class="section-title">Stage 3D Outputs ({len(person_buckets_3d)} persons){' - After Merge' if dual_row_mode else ''}</h2>
     <div class="gallery">
         {''.join(person_cards_3d)}
     </div>

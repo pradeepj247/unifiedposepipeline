@@ -22,6 +22,30 @@ global:
   verbose: false                             # Set to true for detailed debug output across all stages
 
 # ============================================================================
+# Pipeline Mode Configuration - Performance vs Thoroughness Tradeoff
+# ============================================================================
+mode: full  # Default mode (fast | balanced | full)
+
+modes:
+  fast:
+    description: "Quick analysis (~59s) - 10 crops per person, no ReID merging"
+    crops_per_person: 10
+    enable_stage3d: false
+    stage4_dual_row: false
+  
+  balanced:
+    description: "Moderate analysis (~67s) - 30 crops per person, no ReID merging"
+    crops_per_person: 30
+    enable_stage3d: false
+    stage4_dual_row: false
+  
+  full:
+    description: "Thorough analysis (~77s) - 50 crops per person, with ReID merging"
+    crops_per_person: 50
+    enable_stage3d: true
+    stage4_dual_row: true
+
+# ============================================================================
 # Pipeline Stage Control - SINGLE SOURCE OF TRUTH
 # ============================================================================
 # NOTE: These settings ALONE control which stages execute.
@@ -179,7 +203,7 @@ stage3b_group:
 # Extracts crops for each selected person.
 #
 # Input: canonical_persons.npz (40+ persons from Stage 3b)
-# Output: canonical_persons_filtered.npz (8-10 persons), final_crops.pkl (8-10 persons with crops)
+# Output: canonical_persons_3c.npz (8-10 persons), final_crops_3c.pkl (8-10 persons with crops)
 #
 # Two-step filtering:
 # 1. Select TOP 10 by ranking score (duration, coverage, center, smoothness)
@@ -206,8 +230,8 @@ stage3c_filter:
     canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz
   
   output:
-    canonical_persons_filtered_file: ${outputs_dir}/${current_video}/canonical_persons_filtered.npz
-    final_crops_file: ${outputs_dir}/${current_video}/final_crops.pkl
+    canonical_persons_filtered_file: ${outputs_dir}/${current_video}/canonical_persons_3c.npz
+    final_crops_file: ${outputs_dir}/${current_video}/final_crops_3c.pkl
   
   advanced:
     verbose: false  # Set true to see top persons with scores and penalties
@@ -216,8 +240,8 @@ stage3c_filter:
 # Stage 3d: Visual Refinement (OSNet ReID-based Person Merging)
 # ============================================================================
 # Uses OSNet embeddings to identify and merge split detections of the same person.
-# Input: canonical_persons_filtered.npz + final_crops.pkl from Stage 3c (8-10 persons)
-# Output: Same filenames, potentially fewer persons (if merges found)
+# Input: canonical_persons_3c.npz + final_crops_3c.pkl from Stage 3c (8-10 persons)
+# Output: canonical_persons_3d.npz, final_crops_3d.pkl, merging_report.json (potentially fewer persons if merges found)
 #
 # Algorithm:
 # - Extract OSNet features from crops (averaged per person)
@@ -242,8 +266,8 @@ stage3d_refine:
     similarity_threshold: 0.60             # Cosine similarity threshold (0-1)
   
   input:
-    final_crops_file: ${outputs_dir}/${current_video}/final_crops.pkl
-    canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons_filtered.npz
+    final_crops_file: ${outputs_dir}/${current_video}/final_crops_3c.pkl
+    canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons_3c.npz
   
   output:
     final_crops_merged_file: ${outputs_dir}/${current_video}/final_crops_3d.pkl  # Stage 3d outputs
@@ -260,8 +284,8 @@ stage3d_refine:
 # Shows 2 rows: 3c outputs (10 persons) vs 3d outputs (7 persons) with merge info.
 stage4_generate_html:
   # Input files - Stage 3c (before merge)
-  final_crops_3c_file: ${outputs_dir}/${current_video}/final_crops.pkl
-  canonical_persons_3c_file: ${outputs_dir}/${current_video}/canonical_persons_filtered.npz
+  final_crops_3c_file: ${outputs_dir}/${current_video}/final_crops_3c.pkl
+  canonical_persons_3c_file: ${outputs_dir}/${current_video}/canonical_persons_3c.npz
   
   # Input files - Stage 3d (after merge)
   final_crops_3d_file: ${outputs_dir}/${current_video}/final_crops_3d.pkl

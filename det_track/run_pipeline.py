@@ -103,6 +103,58 @@ def load_config(config_path):
     return resolve_path_variables(config)
 
 
+def apply_mode_overrides(config, mode, verbose=False):
+    """
+    Apply pipeline mode presets to config (non-destructive override)
+    
+    Args:
+        config: Loaded configuration dictionary
+        mode: Mode name (fast | balanced | full)
+        verbose: Enable detailed logging
+    
+    Returns:
+        Modified config with mode overrides applied
+    """
+    if 'modes' not in config or mode not in config['modes']:
+        if verbose:
+            print(f"⚙️  No mode '{mode}' defined in config, using settings as-is")
+        return config
+    
+    mode_settings = config['modes'][mode]
+    description = mode_settings.get('description', '')
+    
+    print(f"\n⚙️  Pipeline Mode: {mode.upper()}")
+    print(f"   {description}")
+    
+    # Override Stage 3c: crops_per_person
+    if 'stage3c_filter' in config and 'filtering' in config['stage3c_filter']:
+        old_crops = config['stage3c_filter']['filtering'].get('crops_per_person', 50)
+        new_crops = mode_settings['crops_per_person']
+        config['stage3c_filter']['filtering']['crops_per_person'] = new_crops
+        if verbose:
+            print(f"   └─ Stage 3c crops_per_person: {old_crops} → {new_crops}")
+    
+    # Override Stage 3d: enabled flag
+    if 'pipeline' in config and 'stages' in config['pipeline']:
+        old_enabled = config['pipeline']['stages'].get('stage3d', True)
+        new_enabled = mode_settings['enable_stage3d']
+        config['pipeline']['stages']['stage3d'] = new_enabled
+        if verbose:
+            print(f"   └─ Stage 3d enabled: {old_enabled} → {new_enabled}")
+    
+    # Override Stage 4: dual_row mode (create section if needed)
+    if 'stage4_html' not in config:
+        config['stage4_html'] = {}
+    old_dual = config['stage4_html'].get('dual_row', True)
+    new_dual = mode_settings['stage4_dual_row']
+    config['stage4_html']['dual_row'] = new_dual
+    if verbose:
+        print(f"   └─ Stage 4 dual_row: {old_dual} → {new_dual}")
+    
+    print()  # Blank line for readability
+    return config
+
+
 def run_stage(stage_name, stage_script, config_path, verbose=False):
     """Run a single stage script"""
     if verbose:
@@ -183,11 +235,17 @@ def check_stage_outputs_exist(config, stage_key):
     return True
 
 
-def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
+def run_pipeline(config_path, stages_to_run=None, mode=None, verbose=False, force=False):
     """Run the full pipeline"""
     
     # Load config
     config = load_config(config_path)
+    
+    # Determine active mode (CLI overrides config default)
+    active_mode = mode if mode else config.get('mode', 'full')
+    
+    # Apply mode overrides (modifies config in-place)
+    config = apply_mode_overrides(config, active_mode, verbose=verbose)
     
     # Simplified 5-stage pipeline: 0→1→2→3→4
     # Stage 3 splits into 3a (analyze) → 3b (group) → 3c (filter) → 3d (refine)
@@ -252,9 +310,9 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
     stage_times = []  # Track timing for each stage
     
     for stage_name, stage_script, stage_key in stages:
-        # DEPENDENCY CHECK: Stage 4 requires Stage 3d output (final_crops.pkl)
+        # DEPENDENCY CHECK: Stage 4 requires Stage 3d output (final_crops_3d.pkl)
         if stage_key == 'stage4':
-            # Stage 3d saves final_crops.pkl (overwrites stage3c output with same name)
+            # Stage 3d saves final_crops_3d.pkl (or Stage 3c saves final_crops_3c.pkl)
             # Get path from stage3d config (which uses same filename as stage3c)
             final_crops_file = config.get('stage3d_refine', {}).get('output', {}).get('final_crops_merged_file', '')
             if not final_crops_file:
@@ -267,10 +325,10 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                 # Last resort fallback
                 output_dir = config.get('global', {}).get('outputs_dir', '')
                 current_video = config.get('global', {}).get('current_video', '')
-                final_crops_path = Path(output_dir) / current_video / 'final_crops.pkl'
+                final_crops_path = Path(output_dir) / current_video / 'final_crops_3d.pkl'
             
             if not final_crops_path.exists():
-                print(f"\n❌ DEPENDENCY ERROR: Stage 4 requires final_crops.pkl from Stage 3d (or 3c)")
+                print(f"\n❌ DEPENDENCY ERROR: Stage 4 requires final_crops_3d.pkl from Stage 3d")
                 print(f"   Missing file: {final_crops_path}")
                 print(f"   Absolute path: {final_crops_path.absolute()}")
                 print(f"   Run Stage 3d first: python run_pipeline.py --config ... --stages 3d")
@@ -580,6 +638,8 @@ Examples:
                        help='Path to pipeline configuration YAML')
     parser.add_argument('--stages', type=str, default=None,
                        help='Comma-separated stage numbers to run (e.g., "1,2,3,5")')
+    parser.add_argument('--mode', type=str, choices=['fast', 'balanced', 'full'],
+                       help='Pipeline mode: fast (10 crops, no ReID), balanced (30 crops), full (50 crops + ReID)')
     parser.add_argument('--verbose', action='store_true',
                        help='Enable verbose output')
     parser.add_argument('--force', action='store_true',
@@ -587,8 +647,8 @@ Examples:
     
     args = parser.parse_args()
     
-    # Run pipeline
-    success = run_pipeline(args.config, args.stages, args.verbose, args.force)
+    # Run pipeline with mode support
+    success = run_pipeline(args.config, args.stages, args.mode, args.verbose, args.force)
     
     sys.exit(0 if success else 1)
 
