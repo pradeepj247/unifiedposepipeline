@@ -271,12 +271,23 @@ def merge_group(tracklets, group_indices):
     canonical_id = member_tracklets[0]['tracklet_id']
     original_ids = [tracklets[i]['tracklet_id'] for i in group_indices]
     
+    # Collect ALL unique detection indices from all merged tracklets
+    # This is for Stage 3c to extract all crops for quality scoring
+    all_detection_indices = []
+    for tracklet in member_tracklets:
+        if 'detection_indices' in tracklet:
+            all_detection_indices.extend(tracklet['detection_indices'].tolist())
+    
+    # Remove duplicates and -1 (invalid indices), keep unique valid indices
+    unique_detection_indices = np.array(sorted(set(idx for idx in all_detection_indices if idx >= 0)), dtype=np.int64)
+    
     return {
         'person_id': canonical_id,
         'frame_numbers': merged_frames,
         'bboxes': merged_bboxes,
         'confidences': merged_confs,
-        'detection_indices': merged_det_inds,
+        'detection_indices': merged_det_inds,  # Per-frame indices (for bbox alignment)
+        'all_detection_indices': unique_detection_indices,  # ALL unique indices (for Stage 3c crop extraction)
         'original_tracklet_ids': original_ids,
         'num_tracklets_merged': len(original_ids)
     }
