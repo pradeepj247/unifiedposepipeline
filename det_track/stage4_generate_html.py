@@ -324,6 +324,7 @@ def main():
             person_buckets_3c, person_frame_info_3c, total_frames_3c, webp_base64_dict_3c,
             person_buckets_3d, person_frame_info_3d, total_frames_3d, webp_base64_dict_3d,
             merge_info,
+            dual_row_mode,
             verbose
         )
         if verbose:
@@ -398,6 +399,7 @@ def create_dual_row_html_viewer(
     person_buckets_3c: dict, person_frame_info_3c: dict, total_frames_3c: int, webp_base64_dict_3c: dict,
     person_buckets_3d: dict, person_frame_info_3d: dict, total_frames_3d: int, webp_base64_dict_3d: dict,
     merge_info: list,
+    dual_row_mode: bool,
     verbose: bool = False
 ):
     """
