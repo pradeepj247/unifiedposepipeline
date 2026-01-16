@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """
-Stage 4: Generate HTML Viewer (Visualization Only)
+Stage 4: Generate HTML Viewer (Dual Comparison Mode)
 
-Simple visualization stage that:
-1. Loads final_crops.pkl from Stage 3d (already merged)
-2. Creates WebP animations for each person
-3. Generates HTML viewer
-
-NO clustering, NO OSNet - that's Stage 3d's job.
+Visualization stage for debugging Stage 3d merging logic:
+1. Loads Stage 3c outputs (before merge) - typically 10 persons
+2. Loads Stage 3d outputs (after merge) - typically 7 persons
+3. Creates WebP animations for both sets
+4. Generates HTML viewer with 2 rows and merge info panel
 
 Usage:
     python stage4_generate_html.py --config configs/pipeline_config.yaml
@@ -111,8 +110,12 @@ def main():
     logger = PipelineLogger("Stage 4: Generate HTML Viewer", verbose=verbose)
     logger.header()
     
-    # Extract configuration (config is flat, not nested)
-    final_crops_path = Path(stage_config['final_crops_file'])
+    # Extract configuration (both 3c and 3d inputs)
+    crops_3c_path = Path(stage_config['final_crops_3c_file'])
+    canonical_3c_path = Path(stage_config['canonical_persons_3c_file'])
+    crops_3d_path = Path(stage_config['final_crops_3d_file'])
+    canonical_3d_path = Path(stage_config['canonical_persons_3d_file'])
+    merging_report_path = Path(stage_config['merging_report_file'])
     output_dir = Path(stage_config['output_dir'])
     
     resize_to = tuple(stage_config.get('resize_to', [256, 256]))
@@ -122,118 +125,170 @@ def main():
     # Print configuration
     if not verbose:
         print(f"   Loaded config: {args.config}")
-        print(f"   Input: {final_crops_path.name}")
+        print(f"   Input 3c: {crops_3c_path.name}, {canonical_3c_path.name}")
+        print(f"   Input 3d: {crops_3d_path.name}, {canonical_3d_path.name}")
         print(f"   Output: {output_dir}")
         print(f"   WebP: {resize_to[0]}×{resize_to[1]}, {webp_duration_ms}ms per frame")
         print()
     
-    # ==================== Load Crops ====================
+    # ==================== Load Stage 3c Data ====================
     if verbose:
-        logger.step("Loading crops from Stage 3d...")
+        logger.step("Loading Stage 3c data (before merge)...")
     
     try:
-        crops_data = load_final_crops(final_crops_path, verbose=verbose)
+        crops_3c_data = load_final_crops(crops_3c_path, verbose=verbose)
+        canonical_3c_data = np.load(canonical_3c_path, allow_pickle=True)
+        canonical_3c_persons = canonical_3c_data['persons']
+        
+        person_buckets_3c = {pid: crops_3c_data['crops'][pid] for pid in crops_3c_data['person_ids']}
+        person_frame_info_3c = {}
+        total_frames_3c = 0
+        
+        for person in canonical_3c_persons:
+            person_id = person['person_id']
+            frame_numbers = person['frame_numbers']
+            person_frame_info_3c[person_id] = {
+                'start_frame': int(frame_numbers[0]),
+                'end_frame': int(frame_numbers[-1]),
+                'num_frames': len(frame_numbers),
+            }
+            total_frames_3c = max(total_frames_3c, int(frame_numbers[-1]) + 1)
+        
+        if not verbose:
+            print(f"   ✅ Stage 3c: {len(person_buckets_3c)} persons, {sum(len(c) for c in person_buckets_3c.values())} crops")
+            
     except FileNotFoundError as e:
         logger.error(str(e))
         return 1
     except Exception as e:
-        logger.error(f"Error loading final_crops.pkl: {e}")
+        logger.error(f"Error loading Stage 3c data: {e}")
+        import traceback
+        traceback.print_exc()
         return 1
     
-    # Load canonical persons for frame information
-    canonical_file = final_crops_path.parent / 'canonical_persons_filtered.npz'
-    if not canonical_file.exists():
-        logger.error(f"Canonical persons file not found: {canonical_file}")
-        return 1
-    
-    canonical_data = np.load(canonical_file, allow_pickle=True)
-    canonical_persons = canonical_data['persons']
-    
-    # Build person info dict with frame data
-    person_frame_info = {}
-    total_frames = 0
-    for person in canonical_persons:
-        person_id = person['person_id']
-        frame_numbers = person['frame_numbers']
-        person_frame_info[person_id] = {
-            'start_frame': int(frame_numbers[0]),
-            'end_frame': int(frame_numbers[-1]),
-            'num_frames': len(frame_numbers),
-        }
-        total_frames = max(total_frames, int(frame_numbers[-1]) + 1)
-    
-    # Convert pickle format to person_buckets
-    person_buckets = {}
-    person_metadata = {}
-    
-    for person_id in crops_data['person_ids']:
-        crops = crops_data['crops'][person_id]
-        metadata = crops_data['metadata'][person_id]
-        
-        person_buckets[person_id] = crops
-        person_metadata[person_id] = metadata
-    
-    total_crops = sum(len(c) for c in person_buckets.values())
+    # ==================== Load Stage 3d Data ====================
     if verbose:
-        logger.info(f"Loaded {len(person_buckets)} persons, {total_crops} crops")
+        logger.step("Loading Stage 3d data (after merge)...")
+    
+    try:
+        crops_3d_data = load_final_crops(crops_3d_path, verbose=verbose)
+        canonical_3d_data = np.load(canonical_3d_path, allow_pickle=True)
+        canonical_3d_persons = canonical_3d_data['persons']
+        
+        person_buckets_3d = {pid: crops_3d_data['crops'][pid] for pid in crops_3d_data['person_ids']}
+        person_frame_info_3d = {}
+        total_frames_3d = 0
+        
+        for person in canonical_3d_persons:
+            person_id = person['person_id']
+            frame_numbers = person['frame_numbers']
+            person_frame_info_3d[person_id] = {
+                'start_frame': int(frame_numbers[0]),
+                'end_frame': int(frame_numbers[-1]),
+                'num_frames': len(frame_numbers),
+            }
+            total_frames_3d = max(total_frames_3d, int(frame_numbers[-1]) + 1)
+        
+        if not verbose:
+            print(f"   ✅ Stage 3d: {len(person_buckets_3d)} persons, {sum(len(c) for c in person_buckets_3d.values())} crops")
+            
+    except FileNotFoundError as e:
+        logger.error(str(e))
+        return 1
+    except Exception as e:
+        logger.error(f"Error loading Stage 3d data: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
+    
+    # ==================== Load Merge Report ====================
+    merge_info = []
+    if merging_report_path.exists():
+        try:
+            with open(merging_report_path, 'r') as f:
+                merge_report = json.load(f)
+            merge_info = merge_report.get('merges', [])
+            if not verbose:
+                print(f"   ✅ Loaded merge report: {len(merge_info)} merge operations")
+        except Exception as e:
+            if verbose:
+                logger.warning(f"Could not load merge report: {e}")
     else:
-        print(f"   Loaded {len(person_buckets)} persons, {total_crops} crops from {final_crops_path.name}")
+        if verbose:
+            logger.warning(f"Merge report not found: {merging_report_path}")
     
     # ==================== Generate WebP Animations ====================
     if verbose:
         print()
-        logger.step("Generating WebP animations...")
+        logger.step("Generating WebP animations for both 3c and 3d...")
     
     webp_start = time.time()
     
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Generate WebP files directly (limit to 50 crops per person)
         import imageio
         import cv2
         import base64
         
-        webp_base64_dict = {}  # Store base64 encoded WebPs for HTML embedding
+        webp_base64_dict_3c = {}  # Store base64 encoded WebPs for 3c
+        webp_base64_dict_3d = {}  # Store base64 encoded WebPs for 3d
         
-        for person_id, crops in sorted(person_buckets.items()):
+        # Generate WebPs for Stage 3c (limit to 50 crops per person)
+        for person_id, crops in sorted(person_buckets_3c.items()):
             if crops is None or len(crops) == 0:
                 continue
             
-            # Limit to 50 crops (if merged persons have more)
             crops_to_use = crops[:50] if len(crops) > 50 else crops
             
-            # Resize all crops to same size
             resized = []
             for crop in crops_to_use:
                 resized_crop = cv2.resize(crop, resize_to)
                 resized_crop = cv2.cvtColor(resized_crop, cv2.COLOR_BGR2RGB)
                 resized.append(resized_crop)
             
-            # Save as WebP
-            output_file = output_dir / f"person_{person_id}.webp"
-            imageio.mimsave(
-                output_file,
-                resized,
-                format='WEBP',
-                duration=webp_duration_ms,
-                loop=0
-            )
+            output_file = output_dir / f"person_3c_{person_id}.webp"
+            imageio.mimsave(output_file, resized, format='WEBP', duration=webp_duration_ms, loop=0)
             
-            # Read and encode as base64 for embedding
             with open(output_file, 'rb') as f:
                 webp_data = f.read()
-            webp_base64_dict[person_id] = base64.b64encode(webp_data).decode('utf-8')
+            webp_base64_dict_3c[person_id] = base64.b64encode(webp_data).decode('utf-8')
             
             if verbose:
                 file_size_kb = output_file.stat().st_size / 1024
-                logger.info(f"Person {person_id}: {len(crops_to_use)}/{len(crops)} crops → {output_file.name} ({file_size_kb:.0f} KB)")
+                logger.info(f"3c Person {person_id}: {len(crops_to_use)}/{len(crops)} crops → {output_file.name} ({file_size_kb:.0f} KB)")
+        
+        # Generate WebPs for Stage 3d (limit to 50 crops per person)
+        for person_id, crops in sorted(person_buckets_3d.items()):
+            if crops is None or len(crops) == 0:
+                continue
+            
+            crops_to_use = crops[:50] if len(crops) > 50 else crops
+            
+            resized = []
+            for crop in crops_to_use:
+                resized_crop = cv2.resize(crop, resize_to)
+                resized_crop = cv2.cvtColor(resized_crop, cv2.COLOR_BGR2RGB)
+                resized.append(resized_crop)
+            
+            output_file = output_dir / f"person_3d_{person_id}.webp"
+            imageio.mimsave(output_file, resized, format='WEBP', duration=webp_duration_ms, loop=0)
+            
+            with open(output_file, 'rb') as f:
+                webp_data = f.read()
+            webp_base64_dict_3d[person_id] = base64.b64encode(webp_data).decode('utf-8')
+            
+            if verbose:
+                file_size_kb = output_file.stat().st_size / 1024
+                logger.info(f"3d Person {person_id}: {len(crops_to_use)}/{len(crops)} crops → {output_file.name} ({file_size_kb:.0f} KB)")
+        
         webp_time = time.time() - webp_start
         
+        total_webps = len(webp_base64_dict_3c) + len(webp_base64_dict_3d)
         if verbose:
             logger.timing("WebP generation", webp_time)
         else:
-            print(f"   ✅ Generated {len(person_buckets)} WebP animations in {webp_time:.2f}s")
+            print(f"   ✅ Generated {total_webps} WebP animations ({len(webp_base64_dict_3c)} for 3c, {len(webp_base64_dict_3d)} for 3d) in {webp_time:.2f}s")
     
     except Exception as e:
         logger.error(f"Error during WebP generation: {e}")
@@ -244,11 +299,17 @@ def main():
     # ==================== Create HTML Viewer ====================
     if verbose:
         print()
-        logger.step("Creating HTML viewer...")
+        logger.step("Creating dual-row HTML viewer...")
     
     html_file = output_dir / "viewer.html"
     try:
-        create_simple_html_viewer(html_file, person_buckets, person_metadata, person_frame_info, total_frames, webp_base64_dict, verbose)
+        create_dual_row_html_viewer(
+            html_file, 
+            person_buckets_3c, person_frame_info_3c, total_frames_3c, webp_base64_dict_3c,
+            person_buckets_3d, person_frame_info_3d, total_frames_3d, webp_base64_dict_3d,
+            merge_info,
+            verbose
+        )
         if verbose:
             logger.info(f"HTML viewer created: {html_file}")
         else:
@@ -320,49 +381,92 @@ def main():
     return 0
 
 
-def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_metadata: dict, person_frame_info: dict, total_frames: int, webp_base64_dict: dict, verbose: bool = False):
+def create_dual_row_html_viewer(
+    html_file: Path,
+    person_buckets_3c: dict, person_frame_info_3c: dict, total_frames_3c: int, webp_base64_dict_3c: dict,
+    person_buckets_3d: dict, person_frame_info_3d: dict, total_frames_3d: int, webp_base64_dict_3d: dict,
+    merge_info: list,
+    verbose: bool = False
+):
     """
-    Create a simple HTML viewer with WebP animations for each person.
+    Create dual-row HTML viewer comparing Stage 3c (before merge) vs Stage 3d (after merge).
     
     Args:
         html_file: Path to output HTML file
-        person_buckets: Dict of person_id -> list of crops
-        person_metadata: Dict of person_id -> list of metadata dicts
-        person_frame_info: Dict of person_id -> {start_frame, end_frame, num_frames}
-        total_frames: Total frames in video
-        webp_base64_dict: Dict of person_id -> base64 encoded WebP data
+        person_buckets_3c: Dict of person_id -> list of crops (Stage 3c)
+        person_frame_info_3c: Dict of person_id -> frame info (Stage 3c)
+        total_frames_3c: Total frames (Stage 3c)
+        webp_base64_dict_3c: Dict of person_id -> base64 WebP (Stage 3c)
+        person_buckets_3d: Dict of person_id -> list of crops (Stage 3d)
+        person_frame_info_3d: Dict of person_id -> frame info (Stage 3d)
+        total_frames_3d: Total frames (Stage 3d)
+        webp_base64_dict_3d: Dict of person_id -> base64 WebP (Stage 3d)
+        merge_info: List of merge operations from merging_report.json
         verbose: Enable verbose output
     """
     
-    # Build person cards HTML
-    person_cards = []
-    
-    # Sort persons by: 1) Presence % (desc), 2) Start frame (asc), 3) Total frames (desc)
-    sorted_person_ids = sorted(
-        person_buckets.keys(),
+    # Build 3c person cards (sorted chronologically)
+    person_cards_3c = []
+    sorted_person_ids_3c = sorted(
+        person_buckets_3c.keys(),
         key=lambda pid: (
-            -person_frame_info.get(pid, {}).get('num_frames', 0) / total_frames if total_frames > 0 else 0,  # Presence % descending
-            person_frame_info.get(pid, {}).get('start_frame', 999999),  # Start frame ascending (earlier first)
-            -person_frame_info.get(pid, {}).get('num_frames', 0)  # Total frames descending
+            person_frame_info_3c.get(pid, {}).get('start_frame', 999999),  # Start frame ascending (chronological)
+            -person_frame_info_3c.get(pid, {}).get('num_frames', 0)  # Duration descending (if same start)
         )
     )
     
-    for rank, person_id in enumerate(sorted_person_ids, 1):
-        num_crops = len(person_buckets[person_id])
-        
-        # Get frame info
-        frame_info = person_frame_info.get(person_id, {})
+    for person_id in sorted_person_ids_3c:
+        # Build 3c cards (no radio buttons, for comparison only)
+        num_crops = len(person_buckets_3c[person_id])
+        frame_info = person_frame_info_3c.get(person_id, {})
         start_frame = frame_info.get('start_frame', 0)
         end_frame = frame_info.get('end_frame', 0)
         num_frames = frame_info.get('num_frames', 0)
-        presence_pct = (num_frames / total_frames * 100) if total_frames > 0 else 0
+        presence_pct = (num_frames / total_frames_3c * 100) if total_frames_3c > 0 else 0
         
-        # Get base64 encoded WebP
-        webp_base64 = webp_base64_dict.get(person_id, '')
+        webp_base64 = webp_base64_dict_3c.get(person_id, '')
         data_uri = f"data:image/webp;base64,{webp_base64}"
         
         card_html = f"""
-        <div class="person-card" data-person-id="{person_id}" data-rank="{rank}" onclick="selectPerson({person_id})">
+        <div class="person-card person-card-3c" data-person-id="{person_id}">
+            <div class="person-header">
+                <h3>Person {person_id}</h3>
+                <span class="person-info">Frames: {start_frame}-{end_frame} ({presence_pct:.1f}%)</span>
+            </div>
+            <div class="person-animation">
+                <img src="{data_uri}" alt="Person {person_id}" class="webp-animation">
+            </div>
+        </div>
+        """
+        person_cards_3c.append(card_html)
+    
+    # Build 3d person cards (sorted by presence, with radio buttons)
+    person_cards_3d = []
+    sorted_person_ids_3d = sorted(
+        person_buckets_3d.keys(),
+        key=lambda pid: (
+            -person_frame_info_3d.get(pid, {}).get('num_frames', 0) / total_frames_3d if total_frames_3d > 0 else 0,  # Presence % descending
+            person_frame_info_3d.get(pid, {}).get('start_frame', 999999),  # Start frame ascending
+            -person_frame_info_3d.get(pid, {}).get('num_frames', 0)  # Total frames descending
+        )
+    )
+    
+    for rank, person_id in enumerate(sorted_person_ids_3d, 1):
+        num_crops = len(person_buckets_3d[person_id])
+        
+        # Get frame info
+        frame_info = person_frame_info_3d.get(person_id, {})
+        start_frame = frame_info.get('start_frame', 0)
+        end_frame = frame_info.get('end_frame', 0)
+        num_frames = frame_info.get('num_frames', 0)
+        presence_pct = (num_frames / total_frames_3d * 100) if total_frames_3d > 0 else 0
+        
+        # Get base64 encoded WebP
+        webp_base64 = webp_base64_dict_3d.get(person_id, '')
+        data_uri = f"data:image/webp;base64,{webp_base64}"
+        
+        card_html = f"""
+        <div class="person-card person-card-3d" data-person-id="{person_id}" data-rank="{rank}" onclick="selectPerson({person_id})">
             <div class="person-header">
                 <h3>Person {rank} (ID #{person_id})</h3>
                 <span class="person-info">Frames: {start_frame}-{end_frame} ({presence_pct:.1f}%)</span>
@@ -375,15 +479,35 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
             </div>
         </div>
         """
-        person_cards.append(card_html)
+        person_cards_3d.append(card_html)
     
-    # Full HTML template
+    # Build merge info panel
+    merge_panel_html = ""
+    if merge_info:
+        merge_lines = []
+        for merge in merge_info:
+            merged_ids = merge.get('merged_persons', [])
+            result_id = merge.get('result_person_id', '?')
+            if len(merged_ids) > 0:
+                merge_lines.append(f"<li>3D Person {result_id} ← merged 3C Persons {merged_ids}</li>")
+        
+        if merge_lines:
+            merge_panel_html = f"""
+    <div class="merge-info-panel">
+        <h2>🔗 Merge Operations ({len(merge_info)})</h2>
+        <ul>
+            {''.join(merge_lines)}
+        </ul>
+    </div>
+    """
+    
+    # Full HTML template with dual rows
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Person Selection Viewer</title>
+    <title>Person Selection Viewer - Debug Mode</title>
     <style>
         * {{
             margin: 0;
@@ -401,43 +525,31 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
         
         .header {{
             text-align: center;
-            margin-bottom: 40px;
-            padding: 30px;
+            margin-bottom: 30px;
+            padding: 20px;
             background: rgba(255,255,255,0.05);
             border-radius: 12px;
             backdrop-filter: blur(10px);
         }}
         
         .header h1 {{
-            font-size: 2.5em;
+            font-size: 2em;
             color: #4CAF50;
             margin-bottom: 10px;
             text-shadow: 0 2px 10px rgba(76, 175, 80, 0.3);
         }}
         
         .header p {{
-            font-size: 1.1em;
+            font-size: 1em;
             color: #aaa;
         }}
         
-        .stats {{
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-            margin-top: 20px;
-        }}
-        
-        .stat-item {{
-            background: rgba(76, 175, 80, 0.1);
-            padding: 15px 30px;
-            border-radius: 8px;
-            border: 1px solid rgba(76, 175, 80, 0.3);
-        }}
-        
-        .stat-item .label {{
-            font-size: 0.9em;
-            color: #888;
-            margin-bottom: 5px;
+        .section-title {{
+            font-size: 1.5em;
+            color: #4CAF50;
+            margin: 30px 20px 10px 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(76, 175, 80, 0.3);
         }}
         
         .gallery {{
@@ -446,6 +558,9 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
             overflow-x: auto;
             padding: 20px;
             scroll-behavior: smooth;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            margin-bottom: 20px;
         }}
         
         .person-card {{
@@ -457,10 +572,13 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
             overflow: hidden;
             transition: all 0.3s ease;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }}
+        
+        .person-card-3d {{
             cursor: pointer;
         }}
         
-        .person-card:hover {{
+        .person-card-3d:hover {{
             border-color: #4CAF50;
             box-shadow: 0 6px 16px rgba(76, 175, 80, 0.3);
             transform: scale(1.05);
@@ -550,16 +668,54 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
             border-width: 3px !important;
             box-shadow: 0 0 20px rgba(255, 215, 0, 0.5) !important;
         }}
+        
+        .merge-info-panel {{
+            background: rgba(255, 152, 0, 0.1);
+            border: 2px solid rgba(255, 152, 0, 0.5);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 30px 20px;
+        }}
+        
+        .merge-info-panel h2 {{
+            color: #FF9800;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+        }}
+        
+        .merge-info-panel ul {{
+            list-style: none;
+            padding: 0;
+        }}
+        
+        .merge-info-panel li {{
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 152, 0, 0.2);
+            color: #FFA726;
+            font-size: 1.1em;
+        }}
+        
+        .merge-info-panel li:last-child {{
+            border-bottom: none;
+        }}
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>🎯 Person Selection Viewer</h1>
-        <p>Select a person from the gallery below to continue with pose estimation</p>
+        <h1>🔍 Person Selection Viewer - Debug Mode</h1>
+        <p>Comparing Stage 3c (before merge) vs Stage 3d (after merge)</p>
     </div>
     
+    <h2 class="section-title">Stage 3C Outputs ({len(person_buckets_3c)} persons) - Before Merge</h2>
     <div class="gallery">
-        {''.join(person_cards)}
+        {''.join(person_cards_3c)}
+    </div>
+    
+    {merge_panel_html}
+    
+    <h2 class="section-title">Stage 3D Outputs ({len(person_buckets_3d)} persons) - After Merge</h2>
+    <div class="gallery">
+        {''.join(person_cards_3d)}
     </div>
     
     <script>
@@ -567,13 +723,15 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
         
         function selectPerson(personId) {{
             // Remove previous selection
-            document.querySelectorAll('.person-card').forEach(card => {{
+            document.querySelectorAll('.person-card-3d').forEach(card => {{
                 card.classList.remove('selected');
             }});
             
             // Mark new selection
-            const card = document.querySelector(`[data-person-id="${{personId}}"]`);
-            card.classList.add('selected');
+            const card = document.querySelector(`.person-card-3d[data-person-id="${{personId}}"]`);
+            if (card) {{
+                card.classList.add('selected');
+            }}
             
             // Check radio button
             const radio = document.getElementById(`radio-${{personId}}`);
@@ -589,9 +747,9 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
             localStorage.setItem('selected_person_id', personId);
         }}
         
-        // Default select first person (highest ranked)
+        // Default select first 3d person (highest ranked)
         window.addEventListener('load', () => {{
-            const firstCard = document.querySelector('.person-card');
+            const firstCard = document.querySelector('.person-card-3d');
             if (firstCard) {{
                 const firstPersonId = parseInt(firstCard.getAttribute('data-person-id'));
                 selectPerson(firstPersonId);
@@ -606,7 +764,7 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
         f.write(html_content)
     
     if verbose:
-        print(f"   Created HTML viewer with {len(person_buckets)} persons")
+        print(f"   Created dual-row HTML viewer: {len(person_buckets_3c)} 3c persons, {len(person_buckets_3d)} 3d persons")
 
 
 if __name__ == '__main__':

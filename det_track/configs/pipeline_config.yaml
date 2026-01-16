@@ -246,8 +246,8 @@ stage3d_refine:
     canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons_filtered.npz
   
   output:
-    final_crops_merged_file: ${outputs_dir}/${current_video}/final_crops.pkl  # SAME NAME as 3c
-    canonical_persons_merged_file: ${outputs_dir}/${current_video}/canonical_persons_filtered.npz  # SAME NAME as 3c
+    final_crops_merged_file: ${outputs_dir}/${current_video}/final_crops_3d.pkl  # Stage 3d outputs
+    canonical_persons_merged_file: ${outputs_dir}/${current_video}/canonical_persons_3d.npz  # Stage 3d outputs
     merging_report_file: ${outputs_dir}/${current_video}/merging_report.json
   
   advanced:
@@ -256,12 +256,20 @@ stage3d_refine:
 # ============================================================================
 # Stage 4: Generate HTML Viewer
 # ============================================================================
-# Reads final_crops.pkl (after Stage 3d merging) and generates WebP gallery + HTML viewer.
-# No additional filtering or OSNet processing - just visualization.
+# Reads BOTH Stage 3c and 3d outputs for comparison debugging.
+# Shows 2 rows: 3c outputs (10 persons) vs 3d outputs (7 persons) with merge info.
 stage4_generate_html:
-  # Input files
+  # Input files - Stage 3c (before merge)
+  final_crops_3c_file: ${outputs_dir}/${current_video}/final_crops.pkl
+  canonical_persons_3c_file: ${outputs_dir}/${current_video}/canonical_persons_filtered.npz
+  
+  # Input files - Stage 3d (after merge)
+  final_crops_3d_file: ${outputs_dir}/${current_video}/final_crops_3d.pkl
+  canonical_persons_3d_file: ${outputs_dir}/${current_video}/canonical_persons_3d.npz
+  merging_report_file: ${outputs_dir}/${current_video}/merging_report.json
+  
+  # Video file for frame info
   video_file: ${outputs_dir}/${current_video}/canonical_video.mp4
-  final_crops_file: ${outputs_dir}/${current_video}/final_crops.pkl
   
   # Output directory
   output_dir: ${outputs_dir}/${current_video}/webp_viewer
