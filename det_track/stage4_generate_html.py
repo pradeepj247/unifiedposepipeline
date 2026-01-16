@@ -372,7 +372,6 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
             </div>
             <div class="select-radio">
                 <input type="radio" name="person-select" id="radio-{person_id}" value="{person_id}">
-                <label for="radio-{person_id}">Select</label>
             </div>
         </div>
         """
@@ -502,22 +501,48 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
         }}
         
         .select-radio {{
-            padding: 10px;
+            padding: 15px;
             text-align: center;
             background: rgba(76, 175, 80, 0.2);
             border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }}
         
         .select-radio input[type="radio"] {{
-            margin-right: 8px;
+            appearance: none;
+            -webkit-appearance: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(76, 175, 80, 0.3);
+            border: 2px solid #4CAF50;
             cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
         }}
         
-        .select-radio label {{
-            color: #4CAF50;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
+        .select-radio input[type="radio"]:hover {{
+            background: rgba(76, 175, 80, 0.5);
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.6);
+            transform: scale(1.1);
+        }}
+        
+        .select-radio input[type="radio"]:checked {{
+            background: #4CAF50;
+            border-color: #45a049;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.8);
+            animation: pulse 1.5s infinite;
+        }}
+        
+        @keyframes pulse {{
+            0%, 100% {{
+                box-shadow: 0 0 20px rgba(76, 175, 80, 0.8);
+            }}
+            50% {{
+                box-shadow: 0 0 30px rgba(76, 175, 80, 1), 0 0 40px rgba(76, 175, 80, 0.6);
+            }}
         }}
         
         .selected {{
