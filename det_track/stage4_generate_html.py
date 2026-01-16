@@ -337,7 +337,17 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
     # Build person cards HTML
     person_cards = []
     
-    for person_id in sorted(person_buckets.keys()):
+    # Sort persons by: 1) Presence % (desc), 2) Start frame (asc), 3) Total frames (desc)
+    sorted_person_ids = sorted(
+        person_buckets.keys(),
+        key=lambda pid: (
+            -person_frame_info.get(pid, {}).get('num_frames', 0) / total_frames if total_frames > 0 else 0,  # Presence % descending
+            person_frame_info.get(pid, {}).get('start_frame', 999999),  # Start frame ascending (earlier first)
+            -person_frame_info.get(pid, {}).get('num_frames', 0)  # Total frames descending
+        )
+    )
+    
+    for person_id in sorted_person_ids:
         num_crops = len(person_buckets[person_id])
         
         # Get frame info
