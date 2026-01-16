@@ -484,7 +484,7 @@ def run_filter(config):
                         bbox=crop_dict['bbox'],
                         frame_shape=(video_height, video_width),
                         confidence=crop_dict['confidence'],
-                        frame_number=crop_dict['frame_number']
+                        frame_number=crop_dict['frame_idx']  # Stage 1 uses 'frame_idx' not 'frame_number'
                     )
                     
                     # Combined quality score (confidence + visibility)
@@ -493,7 +493,7 @@ def run_filter(config):
                     person_crops.append({
                         'crop': crop_dict['crop'],
                         'bbox': crop_dict['bbox'],
-                        'frame_number': crop_dict['frame_number'],
+                        'frame_number': crop_dict['frame_idx'],  # Normalize to 'frame_number' for output
                         'confidence': crop_dict['confidence'],
                         'quality': quality,
                         'combined_score': combined_score
