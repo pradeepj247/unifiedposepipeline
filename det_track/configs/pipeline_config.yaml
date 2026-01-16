@@ -300,7 +300,7 @@ stage4_generate_html:
   
   # WebP generation parameters
   resize_to: [256, 256]                   # Resize crops to this size (width, height)
-  webp_duration_ms: 100                   # Frame duration in WebP (100ms = 10 FPS)
+  webp_duration_ms: 700                   # Frame duration in WebP (700ms = 1.4 FPS, deliberate viewing)
   
   # Logging
   log_file: ${outputs_dir}/${current_video}/stage4_generate_html.log
