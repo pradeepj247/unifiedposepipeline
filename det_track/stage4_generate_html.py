@@ -107,8 +107,12 @@ def main():
     
     verbose = config.get('global', {}).get('verbose', False)
     
-    # Check if dual-row mode is enabled (default: True for backward compatibility)
-    dual_row_mode = config.get('stage4_html', {}).get('dual_row', True)
+    # Check if dual-row mode is enabled
+    # Priority: CLI argument > config value > default (True)
+    if args.dual_row is not None:
+        dual_row_mode = args.dual_row
+    else:
+        dual_row_mode = config.get('stage4_html', {}).get('dual_row', True)
     
     logger = PipelineLogger("Stage 4: Generate HTML Viewer", verbose=verbose)
     logger.header()

@@ -155,7 +155,7 @@ def apply_mode_overrides(config, mode, verbose=False):
     return config
 
 
-def run_stage(stage_name, stage_script, config_path, verbose=False):
+def run_stage(stage_name, stage_script, config_path, verbose=False, extra_args=None):
     """Run a single stage script"""
     if verbose:
         print(f"\n🚀 Running {stage_name}...")
@@ -164,9 +164,14 @@ def run_stage(stage_name, stage_script, config_path, verbose=False):
     
     t_start = time.time()
     
+    # Build command with optional extra arguments
+    cmd = [sys.executable, '-u', stage_script, '--config', config_path]
+    if extra_args:
+        cmd.extend(extra_args)
+    
     # Run stage script with real-time output streaming
     result = subprocess.run(
-        [sys.executable, '-u', stage_script, '--config', config_path],
+        cmd,
         capture_output=False,  # Stream output directly to console
         text=True
     )
@@ -362,9 +367,16 @@ def run_pipeline(config_path, stages_to_run=None, mode=None, verbose=False, forc
             print(f"❌ Stage script not found: {script_path}")
             return False
         
+        # Prepare extra arguments for specific stages
+        extra_args = []
+        if stage_key == 'stage4':
+            # Pass dual_row_mode value to Stage 4
+            dual_row = config.get('stage4_html', {}).get('dual_row', True)
+            extra_args = ['--dual-row', 'true' if dual_row else 'false']
+        
         # Run stage with timing
         stage_start = time.time()
-        success, _ = run_stage(stage_name, str(script_path), config_path, verbose)
+        success, _ = run_stage(stage_name, str(script_path), config_path, verbose, extra_args=extra_args)
         stage_end = time.time()
         stage_duration = stage_end - stage_start
         
