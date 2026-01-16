@@ -445,23 +445,23 @@ def create_dual_row_html_viewer(
         )
         
         for person_id in sorted_person_ids_3c:
-        # Build 3c cards (no radio buttons, for comparison only)
-        num_crops = len(person_buckets_3c[person_id])
-        frame_info = person_frame_info_3c.get(person_id, {})
-        start_frame = frame_info.get('start_frame', 0)
-        end_frame = frame_info.get('end_frame', 0)
-        num_frames = frame_info.get('num_frames', 0)
-        presence_pct = (num_frames / total_frames_3c * 100) if total_frames_3c > 0 else 0
-        
-        webp_base64 = webp_base64_dict_3c.get(person_id, '')
-        data_uri = f"data:image/webp;base64,{webp_base64}"
-        
-        # Add merge color styling if this person is in a merge group
-        merge_color = person_to_color.get(person_id, '')
-        border_style = f"border-left: 5px solid {merge_color};" if merge_color else ""
-        badge_html = f'<div class="merge-badge" style="background: {merge_color};"></div>' if merge_color else ""
-        
-        card_html = f"""
+            # Build 3c cards (no radio buttons, for comparison only)
+            num_crops = len(person_buckets_3c[person_id])
+            frame_info = person_frame_info_3c.get(person_id, {})
+            start_frame = frame_info.get('start_frame', 0)
+            end_frame = frame_info.get('end_frame', 0)
+            num_frames = frame_info.get('num_frames', 0)
+            presence_pct = (num_frames / total_frames_3c * 100) if total_frames_3c > 0 else 0
+            
+            webp_base64 = webp_base64_dict_3c.get(person_id, '')
+            data_uri = f"data:image/webp;base64,{webp_base64}"
+            
+            # Add merge color styling if this person is in a merge group
+            merge_color = person_to_color.get(person_id, '')
+            border_style = f"border-left: 5px solid {merge_color};" if merge_color else ""
+            badge_html = f'<div class="merge-badge" style="background: {merge_color};"></div>' if merge_color else ""
+            
+            card_html = f"""
         <div class="person-card person-card-3c" data-person-id="{person_id}" style="{border_style}">
             {badge_html}
             <div class="person-header">
@@ -473,7 +473,7 @@ def create_dual_row_html_viewer(
             </div>
         </div>
         """
-        person_cards_3c.append(card_html)
+            person_cards_3c.append(card_html)
     
     # Build 3d person cards (sorted by presence, with radio buttons)
     person_cards_3d = []
