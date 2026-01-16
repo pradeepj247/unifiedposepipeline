@@ -31,6 +31,7 @@ import json
 import time
 import re
 import sys
+import cv2
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils.logger import PipelineLogger
@@ -211,10 +212,27 @@ def run_filter(config):
     video_width = config.get('global', {}).get('video_width', 1920)
     video_height = config.get('global', {}).get('video_height', 1080)
     video_fps = config.get('global', {}).get('video_fps', 30)
-    video_duration = config.get('global', {}).get('video_duration_seconds', 0)
     
-    # Calculate total frames from video metadata if available
-    total_frames = int(video_duration * video_fps) if video_duration > 0 else 10000
+    # Get video path for metadata
+    video_path = config.get('global', {}).get('video_file', '')
+    if not video_path:
+        logger.error("video_file not configured in global section")
+        return
+    
+    # Read ACTUAL frame count from video (not config default)
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        logger.error(f"Cannot open video: {video_path}")
+        return
+    
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+    
+    if total_frames <= 0:
+        logger.error(f"Invalid frame count from video: {total_frames}")
+        return
+    
+    print(f"   VIDEO METADATA: {total_frames} frames, {video_fps} fps, max_appearance_ratio=0.5 (threshold: frame {int(total_frames*0.5)})")
     
     # Load canonical persons
     logger.info(f"Loading canonical persons: {Path(canonical_file).name}")
