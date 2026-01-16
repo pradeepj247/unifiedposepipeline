@@ -243,17 +243,17 @@ def run_tracking(config):
     
     tracklets_dict = {}  # {tracklet_id: {'frame_numbers': [], 'bboxes': [], 'confidences': []}}
     
-    pbar = tqdm(total=num_frames, desc="Tracking", mininterval=1.0)
+    # Create dummy frame ONCE (ByteTrack only uses Kalman, doesn't read pixels)
+    # Use tiny frame to save memory allocation time
+    dummy_frame = np.zeros((100, 100, 3), dtype=np.uint8)
+    
+    pbar = tqdm(total=num_frames, desc="Tracking", mininterval=1.0, disable=not verbose)
     
     debug_first_frame = bool(verbose)
     debug_first_tracking = bool(verbose)
     frame_count = 0
     for frame_id in sorted(unique_frames):
         frame_data = detections_by_frame[frame_id]
-        
-        # Use dummy frame (ByteTrack only uses Kalman filters, not pixel features)
-        # Passing None would fail BoxMOT API, so we pass empty frame placeholder
-        frame = np.zeros((video_height, video_width, 3), dtype=np.uint8)
         
         # Prepare detections for tracker: (N, 6) = [x1, y1, x2, y2, conf, cls]
         if len(frame_data['bboxes']) > 0:
@@ -275,7 +275,7 @@ def run_tracking(config):
         
         # Update tracker (pass frame - required by BoxMOT even for motion-only tracking)
         try:
-            tracked = tracker.update(dets_for_tracker, frame)
+            tracked = tracker.update(dets_for_tracker, dummy_frame)
             
             # Debug first tracking result (verbose only)
             if debug_first_tracking and len(dets_for_tracker) > 0:
