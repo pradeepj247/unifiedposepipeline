@@ -140,6 +140,28 @@ def main():
         logger.error(f"Error loading final_crops.pkl: {e}")
         return 1
     
+    # Load canonical persons for frame information
+    canonical_file = final_crops_path.parent / 'canonical_persons_filtered.npz'
+    if not canonical_file.exists():
+        logger.error(f"Canonical persons file not found: {canonical_file}")
+        return 1
+    
+    canonical_data = np.load(canonical_file, allow_pickle=True)
+    canonical_persons = canonical_data['persons']
+    
+    # Build person info dict with frame data
+    person_frame_info = {}
+    total_frames = 0
+    for person in canonical_persons:
+        person_id = person['person_id']
+        frame_numbers = person['frame_numbers']
+        person_frame_info[person_id] = {
+            'start_frame': int(frame_numbers[0]),
+            'end_frame': int(frame_numbers[-1]),
+            'num_frames': len(frame_numbers),
+        }
+        total_frames = max(total_frames, int(frame_numbers[-1]) + 1)
+    
     # Convert pickle format to person_buckets
     person_buckets = {}
     person_metadata = {}
@@ -167,14 +189,33 @@ def main():
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        generate_webp_animations(
-            person_buckets=person_buckets,
-            output_dir=output_dir,
-            metadata=None,
-            resize_to=resize_to,
-            duration_ms=webp_duration_ms,
-            verbose=verbose
-        )
+        # Generate WebP files directly (don't use generate_webp_animations - it creates wrong HTML)
+        import imageio
+        import cv2
+        for person_id, crops in sorted(person_buckets.items()):
+            if crops is None or len(crops) == 0:
+                continue
+            
+            # Resize all crops to same size
+            resized = []
+            for crop in crops:
+                resized_crop = cv2.resize(crop, resize_to)
+                resized_crop = cv2.cvtColor(resized_crop, cv2.COLOR_BGR2RGB)
+                resized.append(resized_crop)
+            
+            # Save as WebP
+            output_file = output_dir / f"person_{person_id}.webp"
+            imageio.mimsave(
+                output_file,
+                resized,
+                format='WEBP',
+                duration=webp_duration_ms,
+                loop=0
+            )
+            
+            if verbose:
+                file_size_kb = output_file.stat().st_size / 1024
+                logger.info(f"Person {person_id}: {len(crops)} frames → {output_file.name} ({file_size_kb:.0f} KB)")
         webp_time = time.time() - webp_start
         
         if verbose:
@@ -195,7 +236,7 @@ def main():
     
     html_file = output_dir / "viewer.html"
     try:
-        create_simple_html_viewer(html_file, person_buckets, person_metadata, verbose)
+        create_simple_html_viewer(html_file, person_buckets, person_metadata, person_frame_info, total_frames, verbose)
         if verbose:
             logger.info(f"HTML viewer created: {html_file}")
         else:
@@ -206,19 +247,8 @@ def main():
         traceback.print_exc()
         return 1
     
-    # ==================== Cleanup WebP Files ====================
-    if verbose:
-        logger.step("Cleaning up WebP files (embedded in HTML)...")
-    
-    cleanup_start = time.time()
-    deleted_count = cleanup_webp_files(output_dir, verbose=verbose)
-    cleanup_time = time.time() - cleanup_start
-    
-    if verbose:
-        logger.info(f"Deleted {deleted_count} WebP files ({cleanup_time:.2f}s)")
-    
     # ==================== Summary ====================
-    total_time = webp_time + cleanup_time
+    total_time = webp_time
     
     if verbose:
         print()
@@ -228,8 +258,13 @@ def main():
         logger.info(f"  - Cleanup: {cleanup_time:.2f}s")
         logger.info(f"  - Total: {total_time:.2f}s")
         print()
+        logger.info(f"Stage 4 Timing:")
+        logger.info(f"  - WebP generation: {webp_time:.2f}s")
+        logger.info(f"  - Total: {total_time:.2f}s")
+        print()
         logger.info(f"Output:")
         logger.info(f"  - HTML viewer: {html_file}")
+        logger.info(f"  - WebP files: {len(person_buckets)} animations")
         logger.info(f"  - Persons: {len(person_buckets)}")
         print()
     
@@ -254,7 +289,7 @@ def main():
     return 0
 
 
-def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_metadata: dict, verbose: bool = False):
+def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_metadata: dict, person_frame_info: dict, total_frames: int, verbose: bool = False):
     """
     Create a simple HTML viewer with WebP animations for each person.
     
@@ -262,6 +297,8 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
         html_file: Path to output HTML file
         person_buckets: Dict of person_id -> list of crops
         person_metadata: Dict of person_id -> list of metadata dicts
+        person_frame_info: Dict of person_id -> {start_frame, end_frame, num_frames}
+        total_frames: Total frames in video
         verbose: Enable verbose output
     """
     
@@ -272,18 +309,20 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
         num_crops = len(person_buckets[person_id])
         webp_file = f"person_{person_id}.webp"
         
-        # Get metadata stats
-        if person_id in person_metadata and person_metadata[person_id]:
-            avg_quality = np.mean([m.get('quality_score', 0) for m in person_metadata[person_id]])
-            quality_str = f"Quality: {avg_quality:.2f}"
-        else:
-            quality_str = "Quality: N/A"
+        # Get frame info
+        frame_info = person_frame_info.get(person_id, {})
+        start_frame = frame_info.get('start_frame', 0)
+        end_frame = frame_info.get('end_frame', 0)
+        num_frames = frame_info.get('num_frames', 0)
+        presence_pct = (num_frames / total_frames * 100) if total_frames > 0 else 0
         
         card_html = f"""
         <div class="person-card" data-person-id="{person_id}">
             <div class="person-header">
                 <h3>Person {person_id}</h3>
-                <span class="person-info">{num_crops} crops | {quality_str}</span>
+                <span class="person-info">{num_crops} crops | Frames {start_frame}-{end_frame}</span>
+                <br>
+                <span class="person-info">Presence: {num_frames} frames ({presence_pct:.1f}%)</span>
             </div>
             <div class="person-animation">
                 <img src="{webp_file}" alt="Person {person_id}" class="webp-animation">
