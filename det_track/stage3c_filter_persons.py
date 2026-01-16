@@ -445,6 +445,11 @@ def run_filter(config):
     # Load crops_cache.pkl from Stage 1 (same directory as detections_raw.npz)
     stage1_detections_file = config['stage1_detect']['output']['detections_file']
     crops_cache_path = Path(stage1_detections_file).parent / 'crops_cache.pkl'
+    
+    if verbose:
+        logger.verbose_info(f"Stage 1 detections: {stage1_detections_file}")
+        logger.verbose_info(f"Looking for crops_cache at: {crops_cache_path}")
+    
     if not crops_cache_path.exists():
         logger.error(f"crops_cache.pkl not found at {crops_cache_path}")
         logger.error("Run Stage 1 first to generate crops_cache.pkl")
@@ -542,8 +547,12 @@ def run_filter(config):
         
         # ========== CLEANUP: DELETE EPHEMERAL CROPS_CACHE ==========
         try:
-            os.remove(crops_cache_path)
-            logger.info(f"✓ Cleaned up ephemeral crops_cache.pkl ({crops_cache_path.stat().st_size / 1024**2:.1f} MB freed)")
+            if crops_cache_path.exists():
+                cache_size_mb = crops_cache_path.stat().st_size / 1024**2
+                os.remove(crops_cache_path)
+                logger.info(f"✓ Cleaned up ephemeral crops_cache.pkl ({cache_size_mb:.1f} MB freed)")
+            else:
+                logger.warning(f"crops_cache.pkl already deleted or not found at {crops_cache_path}")
         except Exception as e:
             logger.warning(f"Failed to delete crops_cache.pkl: {e}")
         

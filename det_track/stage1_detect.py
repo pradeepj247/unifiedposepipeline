@@ -474,6 +474,7 @@ def run_detection(config):
     # Save crops cache
     import pickle
     crops_cache_path = output_path.parent / 'crops_cache.pkl'
+    print(f"  💾 Saving crops_cache to: {crops_cache_path}")
     with open(crops_cache_path, 'wb') as f:
         pickle.dump(all_crops, f, protocol=pickle.HIGHEST_PROTOCOL)
     
