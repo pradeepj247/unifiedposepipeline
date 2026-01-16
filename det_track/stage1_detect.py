@@ -354,10 +354,14 @@ def run_detection(config):
     all_bboxes = []
     all_confidences = []
     all_classes = []
+    all_detection_indices = []  # NEW: Sequential detection IDs
     num_detections_per_frame = []
     
     # Crop storage for cache
     all_crops = []  # Will store all crops with metadata
+    
+    # Global detection counter for linking detections to crops
+    detection_global_idx = 0
     
     # Process frames
     if verbose:
@@ -393,6 +397,7 @@ def run_detection(config):
             all_bboxes.append(detections[i, :4])
             all_confidences.append(detections[i, 4])
             all_classes.append(classes[i])
+            all_detection_indices.append(detection_global_idx)  # NEW: Store sequential ID
             
             # Extract crop immediately
             x1, y1, x2, y2 = detections[i, :4]
@@ -407,12 +412,16 @@ def run_detection(config):
             if x2 > x1 and y2 > y1:
                 crop = frame[y1:y2, x1:x2].copy()
                 all_crops.append({
+                    'detection_idx': detection_global_idx,  # NEW: Link to detection
                     'frame_idx': frame_idx,
                     'bbox': [x1, y1, x2, y2],
                     'confidence': detections[i, 4],
                     'class_id': classes[i],
                     'crop': crop
                 })
+            
+            # Increment global detection counter
+            detection_global_idx += 1
         
         frame_idx += 1
         pbar.update(1)
@@ -428,6 +437,7 @@ def run_detection(config):
     bboxes = np.array(all_bboxes, dtype=np.float32)
     confidences = np.array(all_confidences, dtype=np.float32)
     classes_array = np.array(all_classes, dtype=np.int64)
+    detection_indices = np.array(all_detection_indices, dtype=np.int64)  # NEW
     num_detections_per_frame = np.array(num_detections_per_frame, dtype=np.int64)
     
     total_detections = len(frame_numbers)
@@ -445,6 +455,7 @@ def run_detection(config):
         bboxes=bboxes,
         confidences=confidences,
         classes=classes_array,
+        detection_indices=detection_indices,  # NEW: Links to crops_cache
         num_detections_per_frame=num_detections_per_frame
     )
     
