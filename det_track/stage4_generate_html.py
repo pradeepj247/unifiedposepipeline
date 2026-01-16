@@ -152,7 +152,7 @@ def main():
             total_frames_3c = max(total_frames_3c, int(frame_numbers[-1]) + 1)
         
         if not verbose:
-            print(f"   ✅ Stage 3c: {len(person_buckets_3c)} persons, {sum(len(c) for c in person_buckets_3c.values())} crops")
+            print(f"   ✅ Stage 3c: {len(person_buckets_3c)} persons")
             
     except FileNotFoundError as e:
         logger.error(str(e))
@@ -187,7 +187,7 @@ def main():
             total_frames_3d = max(total_frames_3d, int(frame_numbers[-1]) + 1)
         
         if not verbose:
-            print(f"   ✅ Stage 3d: {len(person_buckets_3d)} persons, {sum(len(c) for c in person_buckets_3d.values())} crops")
+            print(f"   ✅ Stage 3d: {len(person_buckets_3d)} persons")
             
     except FileNotFoundError as e:
         logger.error(str(e))
@@ -352,8 +352,6 @@ def main():
         logger.info(f"  - WebP files: {len(person_buckets)} animations")
         logger.info(f"  - Persons: {len(person_buckets)}")
         print()
-    
-    logger.success()
     
     # Save timing info
     try:

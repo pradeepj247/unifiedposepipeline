@@ -429,6 +429,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             # Stage 4: Generate HTML Viewer (loads from final_crops.pkl - Phase 5)
             if stage_key == 'stage4':
                 output_dir = config.get('global', {}).get('output_dir', '')
+                print(f"   ✅ Stage 4: Generate HTML Viewer completed in {stage_duration:.2f}s")
                 sidecar_path = Path(output_dir) / 'stage4.timings.json'
                 if sidecar_path.exists():
                     with open(sidecar_path, 'r', encoding='utf-8') as sf:
@@ -443,7 +444,6 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                         if other_overhead < 0 and abs(other_overhead) < 0.05:
                             other_overhead = 0.0
 
-                        print(f"   ✅ Stage 4: Generate HTML Viewer completed in {stage_duration:.2f}s")
                         print(f"      Breakdown (stage parts):")
                         print(f"       webp generation: {webp_time:.2f}s")
                         if clustering_time > 0:
@@ -451,10 +451,7 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
                         print(f"       other overheads: {other_overhead:.2f}s")
                         if verbose:
                             print(f"      Processed {num_persons} persons, {total_crops} total crops")
-                        print(f"{'='*70}")
-                else:
-                    print(f"   ✅ Stage 4: Generate HTML Viewer completed in {stage_duration:.2f}s")
-                    print(f"{'='*70}")
+                print(f"{'='*70}")
 
         except Exception:
             if verbose:
