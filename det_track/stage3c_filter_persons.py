@@ -442,8 +442,9 @@ def run_filter(config):
     logger.info(f"Loading crops cache from Stage 1...")
     t_crop_start = time.time()
     
-    # Load crops_cache.pkl from Stage 1
-    crops_cache_path = Path(canonical_file).parent / 'crops_cache.pkl'
+    # Load crops_cache.pkl from Stage 1 (same directory as detections_raw.npz)
+    stage1_detections_file = config['stage1_detect']['output']['detections_file']
+    crops_cache_path = Path(stage1_detections_file).parent / 'crops_cache.pkl'
     if not crops_cache_path.exists():
         logger.error(f"crops_cache.pkl not found at {crops_cache_path}")
         logger.error("Run Stage 1 first to generate crops_cache.pkl")
