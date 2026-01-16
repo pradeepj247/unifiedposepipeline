@@ -28,8 +28,8 @@ mode: full  # Default mode (fast | balanced | full)
 
 modes:
   fast:
-    description: "Quick analysis (~59s) - 30 crops per person, no ReID merging"
-    crops_per_person: 30
+    description: "Quick analysis (~59s) - 60 crops per person, no ReID merging"
+    crops_per_person: 60
     enable_stage3d: false
     stage4_dual_row: false
   

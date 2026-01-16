@@ -509,21 +509,26 @@ def run_filter(config):
                 logger.warning(f"Person {person_id}: No crops found in cache")
                 continue
             
-            # ========== HYBRID BINNING: QUALITY + TEMPORAL DIVERSITY ==========
+            # ========== 3-BIN TEMPORAL SELECTION: BEGINNING, MIDDLE, END ==========
             # Sort by frame_number for temporal ordering
             person_crops.sort(key=lambda x: x['frame_number'])
             
-            # Divide into bins for temporal spread
-            num_bins = min(10, len(person_crops))  # Max 10 bins, fewer if not enough crops
-            crops_per_bin = (crops_per_person + num_bins - 1) // num_bins  # Ceiling division
+            # Divide into 3 equal bins: beginning, middle, end
+            total_crops = len(person_crops)
+            bin_size = total_crops // 3
+            crops_per_bin = crops_per_person // 3  # Equal distribution across bins
+            
+            # Define bins
+            bins = [
+                person_crops[:bin_size],                    # Beginning
+                person_crops[bin_size:2*bin_size],          # Middle
+                person_crops[2*bin_size:]                   # End
+            ]
             
             selected_crops = []
-            bin_size = max(1, len(person_crops) // num_bins)
-            
-            for i in range(num_bins):
-                start_idx = i * bin_size
-                end_idx = start_idx + bin_size if i < num_bins - 1 else len(person_crops)
-                bin_crops = person_crops[start_idx:end_idx]
+            for bin_idx, bin_crops in enumerate(bins):
+                if len(bin_crops) == 0:
+                    continue
                 
                 # Within each bin: pick best by quality
                 bin_crops_sorted = sorted(bin_crops, key=lambda x: x['combined_score'], reverse=True)
@@ -540,7 +545,7 @@ def run_filter(config):
             })
             
             if verbose:
-                logger.verbose_info(f"Person {person_id}: {len(best_crops)}/{len(person_crops)} best crops selected (hybrid binning: {num_bins} bins)")
+                logger.verbose_info(f"Person {person_id}: {len(best_crops)}/{len(person_crops)} best crops selected (3-bin: beginning/middle/end)")
         
         # Save to final_crops_3c.pkl
         final_crops_path = Path(crops_file)
