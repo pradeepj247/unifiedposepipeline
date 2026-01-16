@@ -509,20 +509,20 @@ def run_filter(config):
                 logger.warning(f"Person {person_id}: No crops found in cache")
                 continue
             
-            # ========== 3-BIN TEMPORAL SELECTION: BEGINNING, MIDDLE, END ==========
+            # ========== 3-BIN CONTIGUOUS SELECTION: BEGINNING, MIDDLE, END ==========
             # Sort by frame_number for temporal ordering
             person_crops.sort(key=lambda x: x['frame_number'])
             
-            # Divide into 3 equal bins: beginning, middle, end
+            # Divide into 3 equal bins: beginning (0-33%), middle (33-67%), end (67-100%)
             total_crops = len(person_crops)
             bin_size = total_crops // 3
-            crops_per_bin = crops_per_person // 3  # Equal distribution across bins
+            crops_per_bin = crops_per_person // 3  # 20 crops per bin for 60 total
             
             # Define bins
             bins = [
-                person_crops[:bin_size],                    # Beginning
-                person_crops[bin_size:2*bin_size],          # Middle
-                person_crops[2*bin_size:]                   # End
+                person_crops[:bin_size],                    # Beginning (0-33%)
+                person_crops[bin_size:2*bin_size],          # Middle (33-67%)
+                person_crops[2*bin_size:]                   # End (67-100%)
             ]
             
             selected_crops = []
@@ -530,22 +530,27 @@ def run_filter(config):
                 if len(bin_crops) == 0:
                     continue
                 
-                # Within each bin: pick best by quality
-                bin_crops_sorted = sorted(bin_crops, key=lambda x: x['combined_score'], reverse=True)
-                selected_crops.extend(bin_crops_sorted[:crops_per_bin])
-            
-            # Trim to exact target count and re-sort by quality for final selection
-            best_crops = sorted(selected_crops, key=lambda x: x['combined_score'], reverse=True)[:crops_per_person]
+                # Find middle of this bin and take 20 contiguous crops
+                bin_len = len(bin_crops)
+                if bin_len <= crops_per_bin:
+                    # If bin has fewer than 20 crops, take all
+                    selected_crops.extend(bin_crops)
+                else:
+                    # Take 20 contiguous crops from middle of bin
+                    mid_point = bin_len // 2
+                    start_idx = max(0, mid_point - crops_per_bin // 2)
+                    end_idx = min(bin_len, start_idx + crops_per_bin)
+                    selected_crops.extend(bin_crops[start_idx:end_idx])
             
             crops_with_quality.append({
                 'person_id': person_id,
-                'crops': best_crops,
+                'crops': selected_crops,
                 'total_available': len(person_crops),
-                'selected_count': len(best_crops)
+                'selected_count': len(selected_crops)
             })
             
             if verbose:
-                logger.verbose_info(f"Person {person_id}: {len(best_crops)}/{len(person_crops)} best crops selected (3-bin: beginning/middle/end)")
+                logger.verbose_info(f"Person {person_id}: {len(selected_crops)}/{len(person_crops)} contiguous crops selected (3-bin: 20 from middle of beginning/middle/end)")
         
         # Save to final_crops_3c.pkl
         final_crops_path = Path(crops_file)
