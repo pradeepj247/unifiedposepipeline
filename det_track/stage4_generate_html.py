@@ -248,7 +248,8 @@ def main():
                     person_buckets_3c = {}
                     for person_data in crops_3c_data['crops_with_quality']:
                         person_id = person_data['person_id']
-                        person_buckets_3c[person_id] = person_data['crops']
+                        # Extract numpy arrays from crop dicts
+                        person_buckets_3c[person_id] = [c['crop'] for c in person_data['crops']]
                 else:
                     # Legacy format
                     person_buckets_3c = {pid: crops_3c_data['crops'][pid] for pid in crops_3c_data['person_ids']}
