@@ -356,12 +356,15 @@ def run_detection(config):
     all_classes = []
     num_detections_per_frame = []
     
+    # Crop storage for cache
+    all_crops = []  # Will store all crops with metadata
+    
     # Process frames
     if verbose:
-        print(f"⚡ Running detection...")
+        print(f"⚡ Running detection and crop extraction...")
     t_loop_start = time.time()
     
-    pbar = tqdm(total=num_frames, desc="  🔍 Detecting", mininterval=1.0)
+    pbar = tqdm(total=num_frames, desc="  🔍 Detecting + extracting crops", mininterval=1.0)
     
     frame_idx = 0
     while frame_idx < num_frames:
@@ -390,6 +393,26 @@ def run_detection(config):
             all_bboxes.append(detections[i, :4])
             all_confidences.append(detections[i, 4])
             all_classes.append(classes[i])
+            
+            # Extract crop immediately
+            x1, y1, x2, y2 = detections[i, :4]
+            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+            
+            # Clamp to frame boundaries
+            x1 = max(0, min(x1, width))
+            x2 = max(0, min(x2, width))
+            y1 = max(0, min(y1, height))
+            y2 = max(0, min(y2, height))
+            
+            if x2 > x1 and y2 > y1:
+                crop = frame[y1:y2, x1:x2].copy()
+                all_crops.append({
+                    'frame_idx': frame_idx,
+                    'bbox': [x1, y1, x2, y2],
+                    'confidence': detections[i, 4],
+                    'class_id': classes[i],
+                    'crop': crop
+                })
         
         frame_idx += 1
         pbar.update(1)
@@ -398,8 +421,7 @@ def run_detection(config):
     cap.release()
     
     t_loop_end = time.time()
-    t_loop_total = t_loop_end - t_loop_start
-    processing_fps = num_frames / t_loop_total if t_loop_total > 0 else 0
+    t_detect_extract_time = t_loop_end - t_loop_start  # t1: detection + crop extraction
     
     # Convert to numpy arrays
     frame_numbers = np.array(all_frame_numbers, dtype=np.int64)
@@ -408,21 +430,15 @@ def run_detection(config):
     classes_array = np.array(all_classes, dtype=np.int64)
     num_detections_per_frame = np.array(num_detections_per_frame, dtype=np.int64)
     
-    # Summary
     total_detections = len(frame_numbers)
-    avg_detections_per_frame = total_detections / num_frames if num_frames > 0 else 0
     
-    print(f"     Detection complete!")
-    print(f"     Total detections: {total_detections}")
-    print(f"     Avg detections/frame: {avg_detections_per_frame:.1f}")
-    print(f"     Processing FPS: {processing_fps:.1f}")
-    print(f"     Detection time: {t_loop_total:.2f}s\n")
-    
-    # Save NPZ
+    # Save detections NPZ and crops cache
     output_path = Path(detections_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
-    t_npz_start = time.time()
+    t_save_start = time.time()
+    
+    # Save detections NPZ
     np.savez_compressed(
         output_path,
         frame_numbers=frame_numbers,
@@ -431,39 +447,48 @@ def run_detection(config):
         classes=classes_array,
         num_detections_per_frame=num_detections_per_frame
     )
-    t_npz_end = time.time()
-    npz_save_time = t_npz_end - t_npz_start
-
-    file_size_mb = output_path.stat().st_size / (1024 * 1024)
-    print(f"     Saved: {output_path.name}")
-    if verbose:
-        print(f"     Size: {file_size_mb:.1f} MB")
-        print(f"     Shape: {total_detections} detections across {num_frames} frames")
-    print(f"     NPZ save time: {npz_save_time:.2f}s")
-
-    # Print full timing breakdown
-    sum_parts = model_load_time + video_open_time + t_loop_total + npz_save_time
-
-    print(f"     Breakdown:")
-    print(f"       model load: {model_load_time:.2f}s")
-    print(f"       video open: {video_open_time:.2f}s")
-    print(f"       detection loop: {t_loop_total:.2f}s")
-    print(f"       npz save: {npz_save_time:.2f}s")
-    print(f"     Sum of parts: {sum_parts:.2f}s")
+    
+    # Save crops cache
+    import pickle
+    crops_cache_path = output_path.parent / 'crops_cache.pkl'
+    with open(crops_cache_path, 'wb') as f:
+        pickle.dump(all_crops, f, protocol=pickle.HIGHEST_PROTOCOL)
+    
+    t_save_end = time.time()
+    t_save_time = t_save_end - t_save_start  # t2: saving time
+    
+    # Total time (t1 + t2)
+    t_total = t_detect_extract_time + t_save_time
+    
+    # FPS calculation
+    processing_fps = num_frames / t_total if t_total > 0 else 0
+    
+    crops_cache_size_mb = crops_cache_path.stat().st_size / (1024 * 1024)
+    
+    # Clean output: show only 4 key metrics
+    print(f"\n  ✅ Detection + Crop Extraction: {t_detect_extract_time:.2f}s")
+    print(f"  ✅ Saving (NPZ + crops cache): {t_save_time:.2f}s")
+    print(f"  ✅ Total time: {t_total:.2f}s")
+    print(f"  ✅ FPS: {processing_fps:.1f}")
+    print(f"\n  📊 {total_detections} detections, {len(all_crops)} crops extracted")
+    print(f"  💾 crops_cache.pkl: {crops_cache_size_mb:.1f} MB")
     print()
 
-    # Write a sidecar JSON with fine-grained timings for the orchestrator to read
+    # Write a sidecar JSON with timings
     try:
         sidecar = {
             'timestamp': datetime.now(timezone.utc).isoformat(),
             'model_load_time': float(model_load_time),
-            'video_open_time': float(video_open_time),
-            'detect_loop_time': float(t_loop_total),
-            'npz_save_time': float(npz_save_time),
-            'sum_parts': float(sum_parts),
+            'detect_extract_time': float(t_detect_extract_time),  # t1
+            'save_time': float(t_save_time),  # t2
+            'total_time': float(t_total),  # t1 + t2
+            'fps': float(processing_fps),
             'num_frames': int(num_frames),
             'total_detections': int(total_detections),
-            'detections_file': str(output_path)
+            'total_crops': len(all_crops),
+            'crops_cache_size_mb': float(crops_cache_size_mb),
+            'detections_file': str(output_path),
+            'crops_cache_file': str(crops_cache_path)
         }
 
         sidecar_path = output_path.parent / (output_path.name + '.timings.json')
@@ -471,11 +496,11 @@ def run_detection(config):
             json.dump(sidecar, sf, indent=2)
 
         if verbose:
-            print(f"     Wrote timings sidecar: {sidecar_path.name}")
+            print(f"  Wrote timings sidecar: {sidecar_path.name}")
     except Exception:
         # Non-fatal: sidecar write failure shouldn't stop the pipeline
         if verbose:
-            print("     ⚠️  Failed to write timings sidecar")
+            print("  ⚠️  Failed to write timings sidecar")
     
     return {
         'detections_file': str(output_path),
