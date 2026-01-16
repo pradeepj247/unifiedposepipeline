@@ -221,28 +221,21 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             matched = False
             print(f"   DEBUG: Processing spec: '{spec}'")
             
-            try:
-                # Try as number first
-                stage_num = int(spec)
-                if 1 <= stage_num <= len(all_stages):
-                    stages.append(all_stages[stage_num - 1])
-                    stage_nums.append(str(stage_num))
+            # Only allow stage keys (0, 1, 2, 3a, 3b, 3c, 3d, 4), not numeric positions
+            # Try as stage key - handle shorthand (3c, 3d) or full key (stage3c, stage3d)
+            search_key = spec if spec.startswith('stage') else f'stage{spec}'
+            print(f"   DEBUG: Trying as key: '{search_key}'")
+            for idx, (name, script, key) in enumerate(all_stages):
+                if key == search_key:
+                    stages.append((name, script, key))
+                    stage_nums.append(key)
                     matched = True
-                    print(f"   DEBUG: Matched as number {stage_num} → {all_stages[stage_num - 1][0]}")
-            except ValueError:
-                # Try as stage key - handle shorthand (3c, 3d) or full key (stage3c, stage3d)
-                search_key = spec if spec.startswith('stage') else f'stage{spec}'
-                print(f"   DEBUG: Not a number, trying as key: '{search_key}'")
-                for idx, (name, script, key) in enumerate(all_stages):
-                    if key == search_key:
-                        stages.append((name, script, key))
-                        stage_nums.append(f"{idx+1}")
-                        matched = True
-                        print(f"   DEBUG: Matched key '{search_key}' → stage {idx+1}: {name}")
-                        break
+                    print(f"   DEBUG: Matched '{search_key}' → {name}")
+                    break
             
             if not matched:
-                print(f"   WARNING: Could not match spec '{spec}'")
+                print(f"   ❌ ERROR: Could not match spec '{spec}'. Valid stages: 0, 1, 2, 3a, 3b, 3c, 3d, 4")
+                print(f"   Example: --stages 3b,3c,3d,4")
         
         print(f"   Running pipeline stages: {', '.join(stage_nums)}")
     else:
@@ -528,8 +521,13 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
             config.get('stage3b_group', {}).get('output', {}).get('grouping_log_file', 'N/A')
         ],
         'stage3c': [
-            config.get('stage3c_rank', {}).get('output', {}).get('primary_person_file', 'N/A'),
-            config.get('stage3c_rank', {}).get('output', {}).get('ranking_report_file', 'N/A')
+            config.get('stage3c_filter', {}).get('output', {}).get('canonical_persons_filtered_file', 'N/A'),
+            config.get('stage3c_filter', {}).get('output', {}).get('final_crops_file', 'N/A')
+        ],
+        'stage3d': [
+            config.get('stage3d_refine', {}).get('output', {}).get('canonical_persons_merged_file', 'N/A'),
+            config.get('stage3d_refine', {}).get('output', {}).get('final_crops_merged_file', 'N/A'),
+            config.get('stage3d_refine', {}).get('output', {}).get('merging_report_file', 'N/A')
         ],
         'stage4': config.get('stage4_generate_html', {}).get('output', {}).get('webp_dir', 'N/A'),
     }
