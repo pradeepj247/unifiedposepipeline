@@ -484,34 +484,11 @@ def run_refine(config):
     
     num_merged = sum(1 for c in components if len(c) > 1)
     
-    # Print merge groups
-    print(f"   === MERGE GROUPS ===")
+    # Print final summary only (detailed groups already shown in HIGH SIMILARITY section)
     if num_merged == 0:
-        print(f"   ✓ No merges needed - all persons are distinct")
-        print(f"   Final: {len(components)} persons (same as input)\n")
+        print(f"\n   Final: {len(components)} persons (same as input)\n")
     else:
-        print(f"   Found {num_merged} group(s) to merge:")
-        merge_group_num = 1  # Sequential counter for merged groups only
-        for component in components:
-            component_sorted = sorted(component)
-            if len(component_sorted) > 1:
-                print(f"\n      Group {merge_group_num}: {len(component_sorted)} persons merged")
-                print(f"         IDs: {', '.join([f'person_{p}' for p in component_sorted])}")
-                print(f"         → Merged into: person_{component_sorted[0]}")
-                
-                # Show pairwise similarities within this group
-                pairs_in_group = [(min(id1, id2), max(id1, id2)) for id1, id2 in combinations(component_sorted, 2)]
-                print(f"         Similarities:")
-                for pair in pairs_in_group:
-                    sim = pair_similarities.get(pair, -1)
-                    if sim >= 0:
-                        print(f"            person_{pair[0]} ↔ person_{pair[1]}: {sim:.4f}")
-                
-                merge_group_num += 1  # Increment only for merged groups
-        
         print(f"\n   Final: {len(components)} persons ({len(components) - num_merged} singles + {num_merged} merged)\n")
-    
-    logger.found(f"{num_merged} person group(s) identified (merges needed)")
     
     # Merge crops and persons
     logger.info(f"Merging crops and canonical persons...")

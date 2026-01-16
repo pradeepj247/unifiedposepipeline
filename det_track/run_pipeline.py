@@ -133,13 +133,15 @@ def run_stage(stage_name, stage_script, config_path, verbose=False):
     # Stage 2: Tracking - compact message (stage prints own breakdown)
     elif 'Stage 2' in stage_name or 'Tracking' in stage_name:
         print(f"  ✅ {stage_name} completed")
-    # Stage 3a, 3b, 3c, 4 - completion with breakdown printed by orchestrator
+    # Stage 3a, 3b, 3c, 3d, 4 - completion with breakdown printed by orchestrator or by stage itself
     elif 'Stage 3a' in stage_name or 'Tracklet Analysis' in stage_name:
         pass  # Will print completion with breakdown below
     elif 'Stage 3b' in stage_name or 'Canonical Grouping' in stage_name:
         pass  # Will print completion with breakdown below
     elif 'Stage 3c' in stage_name or 'Person Ranking' in stage_name:
         pass  # Will print completion with breakdown below
+    elif 'Stage 3d' in stage_name or 'Visual Refinement' in stage_name:
+        pass  # Stage 3d prints its own completion via logger.success()
     elif 'Stage 4' in stage_name or 'Generate HTML Viewer' in stage_name:
         pass  # Will print completion with breakdown below
     else:
@@ -215,22 +217,17 @@ def run_pipeline(config_path, stages_to_run=None, verbose=False, force=False):
         stages = []
         stage_nums = []
         
-        print(f"   DEBUG: Parsing stage specs: {stage_specs}")
-        
         for spec in stage_specs:
             matched = False
-            print(f"   DEBUG: Processing spec: '{spec}'")
             
             # Only allow stage keys (0, 1, 2, 3a, 3b, 3c, 3d, 4), not numeric positions
             # Try as stage key - handle shorthand (3c, 3d) or full key (stage3c, stage3d)
             search_key = spec if spec.startswith('stage') else f'stage{spec}'
-            print(f"   DEBUG: Trying as key: '{search_key}'")
             for idx, (name, script, key) in enumerate(all_stages):
                 if key == search_key:
                     stages.append((name, script, key))
                     stage_nums.append(key)
                     matched = True
-                    print(f"   DEBUG: Matched '{search_key}' → {name}")
                     break
             
             if not matched:

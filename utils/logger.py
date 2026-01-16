@@ -185,7 +185,7 @@ class PipelineLogger:
         print(f"   {error_emoji} ERROR: {message}")
     
     def success(self):
-        """Print completion message with elapsed time. Uses completed emoji #11."""
-        completed_emoji = self._get_emoji('completed')
+        """Print completion message with elapsed time. Uses success emoji #1."""
+        success_emoji = self._get_emoji('success')
         elapsed = time.time() - self._stage_start_time
-        print(f"\n{completed_emoji} {self.stage_name} completed in {elapsed:.2f}s")
+        print(f"\n{success_emoji} {self.stage_name} completed in {elapsed:.2f}s")
