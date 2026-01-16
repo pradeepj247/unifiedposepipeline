@@ -7,7 +7,7 @@ Then applies late-appearance penalty within the top 10 (may reduce to ~8).
 Extracts crops for each selected person.
 
 Input: canonical_persons.npz (40+ persons from Stage 3b)
-Output: canonical_persons_filtered.npz (8-10 persons), final_crops.pkl (8-10 persons with crops)
+Output: canonical_persons_3c.npz (8-10 persons), final_crops_3c.pkl (8-10 persons with crops)
 
 Ranking criteria (with weights):
 - Duration (40%): How long person appears in video
@@ -17,8 +17,8 @@ Ranking criteria (with weights):
 - Late-appearance penalty: Applied to top 10, persons starting after 50% get penalized (up to 30%)
 
 Output files:
-- canonical_persons_filtered.npz: Filtered persons (input for Stage 3d)
-- final_crops.pkl: Crops for filtered persons (input for Stage 3d)
+- canonical_persons_3c.npz: Filtered persons (input for Stage 3d)
+- final_crops_3c.pkl: Crops for filtered persons (input for Stage 3d)
 
 Usage:
     python stage3c_filter_persons.py --config configs/pipeline_config.yaml
@@ -410,7 +410,7 @@ def run_filter(config):
         }
     }
     
-    sidecar_path = output_path.parent / 'stage3c_filtering.json'
+    sidecar_path = output_path.parent / 'stage3c_sidecar.json'
     with open(sidecar_path, 'w', encoding='utf-8') as f:
         json.dump(filtering_details, f, indent=2)
     

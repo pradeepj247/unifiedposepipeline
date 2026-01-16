@@ -6,8 +6,8 @@ Uses OSNet embeddings to identify and merge split detections of the same person.
 Takes output from Stage 3c (8-10 persons) and potentially reduces via ReID merging.
 
 Input:
-  - canonical_persons_filtered.npz: Filtered persons from Stage 3c (8-10 persons)
-  - final_crops.pkl: Crops extracted by Stage 3c (8-10 persons, 50 crops each)
+  - canonical_persons_3c.npz: Filtered persons from Stage 3c (8-10 persons)
+  - final_crops_3c.pkl: Crops extracted by Stage 3c (8-10 persons, 50 crops each)
 
 Algorithm:
   1. Load crops and canonical persons from Stage 3c
@@ -16,12 +16,13 @@ Algorithm:
   4. Compute cosine similarity for all pairs
   5. Build connected components (Union-Find) for same-person chains
   6. Merge crops and canonical person records
-  7. Output merged files (OVERWRITE Stage 3c outputs with same filenames)
+  7. Output merged files with _3d suffix
 
-Output (overwrites Stage 3c outputs):
-  - canonical_persons_filtered.npz: Merged persons (potentially fewer than input)
-  - final_crops.pkl: Merged crops (potentially fewer than input)
+Output:
+  - canonical_persons_3d.npz: Merged persons (potentially fewer than input)
+  - final_crops_3d.pkl: Merged crops (potentially fewer than input)
   - merging_report.json: Details of detected person chains
+  - stage3d_sidecar.json: Debug info (similarity matrix, merge groups)
 
 Note: If no merges found, outputs are identical to inputs (just copied).
 
@@ -633,7 +634,7 @@ def run_refine(config):
         }
     }
     
-    sidecar_path = output_report_path.parent / 'stage3d_reid.json'
+    sidecar_path = output_report_path.parent / 'stage3d_sidecar.json'
     with open(sidecar_path, 'w', encoding='utf-8') as f:
         json.dump(reid_details, f, indent=2)
     
