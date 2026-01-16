@@ -258,7 +258,7 @@ stage3d_refine:
 # ============================================================================
 # Reads final_crops.pkl (after Stage 3d merging) and generates WebP gallery + HTML viewer.
 # No additional filtering or OSNet processing - just visualization.
-#
+stage4_generate_html:
   # Input files
   video_file: ${outputs_dir}/${current_video}/canonical_video.mp4
   final_crops_file: ${outputs_dir}/${current_video}/final_crops.pkl
