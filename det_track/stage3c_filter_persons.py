@@ -223,9 +223,15 @@ def run_filter(config):
     if canonical_video_path.exists():
         video_path = canonical_video_path
     else:
-        # Fallback to original video_file from config
-        video_path = config.get('global', {}).get('video_file', '')
-        if not video_path:
+        # Fallback to original video_file from config (construct full path)
+        video_dir = config.get('global', {}).get('video_dir', '')
+        video_file = config.get('global', {}).get('video_file', '')
+        if video_dir and video_file:
+            video_path = Path(video_dir) / video_file
+        elif video_file:
+            # video_file might already be a full path
+            video_path = Path(video_file)
+        else:
             logger.error("video_file not configured and canonical_video.mp4 not found")
             return
     
