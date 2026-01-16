@@ -405,6 +405,22 @@ def create_dual_row_html_viewer(
         verbose: Enable verbose output
     """
     
+    # Create color mapping for merge groups
+    merge_colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2']
+    person_to_color = {}  # Maps person_id -> color
+    
+    if merge_info:
+        for idx, merge in enumerate(merge_info):
+            color = merge_colors[idx % len(merge_colors)]
+            merged_ids = merge.get('merged_persons', [])
+            result_id = merge.get('result_person_id')
+            
+            # Assign color to all persons in this merge group
+            for pid in merged_ids:
+                person_to_color[pid] = color
+            if result_id:
+                person_to_color[result_id] = color
+    
     # Build 3c person cards (sorted chronologically)
     person_cards_3c = []
     sorted_person_ids_3c = sorted(
@@ -427,8 +443,14 @@ def create_dual_row_html_viewer(
         webp_base64 = webp_base64_dict_3c.get(person_id, '')
         data_uri = f"data:image/webp;base64,{webp_base64}"
         
+        # Add merge color styling if this person is in a merge group
+        merge_color = person_to_color.get(person_id, '')
+        border_style = f"border-left: 5px solid {merge_color};" if merge_color else ""
+        badge_html = f'<div class="merge-badge" style="background: {merge_color};"></div>' if merge_color else ""
+        
         card_html = f"""
-        <div class="person-card person-card-3c" data-person-id="{person_id}">
+        <div class="person-card person-card-3c" data-person-id="{person_id}" style="{border_style}">
+            {badge_html}
             <div class="person-header">
                 <h3>Person {person_id}</h3>
                 <span class="person-info">Frames: {start_frame}-{end_frame} ({presence_pct:.1f}%)</span>
@@ -465,8 +487,14 @@ def create_dual_row_html_viewer(
         webp_base64 = webp_base64_dict_3d.get(person_id, '')
         data_uri = f"data:image/webp;base64,{webp_base64}"
         
+        # Add merge color styling if this person is in a merge group
+        merge_color = person_to_color.get(person_id, '')
+        border_style = f"border-left: 5px solid {merge_color};" if merge_color else ""
+        badge_html = f'<div class="merge-badge" style="background: {merge_color};"></div>' if merge_color else ""
+        
         card_html = f"""
-        <div class="person-card person-card-3d" data-person-id="{person_id}" data-rank="{rank}" onclick="selectPerson({person_id})">
+        <div class="person-card person-card-3d" data-person-id="{person_id}" data-rank="{rank}" onclick="selectPerson({person_id})" style="{border_style}">
+            {badge_html}
             <div class="person-header">
                 <h3>Person {rank} (ID #{person_id})</h3>
                 <span class="person-info">Frames: {start_frame}-{end_frame} ({presence_pct:.1f}%)</span>
@@ -572,6 +600,19 @@ def create_dual_row_html_viewer(
             overflow: hidden;
             transition: all 0.3s ease;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: relative;
+        }}
+        
+        .merge-badge {{
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.8);
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }}
         
         .person-card-3d {{

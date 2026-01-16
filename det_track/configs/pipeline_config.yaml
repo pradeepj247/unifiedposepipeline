@@ -237,8 +237,8 @@ stage3d_refine:
     num_crops_per_person: 16               # Use top 16 crops for feature extraction
   
   merging:
-    temporal_gap_max: 60                   # Max frames between persons (gap > this = separate persons)
-    temporal_overlap_tolerance: 15         # Allow up to 15 frames of overlap
+    temporal_gap_max: 15                   # Max frames between persons (gap > this = separate persons)
+    temporal_overlap_tolerance: 15         # Allow up to 15 frames of overlap (small overlaps OK)
     similarity_threshold: 0.60             # Cosine similarity threshold (0-1)
   
   input:

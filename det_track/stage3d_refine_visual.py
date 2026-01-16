@@ -232,7 +232,7 @@ def check_temporal_overlap(frame_range1: Tuple[int, int], frame_range2: Tuple[in
 
 
 def find_non_overlapping_pairs(person_info: Dict, temporal_gap_max: int, overlap_tolerance: int) -> List[Tuple[int, int]]:
-    """Find all pairs with minimal temporal overlap and reasonable gaps"""
+    """Find pairs with small temporal gaps OR small overlaps (within -15 to +15 frames)"""
     person_ids = sorted(person_info.keys())
     pairs = []
     
@@ -242,14 +242,24 @@ def find_non_overlapping_pairs(person_info: Dict, temporal_gap_max: int, overlap
             range1 = (person_info[id1]['min_frame'], person_info[id1]['max_frame'])
             range2 = (person_info[id2]['min_frame'], person_info[id2]['max_frame'])
             
-            if not check_temporal_overlap(range1, range2, overlap_tolerance=overlap_tolerance):
-                # Calculate gap
+            # Calculate overlap or gap
+            overlap_start = max(range1[0], range2[0])
+            overlap_end = min(range1[1], range2[1])
+            
+            if overlap_end >= overlap_start:
+                # They overlap
+                overlap_size = overlap_end - overlap_start + 1
+                # Accept small overlaps (≤ overlap_tolerance)
+                if overlap_size <= overlap_tolerance:
+                    pairs.append((id1, id2))
+            else:
+                # They don't overlap - calculate gap
                 if range1[1] < range2[0]:
                     gap = range2[0] - range1[1]
                 else:
                     gap = range1[0] - range2[1]
                 
-                # Only consider pairs with reasonable gaps
+                # Accept small gaps (≤ temporal_gap_max)
                 if gap <= temporal_gap_max:
                     pairs.append((id1, id2))
     
@@ -481,10 +491,11 @@ def run_refine(config):
         print(f"   Final: {len(components)} persons (same as input)\n")
     else:
         print(f"   Found {num_merged} group(s) to merge:")
-        for group_idx, component in enumerate(components, 1):
+        merge_group_num = 1  # Sequential counter for merged groups only
+        for component in components:
             component_sorted = sorted(component)
             if len(component_sorted) > 1:
-                print(f"\n      Group {group_idx}: {len(component_sorted)} persons merged")
+                print(f"\n      Group {merge_group_num}: {len(component_sorted)} persons merged")
                 print(f"         IDs: {', '.join([f'person_{p}' for p in component_sorted])}")
                 print(f"         → Merged into: person_{component_sorted[0]}")
                 
@@ -495,6 +506,8 @@ def run_refine(config):
                     sim = pair_similarities.get(pair, -1)
                     if sim >= 0:
                         print(f"            person_{pair[0]} ↔ person_{pair[1]}: {sim:.4f}")
+                
+                merge_group_num += 1  # Increment only for merged groups
         
         print(f"\n   Final: {len(components)} persons ({len(components) - num_merged} singles + {num_merged} merged)\n")
     
