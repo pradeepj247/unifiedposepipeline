@@ -213,11 +213,19 @@ def run_filter(config):
     video_height = config.get('global', {}).get('video_height', 1080)
     video_fps = config.get('global', {}).get('video_fps', 30)
     
-    # Get video path for metadata
-    video_path = config.get('global', {}).get('video_file', '')
-    if not video_path:
-        logger.error("video_file not configured in global section")
-        return
+    # Get video path - try canonical video first (from Stage 0), then fallback to original
+    output_dir = Path(filtered_file).parent
+    video_name = config.get('global', {}).get('current_video', 'canonical_video')
+    canonical_video_path = output_dir.parent / video_name / 'canonical_video.mp4'
+    
+    if canonical_video_path.exists():
+        video_path = canonical_video_path
+    else:
+        # Fallback to original video_file from config
+        video_path = config.get('global', {}).get('video_file', '')
+        if not video_path:
+            logger.error("video_file not configured and canonical_video.mp4 not found")
+            return
     
     # Read ACTUAL frame count from video (not config default)
     cap = cv2.VideoCapture(str(video_path))
