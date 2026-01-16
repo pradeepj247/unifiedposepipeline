@@ -513,25 +513,25 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
         .select-radio input[type="radio"] {{
             appearance: none;
             -webkit-appearance: none;
-            width: 28px;
-            height: 28px;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
-            background: rgba(76, 175, 80, 0.3);
-            border: 2px solid #4CAF50;
+            background: rgba(100, 100, 100, 0.3);
+            border: 2px solid #2196F3;
             cursor: pointer;
             position: relative;
             transition: all 0.3s ease;
         }}
         
         .select-radio input[type="radio"]:hover {{
-            background: rgba(76, 175, 80, 0.5);
-            box-shadow: 0 0 15px rgba(76, 175, 80, 0.6);
+            background: rgba(33, 150, 243, 0.3);
+            box-shadow: 0 0 15px rgba(33, 150, 243, 0.6);
             transform: scale(1.1);
         }}
         
         .select-radio input[type="radio"]:checked {{
             background: #4CAF50;
-            border-color: #45a049;
+            border-color: #2196F3;
             box-shadow: 0 0 20px rgba(76, 175, 80, 0.8);
             animation: pulse 1.5s infinite;
         }}
