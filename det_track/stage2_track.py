@@ -94,13 +94,17 @@ def load_config(config_path):
 def load_detections(detections_file):
     """Load detections from NPZ file"""
     data = np.load(detections_file)
-    return {
+    result = {
         'frame_numbers': data['frame_numbers'],
         'bboxes': data['bboxes'],
         'confidences': data['confidences'],
         'classes': data['classes'],
         'num_detections_per_frame': data['num_detections_per_frame']
     }
+    # Load global detection indices (from Stage 1 eager extraction)
+    if 'detection_indices' in data:
+        result['detection_indices'] = data['detection_indices']
+    return result
 
 
 def reconstruct_detections_per_frame(detections_data):
@@ -109,6 +113,7 @@ def reconstruct_detections_per_frame(detections_data):
     bboxes = detections_data['bboxes']
     confidences = detections_data['confidences']
     classes = detections_data['classes']
+    detection_indices = detections_data.get('detection_indices', None)
     
     # Get unique frame numbers
     unique_frames = np.unique(frame_numbers)
@@ -116,11 +121,15 @@ def reconstruct_detections_per_frame(detections_data):
     detections_by_frame = {}
     for frame_id in unique_frames:
         mask = frame_numbers == frame_id
-        detections_by_frame[frame_id] = {
+        frame_data = {
             'bboxes': bboxes[mask],
             'confidences': confidences[mask],
             'classes': classes[mask]
         }
+        # Include global detection indices if available
+        if detection_indices is not None:
+            frame_data['detection_indices'] = detection_indices[mask]
+        detections_by_frame[frame_id] = frame_data
     
     return detections_by_frame, unique_frames
 
@@ -280,7 +289,10 @@ def run_tracking(config):
             # Store tracklets
             # tracked: (N, 8) = [x1, y1, x2, y2, track_id, conf, cls, det_ind]
             if len(tracked) > 0:
-                for track in tracked:
+                # Get global detection indices for this frame (if available)
+                frame_global_indices = frame_data.get('detection_indices', None)
+                
+                for idx, track in enumerate(tracked):
                     track_id = int(track[4])
                     bbox = track[:4].astype(np.float32)
                     conf = float(track[5])
@@ -293,14 +305,20 @@ def run_tracking(config):
                             'detection_indices': []
                         }
                     
-                    # Extract detection index from ByteTrack output
-                    # tracked: (N, 8) = [x1, y1, x2, y2, track_id, conf, cls, det_ind]
-                    det_ind = int(track[7]) if len(track) > 7 else -1
+                    # Map to global detection index from Stage 1
+                    # ByteTrack's det_ind (track[7]) is the index within this frame's detections
+                    frame_local_idx = int(track[7]) if len(track) > 7 else -1
+                    
+                    # Convert frame-local index to global detection_idx
+                    if frame_global_indices is not None and 0 <= frame_local_idx < len(frame_global_indices):
+                        global_det_idx = int(frame_global_indices[frame_local_idx])
+                    else:
+                        global_det_idx = -1  # No linkage available
                     
                     tracklets_dict[track_id]['frame_numbers'].append(int(frame_id))
                     tracklets_dict[track_id]['bboxes'].append(bbox)
                     tracklets_dict[track_id]['confidences'].append(conf)
-                    tracklets_dict[track_id]['detection_indices'].append(det_ind)
+                    tracklets_dict[track_id]['detection_indices'].append(global_det_idx)
         
         except Exception as e:
             # Tracker error - skip this frame
