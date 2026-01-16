@@ -455,65 +455,68 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
             overflow-x: auto;
             padding: 20px;
             scroll-behavior: smooth;
+            background: #f5f5f5;
         }}
         
         .person-card {{
-            flex: 0 0 200px;
-            min-width: 200px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 12px;
+            flex: 0 0 180px;
+            min-width: 180px;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
             overflow: hidden;
             transition: all 0.3s ease;
-            border: 2px solid transparent;
-            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            cursor: pointer;
         }}
         
         .person-card:hover {{
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(76, 175, 80, 0.3);
             border-color: #4CAF50;
+            box-shadow: 0 6px 16px rgba(76, 175, 80, 0.3);
+            transform: scale(1.05);
         }}
         
         .person-header {{
-            padding: 20px;
-            background: rgba(0,0,0,0.3);
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding: 10px;
+            text-align: center;
         }}
         
         .person-header h3 {{
-            font-size: 1.5em;
+            font-size: 18px;
+            font-weight: bold;
             color: #4CAF50;
-            margin-bottom: 8px;
+            margin: 0 0 10px 0;
         }}
         
         .person-info {{
-            color: #888;
-            font-size: 0.9em;
+            font-size: 12px;
+            color: #aaa;
+            display: block;
+            margin-bottom: 5px;
         }}
         
         .person-animation {{
-            padding: 20px;
             display: flex;
             justify-content: center;
-            align-items: center;
-            background: rgba(0,0,0,0.2);
-            min-height: 300px;
+            background: #1a1a1a;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 0 10px 10px 10px;
         }}
         
         .webp-animation {{
             max-width: 100%;
             height: auto;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            border-radius: 4px;
         }}
         
         .select-btn {{
             width: 100%;
-            padding: 15px;
+            padding: 10px;
             background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
             color: white;
             border: none;
-            font-size: 1.1em;
+            font-size: 14px;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.3s ease;
