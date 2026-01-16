@@ -369,7 +369,7 @@ def run_filter(config):
         "stage": "stage3c",
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
         "input": {
-            "total_persons": len(canonical_persons_list),
+            "total_persons": len(all_persons),
             "min_duration_threshold": min_duration_frames
         },
         "removed_by_duration": [
