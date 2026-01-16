@@ -440,14 +440,16 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
         }}
         
         .gallery {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 30px;
-            max-width: 1400px;
-            margin: 0 auto;
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding: 20px;
+            scroll-behavior: smooth;
         }}
         
         .person-card {{
+            flex: 0 0 320px;
+            min-width: 320px;
             background: rgba(255,255,255,0.05);
             border-radius: 12px;
             overflow: hidden;
