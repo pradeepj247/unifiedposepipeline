@@ -801,7 +801,7 @@ def create_dual_row_html_viewer(
 <body>
     <div class="header">
         <h1>🔍 Person Selection Viewer{' - Debug Mode' if dual_row_mode else ''}</h1>
-        <p>{'Comparing Stage 3c (before merge) vs Stage 3d (after merge)' if dual_row_mode else 'Stage 3d Outputs (after merge)'}</p>
+        <p>{'Comparing Stage 3c (before merge) vs Stage 3d (after merge)' if dual_row_mode else 'Select person for pose estimation'}</p>
     </div>
     
     {f'''<h2 class="section-title">Stage 3C Outputs ({len(person_buckets_3c)} persons) - Before Merge</h2>
@@ -812,7 +812,7 @@ def create_dual_row_html_viewer(
     {merge_panel_html}
     ''' if dual_row_mode else ''}
     
-    <h2 class="section-title">Stage 3D Outputs ({len(person_buckets_3d)} persons){' - After Merge' if dual_row_mode else ''}</h2>
+    <h2 class="section-title">{'Stage 3D Outputs' if dual_row_mode else 'Stage 3C Outputs'} ({len(person_buckets_3d)} persons){' - After Merge' if dual_row_mode else ''}</h2>
     <div class="gallery">
         {''.join(person_cards_3d)}
     </div>
