@@ -189,17 +189,18 @@ stage3b_group:
 #    - Result: typically 8-10 persons remain
 stage3c_filter:
   filtering:
-    top_n: 10                              # First, select top 10 persons
-    penalty_threshold: 0.7                 # Then, remove if penalty < this (0.7 = allows up to 30% penalty)
+    min_duration_frames: 150               # STEP 0: Minimum 5 seconds (150 frames at 30fps) - removes short persons early
+    top_n: 10                              # STEP 1: Select top 10 persons from filtered candidates
+    penalty_threshold: 0.75                # STEP 2: Remove if penalty < this (0.75 = allows max 25% penalty; catches very late persons)
     crops_per_person: 50                   # Extract 50 crops per person
     
     # Ranking weights (must sum to 1.0)
     weights:
       duration: 0.4                        # Longest presence
-      coverage: 0.3                        # Best frame coverage
-      center: 0.2                          # Center alignment
-      smoothness: 0.1                      # Motion stability
-      max_appearance_ratio: 0.5            # Penalty starts after 50% of video
+      coverage: 0.3                        # Best frame coverage (% of timespan actually detected)
+      center: 0.2                          # Center alignment (main action usually center)
+      smoothness: 0.1                      # Motion stability (smooth > jittery)
+      max_appearance_ratio: 0.5            # LATE-APPEARANCE: Penalty starts after 50% of video
   
   input:
     canonical_persons_file: ${outputs_dir}/${current_video}/canonical_persons.npz

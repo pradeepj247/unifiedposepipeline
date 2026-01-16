@@ -245,7 +245,20 @@ def run_filter(config):
     
     logger.stat("Total canonical persons", len(all_persons))
     
-    # Step 1: Select TOP 10 persons by score
+    # STEP 0: Filter by minimum duration (NEW - catches short persons early)
+    min_duration_frames = filter_config.get('min_duration_frames', 150)
+    filtered_by_duration = [p for p in all_persons if len(p['frame_numbers']) >= min_duration_frames]
+    removed_by_duration = [p for p in all_persons if len(p['frame_numbers']) < min_duration_frames]
+    
+    if removed_by_duration:
+        logger.info(f"Step 0: Filtering by minimum duration ({min_duration_frames} frames)...")
+        print(f"   DEBUG: Removed {len(removed_by_duration)} persons with <{min_duration_frames} frames")
+        for p in removed_by_duration:
+            print(f"      - person_{p['person_id']}: {len(p['frame_numbers'])} frames")
+    
+    logger.stat("After min_duration filter", f"{len(filtered_by_duration)} persons (threshold: {min_duration_frames} frames)")
+    
+    # Step 1: Select TOP 10 persons by score (from filtered candidates)
     logger.info(f"Step 1: Ranking all persons...")
     t_start = time.time()
     
@@ -257,60 +270,80 @@ def run_filter(config):
         'max_appearance_ratio': 0.5
     })
     
-    ranked_indices, scores = rank_persons(all_persons, video_width, video_height, total_frames, weights)
+    ranked_indices, scores = rank_persons(filtered_by_duration, video_width, video_height, total_frames, weights)
     t_ranking = time.time() - t_start
     
     # Select top N (default 10)
     top_n = filter_config.get('top_n', 10)
     top_indices = ranked_indices[:top_n]
-    top_persons = [all_persons[i] for i in top_indices]
+    top_persons = [filtered_by_duration[i] for i in top_indices]  # From filtered_by_duration, not all_persons
     
-    logger.found(f"Selected TOP {len(top_persons)} persons (from {len(all_persons)} candidates)")
+    logger.found(f"Selected TOP {len(top_persons)} persons (from {len(filtered_by_duration)} filtered candidates)")
     
     if verbose:
-        logger.verbose_info(f"Top {len(top_persons)} persons (before penalty):")
+        logger.verbose_info(f"Top {len(top_persons)} persons by composite score:")
         for rank, idx in enumerate(top_indices, 1):
-            person = all_persons[idx]
+            person = filtered_by_duration[idx]
             score = scores[idx]
             logger.verbose_info(f"  {rank}. Person {person['person_id']}: "
-                  f"score={score['final_score']:.4f}, duration={score['duration']}")
+                  f"score={score['final_score']:.4f}, duration={score['duration']}, "
+                  f"coverage={score['coverage']:.2f}, appearance_ratio={score['appearance_ratio']:.2f}")
     
     # Step 2: Apply late-appearance penalty to top N
     logger.info(f"Step 2: Applying late-appearance penalty to top {len(top_persons)}...")
-    print(f"   DEBUG: total_frames={total_frames}, max_appearance_ratio={weights.get('max_appearance_ratio', 0.5)}, penalty_threshold={filter_config.get('penalty_threshold', 0.7)}")
+    print(f"   DEBUG: total_frames={total_frames}, max_appearance_ratio={weights.get('max_appearance_ratio', 0.5)}, penalty_threshold={filter_config.get('penalty_threshold', 0.75)}")
+    print(f"\n   === TOP 10 SCORING BREAKDOWN ===")
     
     penalized_persons = []
     penalized_scores = []
     removed_persons = []
     
-    for person in top_persons:
+    for rank, person in enumerate(top_persons, 1):
         frames = person['frame_numbers']
         start_frame = int(frames[0])
         
+        # Get the precomputed scores
+        person_idx = filtered_by_duration.index(person)
+        score_dict = scores[person_idx]
+        
         # Check late-appearance penalty
-        appearance_ratio = start_frame / total_frames if total_frames > 0 else 0
+        appearance_ratio = score_dict['appearance_ratio']
         max_appearance_ratio = weights.get('max_appearance_ratio', 0.5)
+        penalty = score_dict['late_appearance_penalty']
+        
+        # Print detailed breakdown
+        print(f"\n   {rank}. PERSON {person['person_id']}:")
+        print(f"      Duration: {score_dict['duration']} frames")
+        print(f"      Coverage: {score_dict['coverage']:.1%} (detected in {score_dict['coverage']:.1%} of timespan)")
+        print(f"      Center dist: {score_dict['center_distance']:.1f} pixels")
+        print(f"      Appearance: frame {start_frame}/{total_frames} (ratio={appearance_ratio:.3f})")
         
         if appearance_ratio > max_appearance_ratio:
-            # Mark for potential removal (late appearance)
-            penalty_factor = (appearance_ratio - max_appearance_ratio) / (1.0 - max_appearance_ratio)
-            penalty = 1.0 - (penalty_factor * 0.3)
-            
+            # Person appeared late
+            print(f"      ⚠️  LATE: ratio {appearance_ratio:.3f} > {max_appearance_ratio} → penalty={penalty:.3f}")
             penalized_persons.append((person, penalty))
-            print(f"   PENALTY: person_{person['person_id']} @ frame {start_frame}/{total_frames} (ratio={appearance_ratio:.3f}) → penalty={penalty:.3f}")
+            if penalty < filter_config.get('penalty_threshold', 0.75):
+                print(f"      ❌ REMOVED: penalty {penalty:.3f} < threshold {filter_config.get('penalty_threshold', 0.75)}")
+                removed_persons.append((person, penalty))
+            else:
+                print(f"      ✓  KEPT: penalty {penalty:.3f} >= threshold {filter_config.get('penalty_threshold', 0.75)}")
+                penalized_persons[-1] = (person, penalty)  # Mark as kept
         else:
-            # No penalty
+            # Person appeared early (no penalty)
+            print(f"      ✓  EARLY: ratio {appearance_ratio:.3f} <= {max_appearance_ratio} → no penalty")
             penalized_persons.append((person, 1.0))
-            print(f"   OK: person_{person['person_id']} @ frame {start_frame}/{total_frames} (ratio={appearance_ratio:.3f}) → no penalty")
+        
+        print(f"      Final score: {score_dict['final_score']:.4f}")
     
-    # Filter: keep persons with penalty > threshold (e.g., 0.8 = only 20% penalty)
-    penalty_threshold = filter_config.get('penalty_threshold', 0.7)
+    # Filter: keep persons with penalty >= threshold
+    penalty_threshold = filter_config.get('penalty_threshold', 0.75)
     selected_persons = [p for p, penalty in penalized_persons if penalty >= penalty_threshold]
-    removed_persons = [p for p, penalty in penalized_persons if penalty < penalty_threshold]
     
+    print(f"\n   === FILTERING RESULT ===")
     print(f"   DEBUG: After filtering - KEEP: {len(selected_persons)}, REMOVE: {len(removed_persons)}")
     if removed_persons:
         print(f"   DEBUG: Removed persons: {[p['person_id'] for p, _ in removed_persons]}")
+    print()
     
     logger.found(f"After penalty filtering: {len(selected_persons)} persons (threshold: {penalty_threshold:.1f})")
     
