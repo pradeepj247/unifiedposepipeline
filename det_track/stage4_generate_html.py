@@ -347,7 +347,7 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
         )
     )
     
-    for person_id in sorted_person_ids:
+    for rank, person_id in enumerate(sorted_person_ids, 1):
         num_crops = len(person_buckets[person_id])
         
         # Get frame info
@@ -361,16 +361,11 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
         webp_base64 = webp_base64_dict.get(person_id, '')
         data_uri = f"data:image/webp;base64,{webp_base64}"
         
-        # Show how many crops were actually used for WebP (50 max)
-        crops_used = min(num_crops, 50)
-        
         card_html = f"""
-        <div class="person-card" data-person-id="{person_id}">
+        <div class="person-card" data-person-id="{person_id}" data-rank="{rank}">
             <div class="person-header">
-                <h3>Person {person_id}</h3>
-                <span class="person-info">{crops_used} crops | Frames {start_frame}-{end_frame}</span>
-                <br>
-                <span class="person-info">Presence: {num_frames} frames ({presence_pct:.1f}%)</span>
+                <h3>Person {rank} (ID #{person_id})</h3>
+                <span class="person-info">Frames: {start_frame}-{end_frame} ({presence_pct:.1f}%)</span>
             </div>
             <div class="person-animation">
                 <img src="{data_uri}" alt="Person {person_id}" class="webp-animation">
@@ -610,11 +605,12 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
             localStorage.setItem('selected_person_id', personId);
         }}
         
-        // Restore previous selection if exists
+        // Default select first person (highest ranked)
         window.addEventListener('load', () => {{
-            const previousSelection = localStorage.getItem('selected_person_id');
-            if (previousSelection) {{
-                selectPerson(parseInt(previousSelection));
+            const firstCard = document.querySelector('.person-card');
+            if (firstCard) {{
+                const firstPersonId = parseInt(firstCard.getAttribute('data-person-id'));
+                selectPerson(firstPersonId);
             }}
         }});
     </script>
