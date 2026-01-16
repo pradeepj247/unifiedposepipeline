@@ -32,6 +32,8 @@ import time
 import re
 import sys
 import cv2
+import pickle
+import os
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils.logger import PipelineLogger
@@ -430,44 +432,119 @@ def run_filter(config):
     
     crops_per_person = filter_config.get('crops_per_person', 50)
     
-    if not video_path or not str(video_path).strip():
-        logger.error("Cannot extract crops: video_path not configured or found")
+    # ========== PHASE 4: LOAD CROPS_CACHE & O(1) LOOKUP ==========
+    logger.info(f"Loading crops cache from Stage 1...")
+    t_crop_start = time.time()
+    
+    # Load crops_cache.pkl from Stage 1
+    crops_cache_path = Path(canonical_file).parent / 'crops_cache.pkl'
+    if not crops_cache_path.exists():
+        logger.error(f"crops_cache.pkl not found at {crops_cache_path}")
+        logger.error("Run Stage 1 first to generate crops_cache.pkl")
         return
     
     try:
-        from crop_utils import extract_crops_with_quality, save_final_crops
+        with open(crops_cache_path, 'rb') as f:
+            all_crops = pickle.load(f)
         
-        t_crop_start = time.time()
+        # Build lookup dict: {detection_idx: crop_dict}
+        crops_by_idx = {crop['detection_idx']: crop for crop in all_crops}
+        logger.info(f"✓ Loaded {len(crops_by_idx)} crops from cache (O(1) lookup ready)")
         
-        # Extract crops with quality metrics
-        crops_with_quality = extract_crops_with_quality(
-            video_path=str(video_path),
-            persons=selected_persons,
-            target_crops_per_person=crops_per_person,
-            top_n=len(selected_persons),  # Extract crops for all selected persons
-            max_first_appearance_ratio=1.0,  # No additional filtering
-            verbose=verbose
-        )
+        # Extract and score crops for each selected person
+        from crop_utils import compute_crop_quality_metrics
         
-        # Save to final_crops.pkl
+        crops_with_quality = []
+        
+        for person in selected_persons:
+            person_id = person['person_id']
+            
+            # Get ALL detection indices for this person (from Stage 3b merge)
+            if 'all_detection_indices' not in person:
+                logger.error(f"Person {person_id} missing all_detection_indices (Stage 3b issue)")
+                continue
+            
+            detection_indices = person['all_detection_indices']
+            
+            # O(1) lookup for each detection
+            person_crops = []
+            for det_idx in detection_indices:
+                det_idx = int(det_idx)
+                if det_idx in crops_by_idx:
+                    crop_dict = crops_by_idx[det_idx]
+                    
+                    # Compute quality metrics
+                    quality = compute_crop_quality_metrics(
+                        bbox=crop_dict['bbox'],
+                        frame_shape=(video_height, video_width),
+                        confidence=crop_dict['confidence'],
+                        frame_number=crop_dict['frame_number']
+                    )
+                    
+                    # Combined quality score (confidence + visibility)
+                    combined_score = quality['confidence'] * 0.6 + quality['visibility_score'] * 0.4
+                    
+                    person_crops.append({
+                        'crop': crop_dict['crop'],
+                        'bbox': crop_dict['bbox'],
+                        'frame_number': crop_dict['frame_number'],
+                        'confidence': crop_dict['confidence'],
+                        'quality': quality,
+                        'combined_score': combined_score
+                    })
+            
+            if len(person_crops) == 0:
+                logger.warning(f"Person {person_id}: No crops found in cache")
+                continue
+            
+            # Sort by combined quality score (descending)
+            person_crops.sort(key=lambda x: x['combined_score'], reverse=True)
+            
+            # Select best N crops (quality-based, not chronological)
+            best_crops = person_crops[:crops_per_person]
+            
+            crops_with_quality.append({
+                'person_id': person_id,
+                'crops': best_crops,
+                'total_available': len(person_crops),
+                'selected_count': len(best_crops)
+            })
+            
+            if verbose:
+                logger.verbose_info(f"Person {person_id}: {len(best_crops)}/{len(person_crops)} best crops selected")
+        
+        # Save to final_crops_3c.pkl
         final_crops_path = Path(crops_file)
-        save_final_crops(
-            crops_with_quality=crops_with_quality,
-            output_path=final_crops_path,
-            video_source=str(video_path),
-            verbose=verbose
-        )
+        final_crops_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        output_data = {
+            'crops_with_quality': crops_with_quality,
+            'video_source': str(video_path),
+            'crops_per_person': crops_per_person,
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }
+        
+        with open(final_crops_path, 'wb') as f:
+            pickle.dump(output_data, f)
         
         t_crop_elapsed = time.time() - t_crop_start
         
-        logger.info(f"✓ Extracted crops for {len(crops_with_quality)} persons")
+        logger.info(f"✓ Extracted best crops for {len(crops_with_quality)} persons (quality-based selection)")
         logger.stat("Output crops file", str(final_crops_path))
-        logger.timing("Crop extraction & save", t_crop_elapsed)
+        logger.timing("Crop lookup, scoring & save", t_crop_elapsed)
         
-    except ImportError as e:
-        logger.error(f"crop_utils module not found: {e}")
+        # ========== CLEANUP: DELETE EPHEMERAL CROPS_CACHE ==========
+        try:
+            os.remove(crops_cache_path)
+            logger.info(f"✓ Cleaned up ephemeral crops_cache.pkl ({crops_cache_path.stat().st_size / 1024**2:.1f} MB freed)")
+        except Exception as e:
+            logger.warning(f"Failed to delete crops_cache.pkl: {e}")
+        
     except Exception as e:
         logger.error(f"Error during crop extraction: {e}")
+        import traceback
+        if verbose:
+            traceback.print_exc()
         if verbose:
             import traceback
             traceback.print_exc()
