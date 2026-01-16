@@ -188,8 +188,12 @@ def main():
             print(f"   ⏭️  Stage 3c: Skipped (single-row mode)")
     
     # ==================== Load Stage 3d Data ====================
-    # Check if Stage 3d outputs exist (they won't if Stage 3d was disabled)
-    stage3d_exists = crops_3d_path.exists() and canonical_3d_path.exists()
+    # In single-row mode, we only show Stage 3c data (ignore any existing 3d files)
+    # In dual-row mode, check if Stage 3d outputs exist
+    if dual_row_mode:
+        stage3d_exists = crops_3d_path.exists() and canonical_3d_path.exists()
+    else:
+        stage3d_exists = False  # Force skip 3d files in single-row mode
     
     if stage3d_exists:
         if verbose:
