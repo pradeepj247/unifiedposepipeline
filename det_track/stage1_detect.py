@@ -412,8 +412,16 @@ def run_detection(config):
             if x2 > x1 and y2 > y1:
                 crop = frame[y1:y2, x1:x2].copy()
                 
-                # Resize to standard size to save space (256x256 is enough for quality scoring later)
-                crop_resized = cv2.resize(crop, (256, 256))
+                # Resize maintaining aspect ratio (max dimension = 192px)
+                h, w = crop.shape[:2]
+                max_dim = 192
+                if max(h, w) > max_dim:
+                    scale = max_dim / max(h, w)
+                    new_w = int(w * scale)
+                    new_h = int(h * scale)
+                    crop_resized = cv2.resize(crop, (new_w, new_h))
+                else:
+                    crop_resized = crop  # Don't upscale small crops
                 
                 all_crops.append({
                     'detection_idx': detection_global_idx,  # NEW: Link to detection
@@ -421,7 +429,7 @@ def run_detection(config):
                     'bbox': [x1, y1, x2, y2],
                     'confidence': detections[i, 4],
                     'class_id': classes[i],
-                    'crop': crop_resized  # Store resized version
+                    'crop': crop_resized  # Store resized version (aspect ratio preserved)
                 })
             
             # Increment global detection counter
