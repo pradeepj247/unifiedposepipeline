@@ -310,28 +310,39 @@ def run_pipeline(config_path, stages_to_run=None, mode=None, verbose=False, forc
     stage_times = []  # Track timing for each stage
     
     for stage_name, stage_script, stage_key in stages:
-        # DEPENDENCY CHECK: Stage 4 requires Stage 3d output (final_crops_3d.pkl)
+        # DEPENDENCY CHECK: Stage 4 requires either Stage 3d or Stage 3c output
         if stage_key == 'stage4':
-            # Stage 3d saves final_crops_3d.pkl (or Stage 3c saves final_crops_3c.pkl)
-            # Get path from stage3d config (which uses same filename as stage3c)
-            final_crops_file = config.get('stage3d_refine', {}).get('output', {}).get('final_crops_merged_file', '')
-            if not final_crops_file:
-                # Fallback: try stage3c_filter config
-                final_crops_file = config.get('stage3c_filter', {}).get('output', {}).get('final_crops_file', '')
+            # Check if Stage 3d is enabled
+            stage3d_enabled = config.get('pipeline', {}).get('stages', {}).get('stage3d', True)
             
-            if final_crops_file:
-                final_crops_path = Path(final_crops_file)
+            # Determine which file to look for based on stage3d status
+            if stage3d_enabled:
+                # Stage 3d enabled: look for final_crops_3d.pkl
+                final_crops_file = config.get('stage3d_refine', {}).get('output', {}).get('final_crops_merged_file', '')
+                if not final_crops_file:
+                    output_dir = config.get('global', {}).get('outputs_dir', '')
+                    current_video = config.get('global', {}).get('current_video', '')
+                    final_crops_file = str(Path(output_dir) / current_video / 'final_crops_3d.pkl')
+                required_file = 'final_crops_3d.pkl (from Stage 3d)'
             else:
-                # Last resort fallback
-                output_dir = config.get('global', {}).get('outputs_dir', '')
-                current_video = config.get('global', {}).get('current_video', '')
-                final_crops_path = Path(output_dir) / current_video / 'final_crops_3d.pkl'
+                # Stage 3d disabled: look for final_crops_3c.pkl
+                final_crops_file = config.get('stage3c_filter', {}).get('output', {}).get('final_crops_file', '')
+                if not final_crops_file:
+                    output_dir = config.get('global', {}).get('outputs_dir', '')
+                    current_video = config.get('global', {}).get('current_video', '')
+                    final_crops_file = str(Path(output_dir) / current_video / 'final_crops_3c.pkl')
+                required_file = 'final_crops_3c.pkl (from Stage 3c)'
+            
+            final_crops_path = Path(final_crops_file)
             
             if not final_crops_path.exists():
-                print(f"\n❌ DEPENDENCY ERROR: Stage 4 requires final_crops_3d.pkl from Stage 3d")
+                print(f"\n❌ DEPENDENCY ERROR: Stage 4 requires {required_file}")
                 print(f"   Missing file: {final_crops_path}")
                 print(f"   Absolute path: {final_crops_path.absolute()}")
-                print(f"   Run Stage 3d first: python run_pipeline.py --config ... --stages 3d")
+                if stage3d_enabled:
+                    print(f"   Run Stage 3d first: python run_pipeline.py --config ... --stages 3d")
+                else:
+                    print(f"   Run Stage 3c first: python run_pipeline.py --config ... --stages 3c")
                 print(f"   Or run the full pipeline: python run_pipeline.py --config ...")
                 return False
             else:

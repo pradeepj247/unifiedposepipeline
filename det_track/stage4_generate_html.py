@@ -181,39 +181,81 @@ def main():
             print(f"   ⏭️  Stage 3c: Skipped (single-row mode)")
     
     # ==================== Load Stage 3d Data ====================
-    if verbose:
-        logger.step("Loading Stage 3d data (after merge)...")
+    # Check if Stage 3d outputs exist (they won't if Stage 3d was disabled)
+    stage3d_exists = crops_3d_path.exists() and canonical_3d_path.exists()
     
-    try:
-        crops_3d_data = load_final_crops(crops_3d_path, verbose=verbose)
-        canonical_3d_data = np.load(canonical_3d_path, allow_pickle=True)
-        canonical_3d_persons = canonical_3d_data['persons']
+    if stage3d_exists:
+        if verbose:
+            logger.step("Loading Stage 3d data (after merge)...")
         
-        person_buckets_3d = {pid: crops_3d_data['crops'][pid] for pid in crops_3d_data['person_ids']}
-        person_frame_info_3d = {}
-        total_frames_3d = 0
-        
-        for person in canonical_3d_persons:
-            person_id = person['person_id']
-            frame_numbers = person['frame_numbers']
-            person_frame_info_3d[person_id] = {
-                'start_frame': int(frame_numbers[0]),
-                'end_frame': int(frame_numbers[-1]),
-                'num_frames': len(frame_numbers),
-            }
-            total_frames_3d = max(total_frames_3d, int(frame_numbers[-1]) + 1)
-        
-        if not verbose:
-            print(f"   ✅ Stage 3d: {len(person_buckets_3d)} persons")
+        try:
+            crops_3d_data = load_final_crops(crops_3d_path, verbose=verbose)
+            canonical_3d_data = np.load(canonical_3d_path, allow_pickle=True)
+            canonical_3d_persons = canonical_3d_data['persons']
             
-    except FileNotFoundError as e:
-        logger.error(str(e))
-        return 1
-    except Exception as e:
-        logger.error(f"Error loading Stage 3d data: {e}")
-        import traceback
-        traceback.print_exc()
-        return 1
+            person_buckets_3d = {pid: crops_3d_data['crops'][pid] for pid in crops_3d_data['person_ids']}
+            person_frame_info_3d = {}
+            total_frames_3d = 0
+            
+            for person in canonical_3d_persons:
+                person_id = person['person_id']
+                frame_numbers = person['frame_numbers']
+                person_frame_info_3d[person_id] = {
+                    'start_frame': int(frame_numbers[0]),
+                    'end_frame': int(frame_numbers[-1]),
+                    'num_frames': len(frame_numbers),
+                }
+                total_frames_3d = max(total_frames_3d, int(frame_numbers[-1]) + 1)
+            
+            if not verbose:
+                print(f"   ✅ Stage 3d: {len(person_buckets_3d)} persons")
+                
+        except FileNotFoundError as e:
+            logger.error(str(e))
+            return 1
+        except Exception as e:
+            logger.error(f"Error loading Stage 3d data: {e}")
+            import traceback
+            traceback.print_exc()
+            return 1
+    else:
+        # Stage 3d was skipped (e.g., fast mode) - use Stage 3c data as the main view
+        if verbose:
+            logger.info("⏭️  Stage 3d skipped - using Stage 3c data as main view")
+        else:
+            print(f"   ⏭️  Stage 3d: Skipped (using Stage 3c data)")
+        
+        # Load Stage 3c data if not already loaded
+        if not person_buckets_3c:
+            try:
+                crops_3c_data = load_final_crops(crops_3c_path, verbose=verbose)
+                canonical_3c_data = np.load(canonical_3c_path, allow_pickle=True)
+                canonical_3c_persons = canonical_3c_data['persons']
+                
+                person_buckets_3c = {pid: crops_3c_data['crops'][pid] for pid in crops_3c_data['person_ids']}
+                
+                for person in canonical_3c_persons:
+                    person_id = person['person_id']
+                    frame_numbers = person['frame_numbers']
+                    person_frame_info_3c[person_id] = {
+                        'start_frame': int(frame_numbers[0]),
+                        'end_frame': int(frame_numbers[-1]),
+                        'num_frames': len(frame_numbers),
+                    }
+                    total_frames_3c = max(total_frames_3c, int(frame_numbers[-1]) + 1)
+                
+                if not verbose:
+                    print(f"   ✅ Stage 3c: {len(person_buckets_3c)} persons")
+            except Exception as e:
+                logger.error(f"Error loading Stage 3c data: {e}")
+                import traceback
+                traceback.print_exc()
+                return 1
+        
+        # Use 3c data as 3d data (no merging occurred)
+        person_buckets_3d = person_buckets_3c
+        person_frame_info_3d = person_frame_info_3c
+        total_frames_3d = total_frames_3c
     
     # ==================== Load Merge Report ====================
     merge_info = []
