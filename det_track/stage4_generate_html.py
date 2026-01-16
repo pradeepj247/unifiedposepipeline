@@ -76,22 +76,18 @@ def main():
         print("❌ stage4_generate_html config not found")
         return 1
     
-    verbose = stage_config.get('advanced', {}).get('verbose', False) or config.get('global', {}).get('verbose', False)
+    verbose = config.get('global', {}).get('verbose', False)
     
     logger = PipelineLogger("Stage 4: Generate HTML Viewer", verbose=verbose)
     logger.header()
     
-    # Extract configuration
-    input_config = stage_config['input']
-    output_config = stage_config['output']
-    viz_config = stage_config.get('visualization', {})
+    # Extract configuration (config is flat, not nested)
+    final_crops_path = Path(stage_config['final_crops_file'])
+    output_dir = Path(stage_config['output_dir'])
     
-    final_crops_path = Path(input_config['final_crops_file'])
-    output_dir = Path(output_config['output_dir'])
-    
-    resize_to = tuple(viz_config.get('resize_to', [256, 256]))
-    webp_duration_ms = viz_config.get('webp_duration_ms', 100)
-    webp_quality = viz_config.get('webp_quality', 80)
+    resize_to = tuple(stage_config.get('resize_to', [256, 256]))
+    webp_duration_ms = stage_config.get('webp_duration_ms', 100)
+    webp_quality = stage_config.get('webp_quality', 80)
     
     # Print configuration
     if not verbose:
