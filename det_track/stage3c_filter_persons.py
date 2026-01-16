@@ -332,7 +332,7 @@ def run_filter(config):
     selected_persons = [p for p, penalty in penalized_persons if penalty >= penalty_threshold]
     
     # Print concise summary with 💡 emoji
-    total_input = len(canonical_persons_list)
+    total_input = len(filtered_by_duration)
     total_removed = total_input - len(selected_persons)
     top_person = selected_persons[0] if selected_persons else None
     if top_person:
