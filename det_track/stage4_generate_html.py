@@ -441,15 +441,15 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
         
         .gallery {{
             display: flex;
-            gap: 20px;
+            gap: 15px;
             overflow-x: auto;
             padding: 20px;
             scroll-behavior: smooth;
         }}
         
         .person-card {{
-            flex: 0 0 320px;
-            min-width: 320px;
+            flex: 0 0 200px;
+            min-width: 200px;
             background: rgba(255,255,255,0.05);
             border-radius: 12px;
             overflow: hidden;
