@@ -509,11 +509,28 @@ def run_filter(config):
                 logger.warning(f"Person {person_id}: No crops found in cache")
                 continue
             
-            # Sort by combined quality score (descending)
-            person_crops.sort(key=lambda x: x['combined_score'], reverse=True)
+            # ========== HYBRID BINNING: QUALITY + TEMPORAL DIVERSITY ==========
+            # Sort by frame_number for temporal ordering
+            person_crops.sort(key=lambda x: x['frame_number'])
             
-            # Select best N crops (quality-based, not chronological)
-            best_crops = person_crops[:crops_per_person]
+            # Divide into bins for temporal spread
+            num_bins = min(10, len(person_crops))  # Max 10 bins, fewer if not enough crops
+            crops_per_bin = (crops_per_person + num_bins - 1) // num_bins  # Ceiling division
+            
+            selected_crops = []
+            bin_size = max(1, len(person_crops) // num_bins)
+            
+            for i in range(num_bins):
+                start_idx = i * bin_size
+                end_idx = start_idx + bin_size if i < num_bins - 1 else len(person_crops)
+                bin_crops = person_crops[start_idx:end_idx]
+                
+                # Within each bin: pick best by quality
+                bin_crops_sorted = sorted(bin_crops, key=lambda x: x['combined_score'], reverse=True)
+                selected_crops.extend(bin_crops_sorted[:crops_per_bin])
+            
+            # Trim to exact target count and re-sort by quality for final selection
+            best_crops = sorted(selected_crops, key=lambda x: x['combined_score'], reverse=True)[:crops_per_person]
             
             crops_with_quality.append({
                 'person_id': person_id,
@@ -523,7 +540,7 @@ def run_filter(config):
             })
             
             if verbose:
-                logger.verbose_info(f"Person {person_id}: {len(best_crops)}/{len(person_crops)} best crops selected")
+                logger.verbose_info(f"Person {person_id}: {len(best_crops)}/{len(person_crops)} best crops selected (hybrid binning: {num_bins} bins)")
         
         # Save to final_crops_3c.pkl
         final_crops_path = Path(crops_file)
