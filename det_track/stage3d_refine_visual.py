@@ -546,15 +546,31 @@ def run_refine(config):
     output_crops_path = Path(output_crops_file)
     output_crops_path.parent.mkdir(parents=True, exist_ok=True)
     
+    # Load original crops data to preserve metadata structure
+    with open(input_crops_file, 'rb') as f:
+        original_crops_data = pickle.load(f)
+    
+    # Build metadata dict - preserve per-person crop quality metadata
+    merged_metadata_dict = {}
+    for person_id in merged_crops_dict.keys():
+        # If this person was merged, get metadata from original
+        if person_id in original_crops_data['metadata']:
+            merged_metadata_dict[person_id] = original_crops_data['metadata'][person_id]
+        else:
+            # Fallback empty metadata
+            merged_metadata_dict[person_id] = []
+    
     # Re-organize crops_dict with new person IDs
     final_crops_dict = {
         'person_ids': [p['person_id'] for p in merged_persons_list],
         'crops': merged_crops_dict,
-        'metadata': {
+        'metadata': merged_metadata_dict,  # Per-person metadata (crop quality)
+        'global_metadata': {
             'stage': 'stage3d_refine',
             'timestamp': datetime.now(timezone.utc).isoformat(),
             'num_merged_groups': num_merged,
-            'num_persons_final': len(merged_persons_list)
+            'num_persons_final': len(merged_persons_list),
+            'original_stage': original_crops_data.get('global_metadata', {})
         }
     }
     
