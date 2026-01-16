@@ -189,16 +189,23 @@ def main():
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Generate WebP files directly (don't use generate_webp_animations - it creates wrong HTML)
+        # Generate WebP files directly (limit to 50 crops per person)
         import imageio
         import cv2
+        import base64
+        
+        webp_base64_dict = {}  # Store base64 encoded WebPs for HTML embedding
+        
         for person_id, crops in sorted(person_buckets.items()):
             if crops is None or len(crops) == 0:
                 continue
             
+            # Limit to 50 crops (if merged persons have more)
+            crops_to_use = crops[:50] if len(crops) > 50 else crops
+            
             # Resize all crops to same size
             resized = []
-            for crop in crops:
+            for crop in crops_to_use:
                 resized_crop = cv2.resize(crop, resize_to)
                 resized_crop = cv2.cvtColor(resized_crop, cv2.COLOR_BGR2RGB)
                 resized.append(resized_crop)
@@ -213,9 +220,14 @@ def main():
                 loop=0
             )
             
+            # Read and encode as base64 for embedding
+            with open(output_file, 'rb') as f:
+                webp_data = f.read()
+            webp_base64_dict[person_id] = base64.b64encode(webp_data).decode('utf-8')
+            
             if verbose:
                 file_size_kb = output_file.stat().st_size / 1024
-                logger.info(f"Person {person_id}: {len(crops)} frames → {output_file.name} ({file_size_kb:.0f} KB)")
+                logger.info(f"Person {person_id}: {len(crops_to_use)}/{len(crops)} crops → {output_file.name} ({file_size_kb:.0f} KB)")
         webp_time = time.time() - webp_start
         
         if verbose:
@@ -236,7 +248,7 @@ def main():
     
     html_file = output_dir / "viewer.html"
     try:
-        create_simple_html_viewer(html_file, person_buckets, person_metadata, person_frame_info, total_frames, verbose)
+        create_simple_html_viewer(html_file, person_buckets, person_metadata, person_frame_info, total_frames, webp_base64_dict, verbose)
         if verbose:
             logger.info(f"HTML viewer created: {html_file}")
         else:
@@ -247,8 +259,27 @@ def main():
         traceback.print_exc()
         return 1
     
+    # ==================== Cleanup WebP Files ====================
+    # WebPs are embedded in HTML as base64, delete originals to save space
+    if verbose:
+        logger.step("Cleaning up WebP files (embedded in HTML)...")
+    
+    cleanup_start = time.time()
+    deleted_count = 0
+    for webp_file in output_dir.glob('person_*.webp'):
+        try:
+            webp_file.unlink()
+            deleted_count += 1
+        except Exception as e:
+            if verbose:
+                logger.warning(f"Could not delete {webp_file.name}: {e}")
+    
+    cleanup_time = time.time() - cleanup_start
+    if verbose:
+        logger.info(f"Deleted {deleted_count} WebP files ({cleanup_time:.2f}s)")
+    
     # ==================== Summary ====================
-    total_time = webp_time
+    total_time = webp_time + cleanup_time
     
     if verbose:
         print()
@@ -289,7 +320,7 @@ def main():
     return 0
 
 
-def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_metadata: dict, person_frame_info: dict, total_frames: int, verbose: bool = False):
+def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_metadata: dict, person_frame_info: dict, total_frames: int, webp_base64_dict: dict, verbose: bool = False):
     """
     Create a simple HTML viewer with WebP animations for each person.
     
@@ -299,6 +330,7 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
         person_metadata: Dict of person_id -> list of metadata dicts
         person_frame_info: Dict of person_id -> {start_frame, end_frame, num_frames}
         total_frames: Total frames in video
+        webp_base64_dict: Dict of person_id -> base64 encoded WebP data
         verbose: Enable verbose output
     """
     
@@ -307,7 +339,6 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
     
     for person_id in sorted(person_buckets.keys()):
         num_crops = len(person_buckets[person_id])
-        webp_file = f"person_{person_id}.webp"
         
         # Get frame info
         frame_info = person_frame_info.get(person_id, {})
@@ -316,16 +347,23 @@ def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_meta
         num_frames = frame_info.get('num_frames', 0)
         presence_pct = (num_frames / total_frames * 100) if total_frames > 0 else 0
         
+        # Get base64 encoded WebP
+        webp_base64 = webp_base64_dict.get(person_id, '')
+        data_uri = f"data:image/webp;base64,{webp_base64}"
+        
+        # Show how many crops were actually used for WebP (50 max)
+        crops_used = min(num_crops, 50)
+        
         card_html = f"""
         <div class="person-card" data-person-id="{person_id}">
             <div class="person-header">
                 <h3>Person {person_id}</h3>
-                <span class="person-info">{num_crops} crops | Frames {start_frame}-{end_frame}</span>
+                <span class="person-info">{crops_used} crops | Frames {start_frame}-{end_frame}</span>
                 <br>
                 <span class="person-info">Presence: {num_frames} frames ({presence_pct:.1f}%)</span>
             </div>
             <div class="person-animation">
-                <img src="{webp_file}" alt="Person {person_id}" class="webp-animation">
+                <img src="{data_uri}" alt="Person {person_id}" class="webp-animation">
             </div>
             <button class="select-btn" onclick="selectPerson({person_id})">Select This Person</button>
         </div>
