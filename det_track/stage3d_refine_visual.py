@@ -584,6 +584,62 @@ def run_refine(config):
     with open(output_report_path, 'w') as f:
         json.dump(merging_report, f, indent=2)
     
+    # ==================== Save ReID Details to JSON Sidecar ====================
+    reid_details = {
+        "stage": "stage3d",
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "input": {
+            "total_persons": len(sorted_persons),
+            "similarity_threshold": float(similarity_threshold)
+        },
+        "similarity_analysis": {
+            "total_pairs_analyzed": len(pair_similarities),
+            "high_similarity_pairs": [
+                {
+                    "person1": int(id1),
+                    "person2": int(id2),
+                    "similarity": float(sim),
+                    "action": "merge"
+                }
+                for (id1, id2), sim in sorted(pair_similarities.items(), key=lambda x: x[1], reverse=True)
+                if sim >= similarity_threshold
+            ],
+            "low_similarity_pairs": [
+                {
+                    "person1": int(id1),
+                    "person2": int(id2),
+                    "similarity": float(sim),
+                    "action": "no_merge"
+                }
+                for (id1, id2), sim in sorted(pair_similarities.items(), key=lambda x: x[1], reverse=True)
+                if sim < similarity_threshold
+            ]
+        },
+        "merge_groups": [
+            {
+                "group_id": idx + 1,
+                "merged_persons": [int(pid) for pid in sorted(component)],
+                "result_person_id": int(component[0]),
+                "num_persons": len(component)
+            }
+            for idx, component in enumerate(components) if len(component) > 1
+        ],
+        "output": {
+            "total_persons": len(components),
+            "singles": len(components) - num_merged,
+            "merged_groups": num_merged,
+            "canonical_persons_file": output_canonical_path.name,
+            "final_crops_file": Path(output_crops_file).name
+        }
+    }
+    
+    sidecar_path = output_report_path.parent / 'stage3d_reid.json'
+    with open(sidecar_path, 'w', encoding='utf-8') as f:
+        json.dump(reid_details, f, indent=2)
+    
+    if verbose:
+        logger.verbose_info(f"Saved ReID details: {sidecar_path.name}")
+    
     logger.success()
 
 
