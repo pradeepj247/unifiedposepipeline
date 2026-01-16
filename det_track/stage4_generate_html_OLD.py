@@ -1,0 +1,516 @@
+#!/usr/bin/env python3
+"""
+Stage 4: Generate HTML Viewer (Visualization Only)
+
+Simple visualization stage that:
+1. Loads final_crops.pkl from Stage 3d (already merged)
+2. Creates WebP animations for each person
+3. Generates HTML viewer
+
+NO clustering, NO OSNet - that's Stage 3d's job.
+
+Usage:
+    python stage4_generate_html.py --config configs/pipeline_config.yaml
+"""
+
+import argparse
+import yaml
+import numpy as np
+import time
+import re
+import sys
+import json
+from pathlib import Path
+from datetime import datetime, timezone
+
+from crop_utils import load_final_crops
+from ondemand_crop_extraction import generate_webp_animations, cleanup_webp_files
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from utils.logger import PipelineLogger
+
+
+def resolve_path_variables(config):
+    """Recursively resolve ${variable} in config"""
+    global_vars = config.get('global', {})
+    
+    def resolve_string_once(s, vars_dict):
+        if not isinstance(s, str):
+            return s
+        pattern = re.compile(r'\$\{(\w+)\}')
+        return pattern.sub(lambda m: str(vars_dict.get(m.group(1), m.group(0))), s)
+    
+    def resolve_dict(d, vars_dict):
+        for key, value in d.items():
+            if isinstance(value, dict):
+                resolve_dict(value, vars_dict)
+            elif isinstance(value, list):
+                d[key] = [resolve_string_once(item, vars_dict) if isinstance(item, str) else item for item in value]
+            elif isinstance(value, str):
+                d[key] = resolve_string_once(value, vars_dict)
+    
+    # Multi-pass resolution
+    for _ in range(5):
+        old_config = str(config)
+        resolve_dict(config, global_vars)
+        resolve_dict(config, config.get('global', {}))
+        if str(config) == old_config:
+            break
+    
+    return config
+
+
+def main():
+    """Stage 4: Generate HTML Viewer"""
+    parser = argparse.ArgumentParser(description='Stage 4: Generate HTML Viewer')
+    parser.add_argument('--config', type=str, required=True, help='Path to pipeline config YAML')
+    args = parser.parse_args()
+    
+    # Load and resolve config
+    with open(args.config, 'r') as f:
+        config = yaml.safe_load(f)
+    config = resolve_path_variables(config)
+    
+    stage_config = config.get('stage4_generate_html', {})
+    if not stage_config:
+        print("❌ stage4_generate_html config not found")
+        return 1
+    
+    verbose = stage_config.get('advanced', {}).get('verbose', False) or config.get('global', {}).get('verbose', False)
+    
+    logger = PipelineLogger("Stage 4: Generate HTML Viewer", verbose=verbose)
+    logger.header()
+    
+    # Extract configuration
+    input_config = stage_config['input']
+    output_config = stage_config['output']
+    viz_config = stage_config.get('visualization', {})
+    
+    final_crops_path = Path(input_config['final_crops_file'])
+    output_dir = Path(output_config['output_dir'])
+    
+    resize_to = tuple(viz_config.get('resize_to', [256, 256]))
+    webp_duration_ms = viz_config.get('webp_duration_ms', 100)
+    webp_quality = viz_config.get('webp_quality', 80)
+    
+    # Print configuration
+    if not verbose:
+        print(f"   Loaded config: {args.config}")
+        print(f"   Input: {final_crops_path.name}")
+        print(f"   Output: {output_dir}")
+        print(f"   WebP: {resize_to[0]}×{resize_to[1]}, {webp_duration_ms}ms per frame")
+        print()
+    
+    # ==================== Load Crops ====================
+    if verbose:
+        logger.step("Loading crops from Stage 3d...")
+    
+    try:
+        crops_data = load_final_crops(final_crops_path, verbose=verbose)
+    except FileNotFoundError as e:
+        logger.error(str(e))
+        return 1
+    except Exception as e:
+        logger.error(f"Error loading final_crops.pkl: {e}")
+        return 1
+    
+    # Convert pickle format to person_buckets
+    person_buckets = {}
+    person_metadata = {}
+    
+    for person_id in crops_data['person_ids']:
+        crops = crops_data['crops'][person_id]
+        metadata = crops_data['metadata'][person_id]
+        
+        person_buckets[person_id] = crops
+        person_metadata[person_id] = metadata
+    
+    total_crops = sum(len(c) for c in person_buckets.values())
+    if verbose:
+        logger.info(f"Loaded {len(person_buckets)} persons, {total_crops} crops")
+    else:
+        print(f"   Loaded {len(person_buckets)} persons, {total_crops} crops from {final_crops_path.name}")
+    
+    # ==================== Generate WebP Animations ====================
+    if verbose:
+        print()
+        logger.step("Generating WebP animations...")
+    
+    webp_start = time.time()
+    
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        generate_webp_animations(
+            person_buckets=person_buckets,
+            output_dir=output_dir,
+            metadata=None,
+            resize_to=resize_to,
+            duration_ms=webp_duration_ms,
+            verbose=verbose
+        )
+        webp_time = time.time() - webp_start
+        
+        if verbose:
+            logger.timing("WebP generation", webp_time)
+        else:
+            print(f"   ✅ Generated {len(person_buckets)} WebP animations in {webp_time:.2f}s")
+    
+    except Exception as e:
+        logger.error(f"Error during WebP generation: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
+    
+    # ==================== Create HTML Viewer ====================
+    if verbose:
+        print()
+        logger.step("Creating HTML viewer...")
+    
+    html_file = output_dir / "viewer.html"
+    try:
+        create_simple_html_viewer(html_file, person_buckets, person_metadata, verbose)
+        if verbose:
+            logger.info(f"HTML viewer created: {html_file}")
+        else:
+            print(f"   ✅ HTML viewer: {html_file.name}")
+    except Exception as e:
+        logger.error(f"Error creating HTML viewer: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
+    
+    # ==================== Cleanup WebP Files ====================
+    if verbose:
+        logger.step("Cleaning up WebP files (embedded in HTML)...")
+    
+    cleanup_start = time.time()
+    deleted_count = cleanup_webp_files(output_dir, verbose=verbose)
+    cleanup_time = time.time() - cleanup_start
+    
+    if verbose:
+        logger.info(f"Deleted {deleted_count} WebP files ({cleanup_time:.2f}s)")
+    
+    # ==================== Summary ====================
+    total_time = webp_time + cleanup_time
+    
+    if verbose:
+        print()
+        print("=" * 70)
+        logger.info(f"Stage 4 Timing:")
+        logger.info(f"  - WebP generation: {webp_time:.2f}s")
+        logger.info(f"  - Cleanup: {cleanup_time:.2f}s")
+        logger.info(f"  - Total: {total_time:.2f}s")
+        print()
+        logger.info(f"Output:")
+        logger.info(f"  - HTML viewer: {html_file}")
+        logger.info(f"  - Persons: {len(person_buckets)}")
+        print()
+    
+    logger.success()
+    
+    # Save timing info
+    try:
+        sidecar_path = output_dir / 'stage4.timings.json'
+        sidecar_data = {
+            'stage': 'stage4',
+            'webp_time': float(webp_time),
+            'total_time': float(total_time),
+            'num_persons': len(person_buckets),
+            'total_crops': total_crops,
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }
+        with open(sidecar_path, 'w') as f:
+            json.dump(sidecar_data, f, indent=2)
+    except Exception:
+        pass
+    
+    return 0
+
+
+def create_simple_html_viewer(html_file: Path, person_buckets: dict, person_metadata: dict, verbose: bool = False):
+    """
+    Create a simple HTML viewer with WebP animations for each person.
+    
+    Args:
+        html_file: Path to output HTML file
+        person_buckets: Dict of person_id -> list of crops
+        person_metadata: Dict of person_id -> list of metadata dicts
+        verbose: Enable verbose output
+    """
+    
+    # Build person cards HTML
+    person_cards = []
+    
+    for person_id in sorted(person_buckets.keys()):
+        num_crops = len(person_buckets[person_id])
+        webp_file = f"person_{person_id}.webp"
+        
+        # Get metadata stats
+        if person_id in person_metadata and person_metadata[person_id]:
+            avg_quality = np.mean([m.get('quality_score', 0) for m in person_metadata[person_id]])
+            quality_str = f"Quality: {avg_quality:.2f}"
+        else:
+            quality_str = "Quality: N/A"
+        
+        card_html = f"""
+        <div class="person-card" data-person-id="{person_id}">
+            <div class="person-header">
+                <h3>Person {person_id}</h3>
+                <span class="person-info">{num_crops} crops | {quality_str}</span>
+            </div>
+            <div class="person-animation">
+                <img src="{webp_file}" alt="Person {person_id}" class="webp-animation">
+            </div>
+            <button class="select-btn" onclick="selectPerson({person_id})">Select This Person</button>
+        </div>
+        """
+        person_cards.append(card_html)
+    
+    # Full HTML template
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Person Selection Viewer</title>
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            padding: 20px;
+            min-height: 100vh;
+        }}
+        
+        .header {{
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }}
+        
+        .header h1 {{
+            font-size: 2.5em;
+            color: #4CAF50;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 10px rgba(76, 175, 80, 0.3);
+        }}
+        
+        .header p {{
+            font-size: 1.1em;
+            color: #aaa;
+        }}
+        
+        .stats {{
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+        }}
+        
+        .stat-item {{
+            background: rgba(76, 175, 80, 0.1);
+            padding: 15px 30px;
+            border-radius: 8px;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }}
+        
+        .stat-item .label {{
+            font-size: 0.9em;
+            color: #888;
+            margin-bottom: 5px;
+        }}
+        
+        .stat-item .value {{
+            font-size: 1.8em;
+            color: #4CAF50;
+            font-weight: bold;
+        }}
+        
+        .gallery {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }}
+        
+        .person-card {{
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            backdrop-filter: blur(10px);
+        }}
+        
+        .person-card:hover {{
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(76, 175, 80, 0.3);
+            border-color: #4CAF50;
+        }}
+        
+        .person-header {{
+            padding: 20px;
+            background: rgba(0,0,0,0.3);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }}
+        
+        .person-header h3 {{
+            font-size: 1.5em;
+            color: #4CAF50;
+            margin-bottom: 8px;
+        }}
+        
+        .person-info {{
+            color: #888;
+            font-size: 0.9em;
+        }}
+        
+        .person-animation {{
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0,0,0,0.2);
+            min-height: 300px;
+        }}
+        
+        .webp-animation {{
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }}
+        
+        .select-btn {{
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            border: none;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }}
+        
+        .select-btn:hover {{
+            background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+        }}
+        
+        .select-btn:active {{
+            transform: scale(0.98);
+        }}
+        
+        .selected {{
+            border-color: #FFD700 !important;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5) !important;
+        }}
+        
+        #selection-info {{
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(76, 175, 80, 0.95);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            font-size: 1.2em;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            display: none;
+            animation: slideIn 0.3s ease;
+        }}
+        
+        @keyframes slideIn {{
+            from {{
+                transform: translateX(400px);
+                opacity: 0;
+            }}
+            to {{
+                transform: translateX(0);
+                opacity: 1;
+            }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 Person Selection Viewer</h1>
+        <p>Select a person from the gallery below to continue with pose estimation</p>
+        <div class="stats">
+            <div class="stat-item">
+                <div class="label">Total Persons</div>
+                <div class="value">{len(person_buckets)}</div>
+            </div>
+            <div class="stat-item">
+                <div class="label">Total Crops</div>
+                <div class="value">{sum(len(c) for c in person_buckets.values())}</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="gallery">
+        {''.join(person_cards)}
+    </div>
+    
+    <div id="selection-info">
+        ✓ Selected Person <span id="selected-person-id"></span>
+    </div>
+    
+    <script>
+        let selectedPersonId = null;
+        
+        function selectPerson(personId) {{
+            // Remove previous selection
+            document.querySelectorAll('.person-card').forEach(card => {{
+                card.classList.remove('selected');
+            }});
+            
+            // Mark new selection
+            const card = document.querySelector(`[data-person-id="${{personId}}"]`);
+            card.classList.add('selected');
+            
+            // Update selection info
+            selectedPersonId = personId;
+            document.getElementById('selected-person-id').textContent = personId;
+            document.getElementById('selection-info').style.display = 'block';
+            
+            // Log selection (for automation/scripting)
+            console.log(`SELECTED_PERSON: ${{personId}}`);
+            
+            // Save selection to localStorage
+            localStorage.setItem('selected_person_id', personId);
+        }}
+        
+        // Restore previous selection if exists
+        window.addEventListener('load', () => {{
+            const previousSelection = localStorage.getItem('selected_person_id');
+            if (previousSelection) {{
+                selectPerson(parseInt(previousSelection));
+            }}
+        }});
+    </script>
+</body>
+</html>"""
+    
+    # Write HTML file
+    with open(html_file, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    
+    if verbose:
+        print(f"   Created HTML viewer with {len(person_buckets)} persons")
+
+
+if __name__ == '__main__':
+    exit(main())
