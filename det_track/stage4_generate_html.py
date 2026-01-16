@@ -34,30 +34,52 @@ def resolve_path_variables(config):
     """Recursively resolve ${variable} in config"""
     global_vars = config.get('global', {})
     
+    # First pass: resolve variables within global section itself
     def resolve_string_once(s, vars_dict):
         if not isinstance(s, str):
             return s
-        pattern = re.compile(r'\$\{(\w+)\}')
-        return pattern.sub(lambda m: str(vars_dict.get(m.group(1), m.group(0))), s)
+        return re.sub(
+            r'\$\{(\w+)\}',
+            lambda m: str(vars_dict.get(m.group(1), m.group(0))),
+            s
+        )
     
-    def resolve_dict(d, vars_dict):
-        for key, value in d.items():
-            if isinstance(value, dict):
-                resolve_dict(value, vars_dict)
-            elif isinstance(value, list):
-                d[key] = [resolve_string_once(item, vars_dict) if isinstance(item, str) else item for item in value]
-            elif isinstance(value, str):
-                d[key] = resolve_string_once(value, vars_dict)
-    
-    # Multi-pass resolution
-    for _ in range(5):
-        old_config = str(config)
-        resolve_dict(config, global_vars)
-        resolve_dict(config, config.get('global', {}))
-        if str(config) == old_config:
+    # Resolve global variables iteratively
+    max_iterations = 10
+    for _ in range(max_iterations):
+        resolved_globals = {}
+        changed = False
+        for key, value in global_vars.items():
+            if isinstance(value, str):
+                resolved = resolve_string_once(value, global_vars)
+                resolved_globals[key] = resolved
+                if resolved != value:
+                    changed = True
+            else:
+                resolved_globals[key] = value
+        global_vars = resolved_globals
+        if not changed:
             break
     
-    return config
+    def resolve_string(s):
+        return re.sub(
+            r'\$\{(\w+)\}',
+            lambda m: str(global_vars.get(m.group(1), m.group(0))),
+            s
+        )
+    
+    def resolve_recursive(obj):
+        if isinstance(obj, dict):
+            return {k: resolve_recursive(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [resolve_recursive(v) for v in obj]
+        elif isinstance(obj, str):
+            return resolve_string(obj)
+        return obj
+    
+    result = resolve_recursive(config)
+    result['global'] = global_vars
+    return result
 
 
 def main():
