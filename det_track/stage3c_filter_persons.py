@@ -405,7 +405,7 @@ def run_filter(config):
             "npz_file": output_path.name
         },
         "timing": {
-            "ranking_time": float(ranking_time),
+            "ranking_time": float(t_ranking),
             "npz_save_time": float(npz_save_time)
         }
     }
