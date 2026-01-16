@@ -369,7 +369,11 @@ def run_pipeline(config_path, stages_to_run=None, mode=None, verbose=False, forc
         
         # Prepare extra arguments for specific stages
         extra_args = []
-        if stage_key == 'stage4':
+        if stage_key == 'stage3c':
+            # Pass crops_per_person value to Stage 3c
+            crops_per_person = config.get('stage3c_filter', {}).get('filtering', {}).get('crops_per_person', 50)
+            extra_args = ['--crops-per-person', str(crops_per_person)]
+        elif stage_key == 'stage4':
             # Pass dual_row_mode value to Stage 4
             dual_row = config.get('stage4_html', {}).get('dual_row', True)
             extra_args = ['--dual-row', 'true' if dual_row else 'false']

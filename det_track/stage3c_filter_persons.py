@@ -502,10 +502,20 @@ def main():
     parser = argparse.ArgumentParser(description='Stage 3c: Filter Persons')
     parser.add_argument('--config', type=str, required=True,
                        help='Path to pipeline configuration YAML')
+    parser.add_argument('--crops-per-person', type=int, default=None,
+                       help='Number of crops to extract per person. Overrides config.')
     args = parser.parse_args()
     
     # Load config
     config = load_config(args.config)
+    
+    # Apply CLI override for crops_per_person if provided
+    if args.crops_per_person is not None:
+        if 'stage3c_filter' not in config:
+            config['stage3c_filter'] = {}
+        if 'filtering' not in config['stage3c_filter']:
+            config['stage3c_filter']['filtering'] = {}
+        config['stage3c_filter']['filtering']['crops_per_person'] = args.crops_per_person
     
     # Check if stage is enabled
     if not config['pipeline']['stages'].get('stage3c', False):
