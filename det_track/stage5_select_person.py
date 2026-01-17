@@ -1,72 +1,63 @@
 #!/usr/bin/env python3
 """
-Stage 5: Person Selection (Manual)
-==================================
+Stage 5: Person Selection & Bbox Extraction
+============================================
 
-Extracts frame-by-frame bounding box data for selected person(s) from canonical_persons.npz
-and saves as final_tracklet.npz.
+Extracts frame-by-frame bounding box data for a selected person from canonical_persons_3c.npz
+and saves as selected_person.npz in a format compatible with pose estimation pipelines.
 
-This is a MANUAL step - run AFTER viewing the HTML report from Stage 4 to select which
-person(s) you want to extract for pose estimation.
+This is a MANUAL step - run AFTER viewing the HTML report from Stage 4 to visually identify
+which person you want to extract for pose estimation.
 
 Usage:
-    python stage5_select_person.py --persons p3
-    python stage5_select_person.py --persons p3,p4,p40
-    python stage5_select_person.py --config configs/pipeline_config.yaml --persons p3
+    python stage5_select_person.py --config configs/pipeline_config.yaml --person_id 5
+    python stage5_select_person.py --config configs/pipeline_config.yaml --person_id 3 --verbose
+
+Output:
+    selected_person.npz with keys:
+        - frame_numbers: (N,) Frame indices where person appears
+        - bboxes: (N, 4) Bounding boxes [x1, y1, x2, y2]
+        - confidences: (N,) YOLO detection confidences (optional metadata)
+        - person_id: Selected person ID (optional metadata)
+        - video_metadata: Video info dict (optional metadata)
+        - person_metadata: Person info dict (optional metadata)
 """
 
 import argparse
 import numpy as np
 from pathlib import Path
-import json
 import sys
 import yaml
 import re
-from datetime import datetime
+import cv2
+import time
 
 
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Stage 5: Extract selected person(s) tracklet data from canonical_persons.npz",
+        description="Stage 5: Extract selected person bbox data from canonical_persons_3c.npz",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # After viewing Stage 4 HTML report, select person(s):
-  python stage5_select_person.py --config configs/pipeline_config.yaml --persons p3
-  python stage5_select_person.py --config configs/pipeline_config.yaml --persons p3,p4
-  
-  # Or specify video directly:
-  python stage5_select_person.py --persons p3 --video kohli_nets.mp4
+  # After viewing Stage 4 HTML report, select person by ID:
+  python stage5_select_person.py --config configs/pipeline_config.yaml --person_id 5
+  python stage5_select_person.py --config configs/pipeline_config.yaml --person_id 3 --verbose
         """
     )
     
     parser.add_argument(
-        '--persons',
-        type=str,
+        '--person_id',
+        type=int,
         required=True,
-        help='Comma-separated person IDs (e.g., p3 or p3,p4,p40)'
+        help='Person ID to extract (e.g., 5 for person_3c_005 from HTML viewer)'
     )
     
     parser.add_argument(
         '--config',
         type=str,
-        default=None,
-        help='Path to pipeline config YAML (recommended - auto-detects paths)'
-    )
-    
-    parser.add_argument(
-        '--video',
-        type=str,
-        default=None,
-        help='Video file name (alternative to --config)'
-    )
-    
-    parser.add_argument(
-        '--output-dir',
-        type=str,
-        default=None,
-        help='Output directory (default: auto-detected from video name)'
+        required=True,
+        help='Path to pipeline config YAML'
     )
     
     parser.add_argument(
@@ -78,35 +69,60 @@ Examples:
     return parser.parse_args()
 
 
-def parse_person_ids(persons_str):
-    """
-    Parse comma-separated person IDs.
+def resolve_path_variables(config):
+    """Recursively resolve ${variable} in config"""
+    global_vars = config.get('global', {})
     
-    Examples:
-        "p3" → [3]
-        "p3,p4,p40" → [3, 4, 40]
-        "3,4,40" → [3, 4, 40]
-    """
-    person_ids = []
+    # First pass: resolve variables within global section itself
+    def resolve_string_once(s, vars_dict):
+        if not isinstance(s, str):
+            return s
+        return re.sub(
+            r'\$\{(\w+)\}',
+            lambda m: str(vars_dict.get(m.group(1), m.group(0))),
+            s
+        )
     
-    for person_str in persons_str.split(','):
-        person_str = person_str.strip().lower()
-        
-        # Remove 'p' prefix if present
-        if person_str.startswith('p'):
-            person_str = person_str[1:]
-        
-        try:
-            person_id = int(person_str)
-            person_ids.append(person_id)
-        except ValueError:
-            raise ValueError(f"Invalid person ID: {person_str}")
+    # Resolve global variables iteratively
+    max_iterations = 10
+    for _ in range(max_iterations):
+        resolved_globals = {}
+        changed = False
+        for key, value in global_vars.items():
+            if isinstance(value, str):
+                resolved = resolve_string_once(value, global_vars)
+                resolved_globals[key] = resolved
+                if resolved != value:
+                    changed = True
+            else:
+                resolved_globals[key] = value
+        global_vars = resolved_globals
+        if not changed:
+            break
     
-    return sorted(set(person_ids))  # Remove duplicates and sort
+    def resolve_string(s):
+        return re.sub(
+            r'\$\{(\w+)\}',
+            lambda m: str(global_vars.get(m.group(1), m.group(0))),
+            s
+        )
+    
+    def resolve_recursive(obj):
+        if isinstance(obj, dict):
+            return {k: resolve_recursive(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [resolve_recursive(v) for v in obj]
+        elif isinstance(obj, str):
+            return resolve_string(obj)
+        return obj
+    
+    result = resolve_recursive(config)
+    result['global'] = global_vars
+    return result
 
 
 def load_config(config_path):
-    \"\"\"Load and resolve YAML configuration.\"\"\"
+    """Load and resolve YAML configuration."""
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
     
@@ -116,35 +132,14 @@ def load_config(config_path):
         video_name = Path(video_file).stem
         config['global']['current_video'] = video_name
     
+    # Resolve path variables
+    config = resolve_path_variables(config)
+    
     return config
 
 
-def get_output_dir_from_config(config):
-    \"\"\"Get output directory from config.\"\"\"
-    outputs_dir = config['global']['outputs_dir']
-    current_video = config['global']['current_video']
-    
-    # Resolve ${...} variables
-    outputs_dir = outputs_dir.replace('${demo_data_dir}', config['global']['demo_data_dir'])
-    outputs_dir = outputs_dir.replace('${repo_root}', config['global']['repo_root'])
-    
-    return Path(outputs_dir) / current_video
-
-
-def get_output_dir(video_file):
-    """Auto-detect output directory based on video file name."""
-    # Remove extension from video file
-    video_base = Path(video_file).stem
-    
-    # Standard location: demo_data/outputs/{video_base}/
-    repo_root = Path(__file__).parent.parent
-    output_dir = repo_root / 'demo_data' / 'outputs' / video_base
-    
-    return output_dir
-
-
-def load_canonical_persons(npz_path):
-    """Load canonical_persons.npz and return persons list."""
+def load_canonical_persons_3c(npz_path):
+    """Load canonical_persons_3c.npz and return persons array."""
     if not npz_path.exists():
         raise FileNotFoundError(f"File not found: {npz_path}")
     
@@ -154,220 +149,275 @@ def load_canonical_persons(npz_path):
     return persons
 
 
-def extract_selected_persons(persons, selected_ids):
+def find_person_by_id(persons, person_id):
     """
-    Extract data for selected person IDs with metadata about start frames.
+    Find person by ID in persons array.
     
     Returns:
-        Dict mapping person_id → {frame_numbers, bboxes, start_frame}
+        person dict if found, None otherwise
     """
-    selected_data = {}
-    
     for person in persons:
-        person_id = person['person_id']
-        
-        if person_id in selected_ids:
-            frame_numbers = person['frame_numbers'].copy()
-            selected_data[person_id] = {
-                'frame_numbers': frame_numbers,
-                'bboxes': person['bboxes'].copy(),
-                'start_frame': int(frame_numbers[0]),  # Track when this person starts
-            }
-    
-    return selected_data
+        if person['person_id'] == person_id:
+            return person
+    return None
 
 
-def create_detector_format_output(selected_data):
+def get_video_metadata(video_path):
     """
-    Convert selected persons data to detector format (same as run_detector.py output).
-    
-    Handles overlapping frames by using the person with the LATER start time.
-    This ensures continuous data flow with one bbox per frame.
+    Extract metadata from video file.
     
     Returns:
-        Dict with keys:
-        - frame_numbers: (N,) int64 array of all frame indices
-        - bboxes: (N, 4) int64 array of bboxes [x1, y1, x2, y2]
-        - person_mapping: (N,) int64 array of which person contributed each frame (for reference)
+        dict with video_path, total_frames, fps, resolution
     """
-    # Build a dict mapping frame_number → best_person_id
-    frame_to_person = {}
+    if not Path(video_path).exists():
+        raise FileNotFoundError(f"Video file not found: {video_path}")
     
-    # Sort persons by start_frame (descending) - later starters get priority
-    sorted_persons = sorted(
-        selected_data.items(),
-        key=lambda x: x[1]['start_frame'],
-        reverse=True  # Higher start_frame first = gets priority in overlaps
-    )
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise ValueError(f"Could not open video: {video_path}")
     
-    # Assign frames to persons (later starters override earlier ones)
-    for person_id, person_data in sorted_persons:
-        for frame_num in person_data['frame_numbers']:
-            frame_num_int = int(frame_num)
-            frame_to_person[frame_num_int] = person_id
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
-    # Now build contiguous arrays in frame order
-    sorted_frames = sorted(frame_to_person.keys())
+    cap.release()
     
-    frame_numbers = np.array(sorted_frames, dtype=np.int64)
-    bboxes_list = []
-    person_mapping = []
+    return {
+        'video_path': str(video_path),
+        'total_frames': total_frames,
+        'fps': fps,
+        'resolution': (width, height)
+    }
+
+
+def create_selected_person_output(person, video_metadata):
+    """
+    Create output dict in format compatible with pose detection pipelines.
     
-    for frame_num in sorted_frames:
-        person_id = frame_to_person[frame_num]
-        person_data = selected_data[person_id]
-        
-        # Find bbox for this frame in this person's data
-        frame_idx = np.where(person_data['frame_numbers'] == frame_num)[0][0]
-        bbox = person_data['bboxes'][frame_idx]
-        
-        bboxes_list.append(bbox)
-        person_mapping.append(person_id)
+    Args:
+        person: Person dict from canonical_persons_3c.npz
+        video_metadata: Video metadata dict
     
-    bboxes = np.array(bboxes_list, dtype=np.int64)
-    person_mapping_array = np.array(person_mapping, dtype=np.int64)
+    Returns:
+        Dict with all required and optional keys for selected_person.npz
+    """
+    frame_numbers = person['frame_numbers']
+    bboxes = person['bboxes']
+    confidences = person['confidences']
+    person_id = person['person_id']
+    
+    # Calculate person metadata
+    duration_frames = len(frame_numbers)
+    first_frame = int(frame_numbers[0])
+    last_frame = int(frame_numbers[-1])
+    span_frames = last_frame - first_frame + 1
+    coverage_ratio = duration_frames / span_frames if span_frames > 0 else 0.0
+    
+    person_metadata = {
+        'source': '3c',
+        'tracklet_ids': person.get('original_tracklet_ids', []),
+        'duration_frames': duration_frames,
+        'first_frame': first_frame,
+        'last_frame': last_frame,
+        'coverage_ratio': coverage_ratio,
+        'num_tracklets_merged': person.get('num_tracklets_merged', 1)
+    }
     
     output_data = {
-        'frame_numbers': frame_numbers,
-        'bboxes': bboxes,
-        'person_mapping': person_mapping_array,  # Which person contributed each frame
+        # REQUIRED keys for pose detection (backward compatible)
+        'frame_numbers': frame_numbers.astype(np.int64),
+        'bboxes': bboxes.astype(np.int64),
+        
+        # OPTIONAL keys (rich metadata)
+        'person_id': int(person_id),
+        'confidences': confidences.astype(np.float32),
+        'video_metadata': video_metadata,
+        'person_metadata': person_metadata
     }
     
     return output_data
 
 
-def save_detector_format(output_data, output_path):
+def save_selected_person(output_data, output_path):
     """
-    Save output in detector format (same as run_detector.py).
+    Save selected person data to NPZ file.
     
     Args:
-        output_data: Dict with frame_numbers, bboxes, person_mapping
+        output_data: Dict with all keys
         output_path: Path to output NPZ file
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
-    # Save in compressed format (matches run_detector.py output)
     np.savez_compressed(
         output_path,
-        frame_numbers=output_data['frame_numbers'],
-        bboxes=output_data['bboxes'],
-        person_mapping=output_data['person_mapping']  # Extra metadata
+        **output_data
     )
 
 
-def print_summary_detector_format(output_data, selected_data):
-    """Print summary of extracted data in detector format."""
-
-    
+def print_summary(output_data, output_path, verbose=False):
+    """Print summary of extraction."""
     frame_numbers = output_data['frame_numbers']
     bboxes = output_data['bboxes']
-    person_mapping = output_data['person_mapping']
+    confidences = output_data['confidences']
+    person_id = output_data['person_id']
+    person_meta = output_data['person_metadata']
+    video_meta = output_data['video_metadata']
     
-    print(f"\n✅ Selected persons:")
-    for person_id in sorted(selected_data.keys()):
-        data = selected_data[person_id]
-        num_frames_orig = len(data['frame_numbers'])
-        start_frame = data['start_frame']
-        end_frame = int(data['frame_numbers'][-1])
-        
-        # Count how many frames this person actually contributed (after priority resolution)
-        contributed = np.sum(person_mapping == person_id)
-        
-        print(f"   • P{person_id:2d}: Original {num_frames_orig:4d} frames | Range: {start_frame:5d} - {end_frame:5d} | Contributed: {contributed:4d} frames")
+    print(f"\n{'='*70}")
+    print(f"✅ STAGE 5: PERSON EXTRACTION COMPLETE")
+    print(f"{'='*70}\n")
     
-    print(f"\n📊 Detector Format Output:")
-    print(f"   • Total frames in output: {len(frame_numbers)}")
-    print(f"   • Bboxes shape: {bboxes.shape}")
-    print(f\"\\n{'='*70}\")
-    print(f\"🎯 STAGE 5: PERSON SELECTION (MANUAL)\")
-    print(f\"{'='*70}\\n\")
-    print(f\"🔍 Extracting persons: {', '.join([f'P{p}' for p in selected_ids])}\")
+    print(f"📋 Selected Person:")
+    print(f"   • Person ID: {person_id}")
+    print(f"   • Merged from {person_meta['num_tracklets_merged']} tracklet(s): {person_meta['tracklet_ids']}")
+    print(f"   • Frame range: {person_meta['first_frame']} - {person_meta['last_frame']}")
+    print(f"   • Duration: {person_meta['duration_frames']} frames ({person_meta['coverage_ratio']:.1%} coverage)")
+    print(f"   • Mean confidence: {confidences.mean():.3f}")
     
-    # Determine output directory
-    if args.config:
-        # Load from config (recommended)
-        config = load_config(args.config)
-        output_dir = get_output_dir_from_config(config)
-        if args.verbose:
-            print(f\"   Using config: {args.config}\")
-    elif args.video:
-        # Legacy: Use video name directly
-        output_dir = get_output_dir(args.video)
-        if args.verbose:
-            print(f\"   Using video: {args.video}\")
-    else:
-        print(f\"❌ Error: Must specify either --config or --video\")
-        sys.exit(1)ed by priority): {overlaps}")
+    print(f"\n📊 Bounding Boxes:")
+    bbox_min = bboxes.min(axis=0)
+    bbox_max = bboxes.max(axis=0)
+    print(f"   • Total bboxes: {len(bboxes)}")
+    print(f"   • Min bbox: ({bbox_min[0]}, {bbox_min[1]}, {bbox_max[2]}, {bbox_max[3]})")
+    print(f"   • Max bbox: ({bbox_max[0]}, {bbox_max[1]}, {bbox_max[2]}, {bbox_max[3]})")
     
-    print(f"\n   This output is compatible with run_posedet.py")
-    print(f"   Usage: python run_posedet.py --config configs/posedet.yaml")
-    print(f"          (with detections_file pointing to final_tracklet.npz)")
+    print(f"\n🎥 Video Info:")
+    print(f"   • Video: {Path(video_meta['video_path']).name}")
+    print(f"   • Resolution: {video_meta['resolution'][0]}x{video_meta['resolution'][1]}")
+    print(f"   • FPS: {video_meta['fps']:.1f}")
+    print(f"   • Total frames: {video_meta['total_frames']}")
     
-    print("\n" + "="*70 + "\n")
+    print(f"\n💾 Output:")
+    print(f"   • File: {output_path}")
+    print(f"   • Size: {output_path.stat().st_size / 1024:.1f} KB")
+    print(f"   • Format: Pose detection compatible (frame_numbers, bboxes + metadata)")
+    
+    if verbose:
+        print(f"\n🔍 Detailed Info:")
+        print(f"   • First 5 frames: {frame_numbers[:5].tolist()}")
+        print(f"   • First 2 bboxes: {bboxes[:2].tolist()}")
+        print(f"   • Confidence range: [{confidences.min():.3f}, {confidences.max():.3f}]")
+    
+    print(f"\n✅ Next Step:")
+    print(f"   Run pose estimation: python run_posedet.py --config configs/posedet.yaml")
+    print(f"   (Ensure detections_file in config points to: {output_path.name})")
+    
+    print(f"\n{'='*70}\n")
 
 
 def main():
     """Main entry point."""
     args = parse_arguments()
     
-    # Parse person IDs
+    person_id = args.person_id
+    verbose = args.verbose
+    
+    print(f"\n{'='*70}")
+    print(f"🎯 STAGE 5: PERSON SELECTION & BBOX EXTRACTION")
+    print(f"{'='*70}\n")
+    print(f"🔍 Extracting person ID: {person_id}")
+    
+    # Load configuration
     try:
-        selected_ids = parse_person_ids(args.persons)
-    except ValueError as e:
-        print(f"❌ Error: {e}")
+        config = load_config(args.config)
+    except FileNotFoundError:
+        print(f"❌ Error: Config file not found: {args.config}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Error loading config: {e}")
         sys.exit(1)
     
-    print(f"\n🔍 Extracting persons: {', '.join([f'P{p}' for p in selected_ids])}")
+    if verbose:
+        print(f"   ✓ Loaded config: {args.config}")
     
-    # Determine output directory
-    if args.output_dir:
-        output_dir = Path(args.output_dir)
-    else:
-        output_dir = get_output_dir(args.video)
+    # Get paths from config
+    stage_config = config.get('stage3c_filter', {})
+    output_config = stage_config.get('output', {})
     
-    if args.verbose:
-        print(f"   Output directory: {output_dir}")
-    
-    # Load canonical persons
-    canonical_persons_path = output_dir / 'canonical_persons.npz'
-    if args.verbose:
-        print(f"   Loading: {canonical_persons_path}")
-    
-    try:
-        persons = load_canonical_persons(canonical_persons_path)
-    except FileNotFoundError as e:
-        print(f"❌ Error: {e}")
+    # Input file: canonical_persons_3c.npz
+    canonical_persons_path = Path(output_config.get('filtered_file', ''))
+    if not canonical_persons_path.exists():
+        print(f"❌ Error: Input file not found: {canonical_persons_path}")
+        print(f"   Run Stage 3c first: python run_pipeline.py --stages 3c")
         sys.exit(1)
     
-    # Extract selected persons
-    selected_data = extract_selected_persons(persons, selected_ids)
+    if verbose:
+        print(f"   ✓ Found canonical_persons_3c.npz: {canonical_persons_path}")
     
-    # Check if all requested persons were found
-    found_ids = set(selected_data.keys())
-    missing_ids = set(selected_ids) - found_ids
+    # Output file: selected_person.npz
+    output_dir = canonical_persons_path.parent
+    output_path = output_dir / 'selected_person.npz'
     
-    if missing_ids:
-        print(f"⚠️  Warning: Persons not found: {', '.join([f'P{p}' for p in sorted(missing_ids)])}")
-        if not found_ids:
-            print(f"❌ No valid persons found!")
+    # Video file for metadata
+    video_path = Path(config['global']['video_file'])
+    if not video_path.exists():
+        # Try canonical_video.mp4 as fallback
+        canonical_video_path = output_dir / 'canonical_video.mp4'
+        if canonical_video_path.exists():
+            video_path = canonical_video_path
+        else:
+            print(f"❌ Error: Video file not found: {video_path}")
+            print(f"   Also tried: {canonical_video_path}")
             sys.exit(1)
     
-    # Convert to detector format (with priority handling for overlaps)
-    output_data = create_detector_format_output(selected_data)
+    if verbose:
+        print(f"   ✓ Found video: {video_path.name}")
     
-    # Save to file in detector format
-    output_path = output_dir / 'final_tracklet.npz'
-    save_detector_format(output_data, output_path)
+    # Load canonical persons from Stage 3c
+    print(f"\n📂 Loading canonical persons from Stage 3c...")
+    try:
+        persons = load_canonical_persons_3c(canonical_persons_path)
+        print(f"   ✓ Loaded {len(persons)} persons")
+    except Exception as e:
+        print(f"❌ Error loading canonical persons: {e}")
+        sys.exit(1)
+    
+    # Find selected person by ID
+    print(f"\n🔎 Searching for person {person_id}...")
+    person = find_person_by_id(persons, person_id)
+    
+    if person is None:
+        available_ids = sorted([p['person_id'] for p in persons])
+        print(f"❌ Error: Person ID {person_id} not found in canonical_persons_3c.npz")
+        print(f"   Available person IDs: {available_ids}")
+        print(f"   View the HTML report from Stage 4 to see all persons")
+        sys.exit(1)
+    
+    print(f"   ✓ Found person {person_id}")
+    print(f"   • Appears in {len(person['frame_numbers'])} frames")
+    print(f"   • Merged from {person.get('num_tracklets_merged', 1)} tracklet(s)")
+    
+    # Extract video metadata
+    print(f"\n📹 Extracting video metadata...")
+    try:
+        video_metadata = get_video_metadata(video_path)
+        print(f"   ✓ Video: {video_metadata['resolution'][0]}x{video_metadata['resolution'][1]} @ {video_metadata['fps']:.1f} fps")
+        print(f"   ✓ Total frames: {video_metadata['total_frames']}")
+    except Exception as e:
+        print(f"❌ Error reading video metadata: {e}")
+        sys.exit(1)
+    
+    # Create output data
+    print(f"\n📦 Creating output NPZ...")
+    t_start = time.time()
+    output_data = create_selected_person_output(person, video_metadata)
+    t_create = time.time() - t_start
+    
+    if verbose:
+        print(f"   ✓ Created output data in {t_create*1000:.1f}ms")
+    
+    # Save to file
+    print(f"\n💾 Saving to: {output_path.name}...")
+    t_start = time.time()
+    save_selected_person(output_data, output_path)
+    t_save = time.time() - t_start
+    
+    if verbose:
+        print(f"   ✓ Saved in {t_save*1000:.1f}ms")
     
     # Print summary
-    print_summary_detector_format(output_data, selected_data)
-    
-    print(f\"\\n💾 Output:\")
-    print(f\"   File: {output_path}\")
-    print(f\"   Size: {output_path.stat().st_size / 1024:.1f} KB\")
-    print(f\"   Format: Detector compatible (frame_numbers, bboxes)\")
-    
-    print(f\"\\n{'='*70}\\n\")
+    print_summary(output_data, output_path, verbose=verbose)
 
 
 if __name__ == '__main__':
