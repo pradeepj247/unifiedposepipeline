@@ -349,20 +349,30 @@ def main():
     output_dir = canonical_persons_path.parent
     output_path = output_dir / 'selected_person.npz'
     
-    # Video file for metadata
-    video_path = Path(config['global']['video_file'])
-    if not video_path.exists():
-        # Try canonical_video.mp4 as fallback
-        canonical_video_path = output_dir / 'canonical_video.mp4'
-        if canonical_video_path.exists():
-            video_path = canonical_video_path
-        else:
-            print(f"❌ Error: Video file not found: {video_path}")
-            print(f"   Also tried: {canonical_video_path}")
+    # Video file for metadata - try multiple locations
+    # 1. First try canonical_video.mp4 (created by Stage 0 in output dir)
+    canonical_video_path = output_dir / 'canonical_video.mp4'
+    if canonical_video_path.exists():
+        video_path = canonical_video_path
+        if verbose:
+            print(f"   ✓ Using canonical video: {canonical_video_path}")
+    else:
+        # 2. Try constructing from video_dir + video_file
+        video_dir = Path(config['global'].get('video_dir', ''))
+        video_file = config['global'].get('video_file', '')
+        video_path = video_dir / video_file
+        
+        if not video_path.exists():
+            print(f"❌ Error: Video file not found")
+            print(f"   Tried:")
+            print(f"   1. {canonical_video_path}")
+            print(f"   2. {video_path}")
+            print(f"\n   💡 Tip: Stage 0 creates canonical_video.mp4 in the output directory")
+            print(f"   Run Stage 0 first if missing: python run_pipeline.py --stages 0")
             sys.exit(1)
-    
-    if verbose:
-        print(f"   ✓ Found video: {video_path.name}")
+        
+        if verbose:
+            print(f"   ✓ Found video: {video_path}")
     
     # Load canonical persons from Stage 3c
     print(f"\n📂 Loading canonical persons from Stage 3c...")
