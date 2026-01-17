@@ -6,25 +6,25 @@ pose_estimation_model: rtmpose  # Options: rtmpose, vitpose, rtmpose_h26, wholeb
 
 # Model configurations
 rtmpose:
-  pose_model_path: models/rtmlib/rtmpose-l-coco-384x288.onnx
+  pose_model_path: unifiedposepipeline/models/rtmlib/rtmpose-l-coco-384x288.onnx
   pose_input_size: [288, 384]
   backend: onnxruntime
   device: cuda
 
 rtmpose_h26:
-  pose_model_path: models/rtmlib/rtmpose-l-halpe26-384x288.onnx
+  pose_model_path: unifiedposepipeline/models/rtmlib/rtmpose-l-halpe26-384x288.onnx
   pose_input_size: [288, 384]
   backend: onnxruntime
   device: cuda
 
 vitpose:
-  model_path: models/vitpose/vitpose-b.pth
+  model_path: unifiedposepipeline/models/vitpose/vitpose-b.pth
   model_name: b
   dataset: coco
   device: cuda
 
 wholebody:
-  pose_model_path: models/wb3d/rtmw3d-l.onnx
+  pose_model_path: unifiedposepipeline/models/wb3d/rtmw3d-l.onnx
   pose_input_size: [288, 384]
   backend: onnxruntime
   device: cuda
@@ -41,7 +41,7 @@ detections_file: demo_data/outputs/kohli_nets/selected_person.npz
 # Maximum frames to process (null or 0 to process all frames)
 # For full video: set to null or 0
 # For testing: set to 100-200
-max_frames: null
+max_frames: 600  # Quick test (600 frames = ~24 seconds @ 25fps)
 
 # Output directory (filename will be auto-generated based on model type)
 output_dir: demo_data/outputs
