@@ -29,11 +29,11 @@ wholebody:
   backend: onnxruntime
   device: cuda
 
-# Input video file
-# Priority order (script will auto-fallback):
-#   1. Path specified below
-#   2. canonical_video.mp4 in same dir as selected_person.npz (if Stage 0 ran)
-input_video: demo_data/videos/kohli_nets.mp4
+# Input video files (auto-fallback)
+# Primary: canonical_video.mp4 from Stage 0 (normalized/validated)
+# Fallback: Original video if Stage 0 was skipped
+input_video_primary: demo_data/outputs/kohli_nets/canonical_video.mp4
+input_video_fallback: demo_data/videos/kohli_nets.mp4
 
 # Detections file from Stage 5 (selected_person.npz)
 detections_file: demo_data/outputs/kohli_nets/selected_person.npz

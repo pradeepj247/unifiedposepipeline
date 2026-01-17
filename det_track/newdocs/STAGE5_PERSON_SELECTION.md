@@ -16,6 +16,7 @@ For rapid testing of the pose estimation pipeline, you can skip Stages 0-4 by us
 
 **Available Files** (from complete pipeline run):
 ```
+canonical_video.mp4               # 47.3 MB - Normalized video (Stage 0)
 canonical_persons_3c.npz          # 139 KB - Filtered persons (Stage 3c)
 canonical_persons_3c.npz.timings.json
 canonical_persons.npz             # 185 KB - All grouped persons (Stage 3b)

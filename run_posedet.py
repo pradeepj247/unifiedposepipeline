@@ -559,23 +559,23 @@ def main():
         print("   Supported methods: rtmpose, rtmpose_h26, vitpose, wholebody")
         return 1
     
-    video_path = REPO_ROOT / config["input_video"]
+    # Try primary video first (canonical_video.mp4 from Stage 0)
+    primary_video = REPO_ROOT / config.get("input_video_primary", "")
+    fallback_video = REPO_ROOT / config.get("input_video_fallback", "")
     
-    # Auto-fallback: If video doesn't exist, try canonical_video.mp4 in output dir
-    if not video_path.exists():
-        # Try canonical_video.mp4 in the detections output directory
-        detections_dir = detections_path.parent
-        canonical_video = detections_dir / "canonical_video.mp4"
-        
-        if canonical_video.exists():
-            video_path = canonical_video
-            print(f"   📹 Using canonical video: {canonical_video}")
-        else:
-            print(f"\n❌ Error: Video file not found")
-            print(f"   Tried:")
-            print(f"   1. {REPO_ROOT / config['input_video']}")
-            print(f"   2. {canonical_video}")
-            return 1
+    if primary_video.exists():
+        video_path = primary_video
+        print(f"   📹 Using canonical video (Stage 0): {primary_video.name}")
+    elif fallback_video.exists():
+        video_path = fallback_video
+        print(f"   📹 Using original video (fallback): {fallback_video.name}")
+    else:
+        print(f"\n❌ Error: Video file not found")
+        print(f"   Tried:")
+        print(f"   1. Primary: {primary_video}")
+        print(f"   2. Fallback: {fallback_video}")
+        print(f"\n   💡 Tip: Run Stage 0 to create canonical_video.mp4")
+        return 1
     
     # Run 2D pose estimation
     if method == "rtmpose":
