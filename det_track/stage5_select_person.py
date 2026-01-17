@@ -336,7 +336,7 @@ def main():
     output_config = stage_config.get('output', {})
     
     # Input file: canonical_persons_3c.npz
-    canonical_persons_path = Path(output_config.get('filtered_file', ''))
+    canonical_persons_path = Path(output_config.get('canonical_persons_filtered_file', ''))
     if not canonical_persons_path.exists():
         print(f"❌ Error: Input file not found: {canonical_persons_path}")
         print(f"   Run Stage 3c first: python run_pipeline.py --stages 3c")
