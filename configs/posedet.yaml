@@ -29,14 +29,17 @@ wholebody:
   backend: onnxruntime
   device: cuda
 
-# Input video file
-input_video: demo_data/videos/dance.mp4
+# Input video file (or canonical_video.mp4 from Stage 0)
+input_video: demo_data/outputs/kohli_nets/canonical_video.mp4
+# Alternative: demo_data/videos/kohli_nets.mp4 (if original available)
 
-# Detections file from Stage 1 (run_detector.py or udp_video.py Stage 1)
-detections_file: demo_data/outputs/detections.npz
+# Detections file from Stage 5 (selected_person.npz)
+detections_file: demo_data/outputs/kohli_nets/selected_person.npz
 
 # Maximum frames to process (null or 0 to process all frames)
-max_frames: 360
+# For full video: set to null or 0
+# For testing: set to 100-200
+max_frames: null
 
 # Output directory (filename will be auto-generated based on model type)
 output_dir: demo_data/outputs
