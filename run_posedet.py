@@ -560,9 +560,22 @@ def main():
         return 1
     
     video_path = REPO_ROOT / config["input_video"]
+    
+    # Auto-fallback: If video doesn't exist, try canonical_video.mp4 in output dir
     if not video_path.exists():
-        print(f"\n❌ Error: Video file not found: {video_path}")
-        return 1
+        # Try canonical_video.mp4 in the detections output directory
+        detections_dir = detections_path.parent
+        canonical_video = detections_dir / "canonical_video.mp4"
+        
+        if canonical_video.exists():
+            video_path = canonical_video
+            print(f"   📹 Using canonical video: {canonical_video}")
+        else:
+            print(f"\n❌ Error: Video file not found")
+            print(f"   Tried:")
+            print(f"   1. {REPO_ROOT / config['input_video']}")
+            print(f"   2. {canonical_video}")
+            return 1
     
     # Run 2D pose estimation
     if method == "rtmpose":

@@ -30,9 +30,10 @@ wholebody:
   device: cuda
 
 # Input video file
-# Use original video if Stage 0 was skipped (no canonical_video.mp4)
+# Priority order (script will auto-fallback):
+#   1. Path specified below
+#   2. canonical_video.mp4 in same dir as selected_person.npz (if Stage 0 ran)
 input_video: demo_data/videos/kohli_nets.mp4
-# Alternative (if Stage 0 was run): demo_data/outputs/kohli_nets/canonical_video.mp4
 
 # Detections file from Stage 5 (selected_person.npz)
 detections_file: demo_data/outputs/kohli_nets/selected_person.npz
