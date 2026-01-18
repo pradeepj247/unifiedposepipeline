@@ -127,11 +127,10 @@ def benchmark_gpu_decode_ffmpeg(model, video_path, max_frames=None):
     print(f"Starting GPU decode benchmark...\n")
     
     # FFmpeg command with GPU decode
-    # Output raw BGR24 frames (same as OpenCV default)
+    # GPU decodes but outputs to CPU for piping (still faster than pure CPU decode)
     ffmpeg_cmd = [
         'ffmpeg',
-        '-hwaccel', 'cuda',           # GPU decode
-        '-hwaccel_output_format', 'cuda',  # Keep on GPU
+        '-hwaccel', 'cuda',           # GPU decode (NVDEC)
         '-i', str(video_path),
         '-f', 'rawvideo',              # Raw video output
         '-pix_fmt', 'bgr24',          # BGR format (OpenCV compatible)
@@ -203,6 +202,7 @@ def benchmark_gpu_decode_ffmpeg(model, video_path, max_frames=None):
     print(f"   Frames: {frame_count}")
     print(f"   FPS: {fps:.1f}")
     print(f"   Avg inference time: {avg_infer:.2f}ms/frame")
+    print(f"   Total per frame: {(total_time / frame_count * 1000) if frame_count > 0 else 0:.2f}ms")
     print(f"   Note: Decode time included in total (pipelined with FFmpeg)")
     
     return {
@@ -212,7 +212,7 @@ def benchmark_gpu_decode_ffmpeg(model, video_path, max_frames=None):
         'fps': fps,
         'decode_ms': None,  # Pipelined, can't separate
         'inference_ms': avg_infer,
-        'total_ms': (total_time / frame_count) * 1000
+        'total_ms': (total_time / frame_count * 1000) if frame_count > 0 else 0
     }
 
 
