@@ -184,6 +184,9 @@ def auto_select_best_model(model_path, verbose=False):
 
 def load_yolo_detector(model_path, device='cuda', verbose=False):
     """Load YOLO detector - supports both PyTorch (.pt) and TensorRT (.engine) models"""
+    import sys
+    import os
+    
     try:
         from ultralytics import YOLO
         import torch
@@ -194,8 +197,6 @@ def load_yolo_detector(model_path, device='cuda', verbose=False):
     if model_path.endswith('.engine'):
         try:
             import tensorrt as trt
-            import sys
-            import os
             # Set TensorRT logger to ERROR level
             logger = trt.Logger(trt.Logger.ERROR)
             trt.init_libnvinfer_plugins(logger, "")
@@ -227,8 +228,6 @@ def load_yolo_detector(model_path, device='cuda', verbose=False):
         print(f"  ✅ Loading {model_type}: {model_path}")
     
     # Suppress ultralytics and TensorRT verbose output during model loading
-    import sys
-    import os
     old_stdout = sys.stdout
     old_stderr = sys.stderr
     if not verbose and model_path.endswith('.engine'):
