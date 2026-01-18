@@ -350,8 +350,13 @@ def normalize_video(input_path, output_path, metadata, config):
         return False, 0
 
 
-def run_stage0_normalize(config):
-    """Main function for Stage 0"""
+def run_stage0_normalize(config, verbose=False):
+    """Main function for Stage 0
+    
+    Args:
+        config: Pipeline configuration
+        verbose: Show detailed output
+    """
     
     stage_config = config.get('stage0_normalize', {})
     
@@ -380,12 +385,13 @@ def run_stage0_normalize(config):
     print("\n" + "="*70)
     print("STAGE 0: VIDEO NORMALIZATION & VALIDATION")
     print("="*70)
-    print(f"Input video: {input_video}")
-    print("-"*70)
+    print(f"🎞️ Input video: {input_video}")
     
     # Step 1: Extract metadata
-    print("\n📊 Step 1: Extracting video metadata...")
+    print("\n📊 Step A: Extracting video metadata")
     metadata_start = time.time()
+    if verbose:
+        print(f"  Extracting metadata from: {input_video}")
     metadata = get_video_metadata(input_video)
     metadata_time = time.time() - metadata_start
     timing['metadata_extraction_time'] = metadata_time
@@ -394,33 +400,36 @@ def run_stage0_normalize(config):
         print("[ERROR] FAILED: Could not extract video metadata")
         sys.exit(1)
     
-    print(f"  ✅ Metadata extracted ({metadata_time:.2f}s)")
-    print(f"     Resolution: {metadata['width']}x{metadata['height']}")
-    print(f"     FPS: {metadata['fps']:.2f}")
-    print(f"     Duration: {metadata['duration']:.1f}s")
-    print(f"     Codec: {metadata['codec']}")
-    print(f"     File size: {metadata['filesize_mb']:.1f} MB")
+    if verbose:
+        print(f"  ✅ Metadata extracted ({metadata_time:.2f}s)")
+        print(f"     Resolution: {metadata['width']}x{metadata['height']}")
+        print(f"     FPS: {metadata['fps']:.2f}")
+        print(f"     Duration: {metadata['duration']:.1f}s")
+        print(f"     Codec: {metadata['codec']}")
+        print(f"     File size: {metadata['filesize_mb']:.1f} MB")
     
     # Step 2: Validate
-    print("\n✅ Step 2: Validating video...")
+    print("\n🔍 Step B: Validating video")
     is_valid, checks = validate_metadata(metadata, config)
     timing['validation_time'] = time.time() - metadata_start - metadata_time
     
-    for status, message in checks:
-        icon = {'PASS': '✅', 'WARN': '⚠️', 'INFO': 'ℹ️', 'FAIL': '❌'}[status]
-        print(f"  {icon} {message}")
+    if verbose:
+        for status, message in checks:
+            icon = {'PASS': '✅', 'WARN': '⚠️', 'INFO': 'ℹ️', 'FAIL': '❌'}[status]
+            print(f"  {icon} {message}")
     
     if not is_valid:
         print("\n[ERROR] VALIDATION FAILED: Video does not meet requirements")
         sys.exit(1)
     
     # Step 3: Check if normalization needed
-    print("\n🔍 Step 3: Checking if normalization needed...")
+    print("\n�️ Step C: Creating canonical video")
     needs_norm, reasons = needs_normalization(metadata, config)
     
     if not needs_norm:
-        print("  ✅ Video already in canonical format, no normalization needed")
-        print(f"     Using original video as canonical: {input_video}")
+        if verbose:
+            print("  ✅ Video already in canonical format, no normalization needed")
+            print(f"     Using original video as canonical: {input_video}")
         
         # Create symlink or copy
         if stage_config.get('output', {}).get('symlink_if_canonical', True):
@@ -430,21 +439,22 @@ def run_stage0_normalize(config):
                     if Path(output_video).exists():
                         Path(output_video).unlink()
                     Path(output_video).symlink_to(Path(input_video).resolve())
-                    print(f"     Created symlink: {output_video}")
+                    if verbose:
+                        print(f"     Created symlink: {output_video}")
                 except OSError:
                     # Symlink failed (Windows?), copy instead
                     import shutil
                     shutil.copy2(input_video, output_video)
-                    print(f"     Copied file: {output_video}")
+                    if verbose:
+                        print(f"     Copied file: {output_video}")
         
         timing['normalization_time'] = 0
         timing['normalization_needed'] = False
     
     else:
-        print(f"  ⚙️  Normalization needed: {', '.join(reasons)}")
+        if verbose:
+            print(f"  ⚙️  Normalization needed: {', '.join(reasons)}")
         
-        # Step 4: Normalize
-        print("\n🔄 Step 4: Normalizing video...")
         norm_start = time.time()
         success, norm_time = normalize_video(input_video, output_video, metadata, config)
         timing['normalization_time'] = norm_time
@@ -456,14 +466,16 @@ def run_stage0_normalize(config):
             sys.exit(1)
     
     # Get canonical video metadata
-    print("\n📊 Verifying canonical video...")
+    print("\n📊 Step D: Verifying canonical video")
+    if verbose:
+        print(f"  Extracting metadata from: {output_video}")
     canonical_metadata = get_video_metadata(output_video)
     if canonical_metadata:
-        print(f"  ✅ Canonical video created:")
-        print(f"     Resolution: {canonical_metadata['width']}x{canonical_metadata['height']}")
-        print(f"     FPS: {canonical_metadata['fps']:.2f}")
-        print(f"     Codec: {canonical_metadata['codec']}")
-        print(f"     File size: {canonical_metadata['filesize_mb']:.1f} MB")
+        print(f"\n🎞️ Canonical video created")
+        print(f"   Resolution: {canonical_metadata['width']}x{canonical_metadata['height']}")
+        print(f"   FPS: {canonical_metadata['fps']:.2f}")
+        print(f"   Codec: {canonical_metadata['codec']}")
+        print(f"   File size: {canonical_metadata['filesize_mb']:.1f} MB")
     
     # Save timing
     timing['end_time'] = time.time()
@@ -479,13 +491,13 @@ def run_stage0_normalize(config):
         json.dump(timing, f, indent=2)
     
     print("\n" + "="*70)
-    print("STAGE 0 COMPLETE")
+    print("✅ STAGE 0 COMPLETE")
     print("="*70)
-    print(f"Total time: {timing['total_time']:.2f}s")
+    print(f"  Total time: {timing['total_time']:.2f}s")
     print(f"  Metadata extraction: {timing['metadata_extraction_time']:.2f}s")
     print(f"  Normalization: {timing['normalization_time']:.2f}s")
-    print(f"\nCanonical video: {output_video}")
-    print(f"Timing saved: {timing_file}")
+    print(f"\n  Canonical video: {output_video}")
+    print(f"  Timing saved: {timing_file}")
     print("="*70)
     
     return output_video
@@ -497,10 +509,12 @@ def main():
     args = parser.parse_args()
     
     config = load_config(args.config)
-    canonical_video = run_stage0_normalize(config)
+    verbose = config.get('global', {}).get('verbose', False)
+    canonical_video = run_stage0_normalize(config, verbose=verbose)
     
     if canonical_video:
-        print(f"\n✅ Stage 0 successful: {canonical_video}")
+        if verbose:
+            print(f"\n✅ Stage 0 successful: {canonical_video}")
     else:
         print("\n⏭️  Stage 0 skipped")
 
