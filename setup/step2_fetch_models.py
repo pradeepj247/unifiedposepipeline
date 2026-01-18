@@ -210,9 +210,18 @@ def main():
     # Fetch each model
     success_count = 0
     failed_models = []
+    skipped_models = []
     
     try:
         for i, model in enumerate(models, 1):
+            # Check if fetch is disabled
+            fetch_enabled = model.get('fetch', 'yes').lower() in ['yes', 'true', '1']
+            
+            if not fetch_enabled:
+                print(f"  ⏭️  [{i}/{len(models)}] Skipping: {model['name']} (fetch=no)")
+                skipped_models.append(model['name'])
+                continue
+            
             print(f"  ⬇️  [{i}/{len(models)}] Fetching: {model['name']}")
             
             if fetch_model(model, preferred_source, base_dir):
@@ -224,13 +233,23 @@ def main():
         total_time = time.time() - start_time
         print("\n" + "=" * 70)
         
+        if skipped_models:
+            print(f"{COLOR_BLUE}⏭️  SKIPPED: {len(skipped_models)} model(s) (fetch=no){COLOR_RESET}")
+            for model_name in skipped_models:
+                print(f"  ⏭️  {model_name}")
+            print()
+        
         if failed_models:
-            print(f"{COLOR_YELLOW}⚠️  PARTIAL SUCCESS: {success_count}/{len(models)} models fetched{COLOR_RESET}")
+            print(f"{COLOR_YELLOW}⚠️  PARTIAL SUCCESS: {success_count}/{len(models) - len(skipped_models)} models fetched{COLOR_RESET}")
             print(f"\nFailed models:")
             for model_name in failed_models:
                 print(f"  ✗ {model_name}")
         else:
-            print(f"{COLOR_GREEN}✅  SUCCESS: All {len(models)} models fetched!{COLOR_RESET}")
+            fetched_count = len(models) - len(skipped_models)
+            if fetched_count > 0:
+                print(f"{COLOR_GREEN}✅  SUCCESS: All {fetched_count} enabled models fetched!{COLOR_RESET}")
+            else:
+                print(f"{COLOR_YELLOW}⚠️  No models fetched (all marked fetch=no){COLOR_RESET}")
         
         print(f"⏱️  TOTAL TIME TAKEN: {total_time:.2f}s")
         print("=" * 70 + "\n")

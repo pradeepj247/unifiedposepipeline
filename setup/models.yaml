@@ -14,6 +14,7 @@ models:
     subfolder: yolo/
     size_mb: 22.6
     fallback_location: /content/drive/MyDrive/pipelinemodels/yolo/yolov8s.pt
+    fetch: yes
 
   - name: YOLOv8s TensorRT
     filename: yolov8s.engine
@@ -22,6 +23,7 @@ models:
     subfolder: yolo/
     size_mb: 23.0
     fallback_location: /content/drive/MyDrive/pipelinemodels/yolo/yolov8s.engine
+    fetch: yes
 
   - name: VITPose
     filename: vitpose-b.pth
@@ -30,6 +32,7 @@ models:
     subfolder: vitpose/
     size_mb: 360.0
     fallback_location: /content/drive/MyDrive/pipelinemodels/vitpose/vitpose-b.pth
+    fetch: yes
 
   - name: RTMPose (COCO)
     filename: rtmpose-l-coco-384x288.onnx
@@ -38,6 +41,7 @@ models:
     subfolder: rtmlib/
     size_mb: 111.1
     fallback_location: /content/drive/MyDrive/pipelinemodels/rtmlib/rtmpose-l-coco-384x288.onnx
+    fetch: yes
 
   - name: RTMPose (Halpe26)
     filename: rtmpose-l-halpe26-384x288.onnx
@@ -46,6 +50,7 @@ models:
     subfolder: rtmlib/
     size_mb: 112.9
     fallback_location: /content/drive/MyDrive/pipelinemodels/rtmlib/rtmpose-l-halpe26-384x288.onnx
+    fetch: yes
 
   - name: MotionAGFormer
     filename: motionagformer-base-h36m.pth.tr
@@ -54,6 +59,7 @@ models:
     subfolder: motionagformer/
     size_mb: 141.9
     fallback_location: /content/drive/MyDrive/pipelinemodels/motionagformer/motionagformer-base-h36m.pth.tr
+    fetch: yes
 
   - name: RTM Wholebody
     filename: rtmw3d-l.onnx
@@ -62,6 +68,7 @@ models:
     subfolder: wb3d/
     size_mb: 230.0
     fallback_location: /content/drive/MyDrive/pipelinemodels/wb3d/rtmw3d-l.onnx
+    fetch: yes
 
   - name: OSNet x1.0 (PyTorch)
     filename: osnet_x1_0_msmt17.pt
@@ -70,6 +77,7 @@ models:
     subfolder: reid/
     size_mb: 10.9
     fallback_location: /content/drive/MyDrive/pipelinemodels/reid/osnet_x1_0_msmt17.pt
+    fetch: yes
 
   - name: OSNet x0.25 (PyTorch)
     filename: osnet_x0_25_msmt17.pt
@@ -78,6 +86,7 @@ models:
     subfolder: reid/
     size_mb: 3.1
     fallback_location: /content/drive/MyDrive/pipelinemodels/reid/osnet_x0_25_msmt17.pt
+    fetch: yes
 
   - name: OSNet x0.25 (ONNX)
     filename: osnet_x0_25_msmt17.onnx
@@ -86,3 +95,4 @@ models:
     subfolder: reid/
     size_mb: 0.9
     fallback_location: /content/drive/MyDrive/pipelinemodels/reid/osnet_x0_25_msmt17.onnx
+    fetch: yes
