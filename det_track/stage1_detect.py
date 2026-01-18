@@ -384,8 +384,8 @@ def run_detection(config):
     device = detector_config['device']
     detect_only_humans = detector_config['detect_only_humans']
     
-    # Get video path from global config (single source of truth)
-    video_path = config['global']['video_dir'] + config['global']['video_file']
+    # Use canonical video from Stage 0 (normalized to 720p)
+    video_path = config['global']['outputs_dir'] + 'canonical_video.mp4'
     max_frames = input_config['max_frames']
     
     detections_file = output_config['detections_file']
