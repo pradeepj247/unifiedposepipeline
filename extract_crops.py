@@ -144,27 +144,34 @@ def extract_crops(selected_person_path, video_path, output_path, expand_bbox=0.1
     except KeyboardInterrupt:
         print(f"\n\n   ⚠️  Process interrupted by user at frame {current_frame}")
         print(f"   Extracted {valid_crops} crops before interruption")
+        sys.stdout.flush()
         cap.release()
         return None, 0
     except Exception as e:
         print(f"\n\n   ❌ Error during extraction: {e}")
         import traceback
         traceback.print_exc()
+        sys.stdout.flush()
         cap.release()
         return None, 0
     
+    # Close video
     cap.release()
     t_end = time.time()
     total_time = t_end - t_start
     
-    print(f"\n   ✅ Extraction complete!")
+    print(f"\n\n   ✅ Extraction complete!")
     print(f"   Video frames read: {current_frame}/{total_frames}")
     print(f"   Valid crops: {valid_crops}/{len(frame_numbers)}")
     print(f"   Time: {total_time:.2f}s ({total_time / 60:.2f} min)")
     print(f"   Processing FPS: {current_frame / total_time:.1f}")
     print(f"   Time per frame: {(total_time / current_frame) * 1000:.1f} ms")
+    sys.stdout.flush()
     
     # Calculate storage size
+    print(f"\n💾 Calculating storage info...")
+    sys.stdout.flush()
+    
     crop_sizes = [crop.nbytes for crop in crops if crop is not None]
     avg_crop_size = np.mean(crop_sizes) if crop_sizes else 0
     total_size_mb = sum(crop_sizes) / (1024 * 1024)
@@ -174,35 +181,54 @@ def extract_crops(selected_person_path, video_path, output_path, expand_bbox=0.1
     avg_height = np.mean([s[0] for s in crop_shapes]) if crop_shapes else 0
     avg_width = np.mean([s[1] for s in crop_shapes]) if crop_shapes else 0
     
-    print(f"\n💾 Storage info:")
     print(f"   Avg crop size: {avg_crop_size / 1024:.1f} KB")
     print(f"   Avg dimensions: {avg_width:.0f}×{avg_height:.0f} px")
     print(f"   Total size: {total_size_mb:.1f} MB")
+    sys.stdout.flush()
     
     # Save to PKL
     print(f"\n📦 Saving crops to PKL...")
+    sys.stdout.flush()
+    
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
+    print(f"   Output path: {output_path}")
+    sys.stdout.flush()
+    
     t_save_start = time.time()
     
-    # Save with metadata
-    crops_data = {
-        'crops': crops,
-        'frame_numbers': frame_numbers,
-        'bboxes': bboxes,
-        'person_id': data.get('person_id', None),
-        'expand_bbox': expand_bbox,
-        'video_metadata': {
-            'width': width,
-            'height': height,
-            'fps': fps,
-            'total_frames': total_frames
+    try:
+        # Save with metadata
+        crops_data = {
+            'crops': crops,
+            'frame_numbers': frame_numbers,
+            'bboxes': bboxes,
+            'person_id': data.get('person_id', None),
+            'expand_bbox': expand_bbox,
+            'video_metadata': {
+                'width': width,
+                'height': height,
+                'fps': fps,
+                'total_frames': total_frames
+            }
         }
-    }
-    
-    with open(output_path, 'wb') as f:
-        pickle.dump(crops_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+        
+        print(f"   Writing to disk...")
+        sys.stdout.flush()
+        
+        with open(output_path, 'wb') as f:
+            pickle.dump(crops_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+        
+        print(f"   ✅ Write complete!")
+        sys.stdout.flush()
+        
+    except Exception as e:
+        print(f"\n   ❌ Error saving PKL: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.stdout.flush()
+        return None, 0
     
     t_save_end = time.time()
     save_time = t_save_end - t_save_start
