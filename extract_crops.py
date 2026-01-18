@@ -93,6 +93,8 @@ def extract_crops(selected_person_path, video_path, output_path, expand_bbox=0.1
         while True:
             ret, frame = cap.read()
             if not ret:
+                print(f"\n   📹 Video read finished at frame {current_frame}")
+                sys.stdout.flush()
                 break
             
             # Check if this frame is in our selection
