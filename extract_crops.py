@@ -317,6 +317,18 @@ def extract_crops(selected_person_path, video_path, output_path, expand_bbox=0.1
 
 
 def main():
+    import signal
+    import sys
+    
+    def signal_handler(sig, frame):
+        print('\n\n⚠️  Signal received! Attempting graceful shutdown...')
+        sys.stdout.flush()
+        sys.exit(1)
+    
+    # Register signal handler
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
     parser = argparse.ArgumentParser(description='Extract person crops from video')
     parser.add_argument('--selected_person', type=str, required=True,
                         help='Path to selected_person.npz')
@@ -334,8 +346,19 @@ def main():
         selected_path = Path(args.selected_person)
         args.output = selected_path.parent / "selected_crops.pkl"
     
-    # Extract crops
-    extract_crops(args.selected_person, args.video, args.output, args.expand_bbox)
+    try:
+        # Extract crops
+        extract_crops(args.selected_person, args.video, args.output, args.expand_bbox)
+    except KeyboardInterrupt:
+        print('\n\n⚠️  Main KeyboardInterrupt caught!')
+        sys.stdout.flush()
+        return 1
+    except Exception as e:
+        print(f'\n\n❌ Main exception: {e}')
+        import traceback
+        traceback.print_exc()
+        sys.stdout.flush()
+        return 1
     
     return 0
 
