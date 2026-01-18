@@ -140,6 +140,10 @@ def extract_crops(selected_person_path, video_path, output_path, expand_bbox=0.1
                 fps_proc = current_frame / elapsed
                 print(f"\n   ✅ Progress: {current_frame}/{total_frames} frames | {fps_proc:.1f} FPS | {valid_crops} crops extracted")
                 sys.stdout.flush()
+        
+        # Loop completed
+        print(f"\n\n   🎉 Loop completed! Read {current_frame} frames, extracted {valid_crops} crops")
+        sys.stdout.flush()
     
     except KeyboardInterrupt:
         print(f"\n\n   ⚠️  Process interrupted by user at frame {current_frame}")
