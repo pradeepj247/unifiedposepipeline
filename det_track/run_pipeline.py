@@ -443,12 +443,6 @@ def run_pipeline(config_path, stages_to_run=None, mode=None, verbose=False, forc
                             other_overhead = 0.0
 
                         print(f"   ✅ Stage 3b: Enhanced Canonical Grouping completed in {stage_duration:.2f}s")
-                        print(f"      Breakdown (stage parts):")
-                        print(f"       grouping (5 checks): {grouping_time:.2f}s")
-                        print(f"       files saving: {save_time:.2f}s")
-                        print(f"       other overheads: {other_overhead:.2f}s")
-                        if verbose:
-                            print(f"      Merge stats: {num_merged} groups merged from multiple tracklets")
                     else:
                         print(f"   ✅ Stage 3b: Enhanced Canonical Grouping completed in {stage_duration:.2f}s")
 

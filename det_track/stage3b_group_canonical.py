@@ -317,10 +317,7 @@ def run_enhanced_grouping(config):
     tracklets = list(data['tracklets'])
     stats = list(data['statistics'])
     
-    logger.info(f"Loaded {len(tracklets)} tracklets with pre-computed statistics")
-    
     # Group tracklets with enhanced criteria
-    logger.info(f"Grouping tracklets with enhanced merge checks (5 criteria)...")
     t_start = time.time()
     
     criteria = grouping_config['enhanced_criteria']
