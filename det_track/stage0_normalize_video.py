@@ -284,8 +284,8 @@ def normalize_video(input_path, output_path, metadata, config):
     # Resolution normalization with GPU scaling
     target_res = normalization.get('target_resolution', [1280, 720])
     if use_gpu:
-        # GPU-based scaling
-        scale_filter = f"scale_cuda={target_res[0]}:{target_res[1]}"
+        # GPU-based scaling with format conversion
+        scale_filter = f"scale_cuda={target_res[0]}:{target_res[1]}:format=yuv420p"
         print(f"    Resolution: {metadata['width']}x{metadata['height']} → {target_res[0]}x{target_res[1]} (GPU)")
     else:
         # CPU-based scaling (fallback)
