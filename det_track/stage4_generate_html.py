@@ -397,24 +397,37 @@ def main():
         traceback.print_exc()
         return 1
     
-    # ==================== Cleanup WebP Files ====================
-    # WebPs are embedded in HTML as base64, delete originals to save space
+    # ==================== Move HTML and Cleanup ====================
+    # Move HTML file one directory above (to parent of output_dir)
     if verbose:
-        logger.step("Cleaning up WebP files (embedded in HTML)...")
+        logger.step("Moving HTML viewer to parent directory...")
+    
+    parent_dir = output_dir.parent
+    final_html_path = parent_dir / html_file.name
+    
+    try:
+        import shutil
+        shutil.move(str(html_file), str(final_html_path))
+        if verbose:
+            logger.info(f"HTML moved to: {final_html_path}")
+    except Exception as e:
+        logger.error(f"Error moving HTML file: {e}")
+        return 1
+    
+    # Delete entire WebP directory (WebPs are embedded in HTML)
+    if verbose:
+        logger.step("Removing WebP directory...")
     
     cleanup_start = time.time()
-    deleted_count = 0
-    for webp_file in output_dir.glob('person_*.webp'):
-        try:
-            webp_file.unlink()
-            deleted_count += 1
-        except Exception as e:
-            if verbose:
-                logger.warning(f"Could not delete {webp_file.name}: {e}")
-    
-    cleanup_time = time.time() - cleanup_start
-    if verbose:
-        logger.info(f"Deleted {deleted_count} WebP files ({cleanup_time:.2f}s)")
+    try:
+        import shutil
+        shutil.rmtree(output_dir)
+        cleanup_time = time.time() - cleanup_start
+        if verbose:
+            logger.info(f"Removed directory: {output_dir} ({cleanup_time:.2f}s)")
+    except Exception as e:
+        cleanup_time = time.time() - cleanup_start
+        logger.error(f"Error removing directory {output_dir}: {e}")
     
     # ==================== Summary ====================
     total_time = webp_time + cleanup_time
@@ -432,8 +445,8 @@ def main():
         logger.info(f"  - Total: {total_time:.2f}s")
         print()
         logger.info(f"Output:")
-        logger.info(f"  - HTML viewer: {html_file}")
-        logger.info(f"  - WebP files: {len(person_buckets)} animations")
+        logger.info(f"  - HTML viewer: {final_html_path}")
+        logger.info(f"  - WebP directory: Removed (embedded in HTML)")
         logger.info(f"  - Persons: {len(person_buckets)}")
         print()
     
