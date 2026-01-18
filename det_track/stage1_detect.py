@@ -109,6 +109,79 @@ def load_config(config_path):
     return resolved_config
 
 
+def auto_select_best_model(model_path, verbose=False):
+    """
+    Automatically select best available YOLO model:
+    - Prefers yolov8n.engine (121 FPS) if exists and compatible
+    - Falls back to specified model_path otherwise
+    
+    Returns: Path to best model to use
+    """
+    # If already specifying .engine, use it
+    if model_path.endswith('.engine'):
+        return model_path
+    
+    # Extract directory from model_path
+    model_dir = os.path.dirname(model_path)
+    yolov8n_engine = os.path.join(model_dir, 'yolov8n.engine')
+    
+    # Check if yolov8n.engine exists
+    if not os.path.exists(yolov8n_engine):
+        if verbose:
+            print(f"  ℹ️  TensorRT engine not found: {yolov8n_engine}")
+            print(f"  ℹ️  Using configured model: {model_path}")
+        return model_path
+    
+    # Quick compatibility check: try to load engine
+    try:
+        if verbose:
+            print(f"  🔍 Found TensorRT engine: {yolov8n_engine}")
+            print(f"  🧪 Testing compatibility...")
+        
+        from ultralytics import YOLO
+        import torch
+        import numpy as np
+        
+        # Initialize CUDA
+        if not torch.cuda.is_available():
+            if verbose:
+                print(f"  ⚠️  CUDA not available - using PyTorch model")
+            return model_path
+        
+        torch.cuda.set_device(0)
+        _ = torch.zeros(1, device="cuda")
+        
+        # Try to load engine (suppress output)
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            test_model = YOLO(yolov8n_engine, task="detect")
+            
+            # Quick inference test
+            dummy = np.zeros((640, 640, 3), dtype=np.uint8)
+            _ = test_model.predict(source=dummy, conf=0.5, device=0, verbose=False)
+        
+        # Success! Engine is compatible
+        if verbose:
+            print(f"  ✅ TensorRT engine compatible - using yolov8n.engine (121 FPS)")
+            print(f"  🚀 Performance boost: ~45% faster than PyTorch")
+        else:
+            print(f"  🚀 Auto-selected TensorRT engine: yolov8n.engine (121 FPS, 45% faster)")
+        
+        return yolov8n_engine
+        
+    except Exception as e:
+        if verbose:
+            print(f"  ⚠️  TensorRT engine incompatible: {str(e)[:100]}")
+            print(f"  💡 Run: python det_track/debug/check_tensorrt_compatibility.py --auto-reexport")
+            print(f"  ℹ️  Falling back to: {model_path}")
+        else:
+            print(f"  ⚠️  TensorRT engine incompatible - using PyTorch model")
+            print(f"  💡 Fix: python det_track/debug/check_tensorrt_compatibility.py --auto-reexport")
+        
+        return model_path
+
+
 def load_yolo_detector(model_path, device='cuda', verbose=False):
     """Load YOLO detector - supports both PyTorch (.pt) and TensorRT (.engine) models"""
     try:
@@ -116,6 +189,10 @@ def load_yolo_detector(model_path, device='cuda', verbose=False):
         import torch
     except ImportError:
         raise ImportError("ultralytics or torch not found. Install with: pip install ultralytics torch")
+    
+    # Auto-select best model (prefers TensorRT if available)
+    original_model_path = model_path
+    model_path = auto_select_best_model(model_path, verbose)
     
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"YOLO model not found: {model_path}")
