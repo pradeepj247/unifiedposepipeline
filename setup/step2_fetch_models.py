@@ -235,6 +235,39 @@ def main():
         print(f"⏱️  TOTAL TIME TAKEN: {total_time:.2f}s")
         print("=" * 70 + "\n")
         
+        # Copy pre-exported YOLO models from Drive backup (if available)
+        drive_yolo_backup = "/content/drive/MyDrive/yolomodels/new"
+        yolo_dest = os.path.join(base_dir, "yolo")
+        
+        if os.path.exists(drive_yolo_backup) and os.path.exists(yolo_dest):
+            print("=" * 70)
+            print(f"{COLOR_BLUE}📦 Copying pre-exported YOLO models from Drive backup{COLOR_RESET}")
+            print("=" * 70 + "\n")
+            print(f"  📂 Source: {drive_yolo_backup}")
+            print(f"  📂 Destination: {yolo_dest}")
+            print(f"  💡 This includes TensorRT engines (.engine), ONNX, and PyTorch (.pt) models\n")
+            
+            copy_cmd = f"cp -v {drive_yolo_backup}/* {yolo_dest}/ 2>&1"
+            try:
+                result = subprocess.run(copy_cmd, shell=True, check=True, capture_output=True, text=True)
+                files_copied = [line for line in result.stdout.split('\n') if line.strip()]
+                
+                print(f"  ✅ Copied {len(files_copied)} file(s):")
+                for line in files_copied[:10]:  # Show first 10 files
+                    if "'" in line:
+                        filename = line.split("'")[-2].split('/')[-1]
+                        print(f"     • {filename}")
+                if len(files_copied) > 10:
+                    print(f"     ... and {len(files_copied) - 10} more")
+                
+                print(f"\n  {COLOR_GREEN}✔️ YOLO model backup restored!{COLOR_RESET}")
+                print("=" * 70 + "\n")
+            except subprocess.CalledProcessError as e:
+                print_warning(f"Could not copy backup models: {e}")
+                print("  (Not critical - models can be re-exported later)\n")
+        elif os.path.exists(drive_yolo_backup):
+            print_warning(f"Drive backup found but destination not created: {yolo_dest}")
+        
         if not failed_models:
             print("📌 Next steps to try:")
             print("    python step3_pull_demodata.py    # Setup demo data")
