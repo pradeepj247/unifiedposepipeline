@@ -313,6 +313,83 @@ def verify_demo_data():
     return True
 
 
+def verify_tensorrt_engine():
+    """Verify TensorRT engine can load and run inference"""
+    print_step("4.5", "TensorRT Engine Verification")
+    
+    # Find yolov8n.engine (smallest/fastest to test)
+    config = load_yaml_config(MODELS_YAML)
+    if not config:
+        print_warning("Cannot load models config - skipping TensorRT check")
+        return None  # Not critical, return None (not False)
+    
+    destination_folder = config.get('destination_folder', '/content/models/')
+    engine_path = os.path.join(destination_folder, 'yolo', 'yolov8n.engine')
+    
+    print()
+    if not os.path.exists(engine_path):
+        print_warning("TensorRT engine not found (optional optimization)")
+        print(f"      Expected: {engine_path}")
+        print(f"      💡 Run: python det_track/debug/export_yolo_tensorrt.py")
+        print(f"      Or: Restore from backup (step2_fetch_models.py)")
+        return None  # Not critical, return None
+    
+    print(f"  📦 Found: yolov8n.engine")
+    print(f"      Location: {engine_path}")
+    
+    try:
+        # Suppress ultralytics verbose output
+        import warnings
+        import os as os_module
+        os_module.environ['YOLO_VERBOSE'] = 'False'
+        
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            # Import after setting env
+            from ultralytics import YOLO
+            import numpy as np
+            
+            print(f"  ⏳ Loading engine...")
+            model = YOLO(engine_path, verbose=False)
+            
+            print(f"  ⏳ Running test inference...")
+            # Create dummy 640x640 RGB image (random data is fine)
+            dummy_image = np.random.randint(0, 255, (640, 640, 3), dtype=np.uint8)
+            
+            # Run inference (suppress output)
+            result = model(dummy_image, verbose=False)
+            
+            print_success("TensorRT engine loaded and executed successfully!")
+            print(f"      ✓ CUDA kernels functional")
+            print(f"      ✓ Memory transfers working")
+            print(f"      ✓ Inference pipeline validated")
+            
+            # Get environment info
+            try:
+                import torch
+                print(f"\n  📊 Current Environment:")
+                print(f"      PyTorch: {torch.__version__}")
+                print(f"      CUDA: {torch.version.cuda}")
+                print(f"      GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None'}")
+            except:
+                pass
+            
+            return True
+            
+    except Exception as e:
+        print_error(f"TensorRT engine failed to load/run")
+        print(f"      Error: {str(e)}")
+        print(f"\n  ⚠️  INCOMPATIBLE ENGINE - Environment may have changed!")
+        print(f"      This happens when CUDA/GPU versions change between sessions")
+        print(f"\n  🔧 SOLUTION: Re-export engines for current environment")
+        print(f"      Run: python det_track/debug/check_tensorrt_compatibility.py \\")
+        print(f"           --models-dir {os.path.join(destination_folder, 'yolo')} \\")
+        print(f"           --auto-reexport")
+        print(f"\n  📚 See: TENSORRT_COMPATIBILITY.md for details")
+        return False
+
+
 def main():
     """Main execution function"""
     print_header("STEP 4: Verify Environment", emoji="🔍")
@@ -332,21 +409,31 @@ def main():
         results["cuda"] = verify_cuda_gpu()
         results["models"] = verify_model_files()
         results["demo_data"] = verify_demo_data()
+        results["tensorrt_engine"] = verify_tensorrt_engine()
         
         # Summary
         print("\n" + "  " + "=" * 66)
         print("  📋 VERIFICATION SUMMARY")
         print("  " + "=" * 66 + "\n")
         
-        passed = sum(1 for v in results.values() if v)
-        total = len(results)
+        # Count passes (None = optional, don't count as fail)
+        critical_results = {k: v for k, v in results.items() if v is not None}
+        passed = sum(1 for v in critical_results.values() if v)
+        total = len(critical_results)
         
         for check, status in results.items():
-            status_str = "✓ PASS" if status else "✗ FAIL"
-            status_emoji = "✅" if status else "❌"
+            if status is None:
+                status_str = "⊘ SKIP (optional)"
+                status_emoji = "⚠️ "
+            elif status:
+                status_str = "✓ PASS"
+                status_emoji = "✅"
+            else:
+                status_str = "✗ FAIL"
+                status_emoji = "❌"
             print(f"  {status_emoji} {check.upper():20s} {status_str}")
         
-        print(f"\n  📊 Overall: {passed}/{total} checks passed")
+        print(f"\n  📊 Overall: {passed}/{total} critical checks passed")
         
         if passed == total:
             print_success("Environment verification complete! All checks passed.")
