@@ -243,6 +243,7 @@ stage3c_filter:
   
   advanced:
     verbose: false  # Set true to see top persons with scores and penalties
+    use_ondemand_extraction: false  # EXPERIMENT: Set true to use stage3c_new.py (on-demand crop extraction from canonical video)
 
 # ============================================================================
 # Stage 3d: Visual Refinement (OSNet ReID-based Person Merging)
