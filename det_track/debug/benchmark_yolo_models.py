@@ -20,12 +20,19 @@ from pathlib import Path
 from ultralytics import YOLO
 
 
-def benchmark_model(model, model_name, video_path, max_frames=800):
+def benchmark_model(model, model_name, video_path, max_frames=800, is_tensorrt=False):
     """
     Benchmark a YOLO model with single-frame inference
+    
+    Args:
+        model: YOLO model instance
+        model_name: Display name (e.g., "yolov8s", "yolov8s-trt")
+        video_path: Path to video file
+        max_frames: Number of frames to test
+        is_tensorrt: Whether this is a TensorRT engine (for display)
     """
     print("\n" + "="*70)
-    print(f"TESTING: {model_name}")
+    print(f"TESTING: {model_name}{' (TensorRT)' if is_tensorrt else ' (PyTorch)'}")
     print("="*70)
     
     cap = cv2.VideoCapture(str(video_path))
@@ -193,7 +200,7 @@ def main():
     parser.add_argument('--video', required=True, help='Path to video file')
     parser.add_argument('--models-dir', default='models/yolo', help='Directory containing YOLO models')
     parser.add_argument('--models', nargs='+', default=['yolov8s.pt', 'yolov8n.pt'], 
-                        help='Model files to test (default: yolov8s.pt yolov8n.pt)')
+                        help='Model files to test (.pt or .engine) - default: yolov8s.pt yolov8n.pt')
     parser.add_argument('--max-frames', type=int, default=800, help='Frames to test (default: 800)')
     parser.add_argument('--full', action='store_true', help='Process entire video')
     args = parser.parse_args()
@@ -233,26 +240,42 @@ def main():
     # Test each model
     for i, model_path in enumerate(model_paths):
         model_name = model_path.stem  # e.g., "yolov8s"
+        is_tensorrt = model_path.suffix == '.engine'
         
         print(f"\n{'='*70}")
         print(f"Loading model {i+1}/{len(model_paths)}: {model_name}")
+        if is_tensorrt:
+            print(f"Format: TensorRT Engine (optimized)")
+        else:
+            print(f"Format: PyTorch (.pt)")
         print(f"{'='*70}")
         
         # Load model
         model = YOLO(str(model_path))
-        model.to('cuda')
+        if not is_tensorrt:
+            model.to('cuda')
         print(f"✅ {model_name} loaded on GPU")
         
         # Warmup
         print(f"🔥 Warming up {model_name}...")
-        dummy = torch.rand(1, 3, 640, 640).cuda()
-        for _ in range(10):
-            _ = model(dummy, verbose=False)
+        if is_tensorrt:
+            # TensorRT needs actual frame warmup
+            cap_warmup = cv2.VideoCapture(str(video_path))
+            ret, warmup_frame = cap_warmup.read()
+            cap_warmup.release()
+            if ret:
+                for _ in range(10):
+                    _ = model(warmup_frame, verbose=False)
+        else:
+            # PyTorch can use dummy tensor
+            dummy = torch.rand(1, 3, 640, 640).cuda()
+            for _ in range(10):
+                _ = model(dummy, verbose=False)
         print(f"✅ Warmup complete")
         
         # Benchmark
         # Note: Timing starts AFTER model load and warmup (excludes initialization overhead)
-        result = benchmark_model(model, model_name, video_path, max_frames)
+        result = benchmark_model(model, model_name, video_path, max_frames, is_tensorrt)
         results_list.append(result)
         
         # Clean up model
