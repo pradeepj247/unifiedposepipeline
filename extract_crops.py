@@ -49,6 +49,25 @@ def extract_crops(selected_person_path, video_path, output_path, expand_bbox=0.1
     
     print(f"   Frames: {len(frame_numbers)}")
     print(f"   Person ID: {data.get('person_id', 'N/A')}")
+    
+    # Validate bboxes
+    print(f"   Validating bboxes...")
+    invalid_bboxes = []
+    for idx, (frame_num, bbox) in enumerate(zip(frame_numbers, bboxes)):
+        x1, y1, x2, y2 = bbox
+        if x1 < 0 or y1 < 0 or x2 < 0 or y2 < 0:
+            invalid_bboxes.append((frame_num, "negative coordinates"))
+        elif x2 <= x1 or y2 <= y1:
+            invalid_bboxes.append((frame_num, "invalid dimensions"))
+    
+    if invalid_bboxes:
+        print(f"   ⚠️  Found {len(invalid_bboxes)} invalid bboxes (will skip)")
+        if len(invalid_bboxes) <= 5:
+            for frame_num, reason in invalid_bboxes:
+                print(f"      Frame {frame_num}: {reason}")
+    else:
+        print(f"   ✅ All bboxes valid")
+    
     sys.stdout.flush()
     
     # Open video
@@ -148,13 +167,43 @@ def extract_crops(selected_person_path, video_path, output_path, expand_bbox=0.1
         sys.stdout.flush()
     
     except KeyboardInterrupt:
-        print(f"\n\n   ⚠️  Process interrupted by user at frame {current_frame}")
+        print(f"\n\n   ⚠️  ⚠️  ⚠️  KeyboardInterrupt received at frame {current_frame}")
+        print(f"   This might be Colab auto-killing the process")
         print(f"   Extracted {valid_crops} crops before interruption")
         sys.stdout.flush()
         cap.release()
+        
+        # Try to save what we have
+        print(f"\n   💾 Attempting to save partial results...")
+        sys.stdout.flush()
+        try:
+            output_path_partial = Path(str(output_path).replace('.pkl', '_partial.pkl'))
+            crops_data = {
+                'crops': crops,
+                'frame_numbers': frame_numbers,
+                'bboxes': bboxes,
+                'person_id': data.get('person_id', None),
+                'expand_bbox': expand_bbox,
+                'partial': True,
+                'frames_processed': current_frame,
+                'video_metadata': {
+                    'width': width,
+                    'height': height,
+                    'fps': fps,
+                    'total_frames': total_frames
+                }
+            }
+            with open(output_path_partial, 'wb') as f:
+                pickle.dump(crops_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+            print(f"   ✅ Saved partial results to: {output_path_partial}")
+            sys.stdout.flush()
+        except Exception as e:
+            print(f"   ❌ Could not save partial results: {e}")
+            sys.stdout.flush()
+        
         return None, 0
     except Exception as e:
-        print(f"\n\n   ❌ Error during extraction: {e}")
+        print(f"\n\n   ❌ Unexpected error during extraction: {e}")
         import traceback
         traceback.print_exc()
         sys.stdout.flush()
