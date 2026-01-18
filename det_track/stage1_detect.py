@@ -190,6 +190,17 @@ def load_yolo_detector(model_path, device='cuda', verbose=False):
     except ImportError:
         raise ImportError("ultralytics or torch not found. Install with: pip install ultralytics torch")
     
+    # Suppress TensorRT verbose logging
+    if model_path.endswith('.engine'):
+        try:
+            import tensorrt as trt
+            # Set TensorRT logger to ERROR level only (suppresses INFO and WARNING)
+            trt.init_libnvinfer_plugins(None, "")
+            logger = trt.Logger(trt.Logger.ERROR)
+            trt.init_libnvinfer_plugins(logger, "")
+        except:
+            pass  # TensorRT not available yet, will be auto-installed
+    
     # Auto-select best model (prefers TensorRT if available)
     original_model_path = model_path
     model_path = auto_select_best_model(model_path, verbose)
