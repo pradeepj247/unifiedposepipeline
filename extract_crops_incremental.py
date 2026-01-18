@@ -122,8 +122,14 @@ def extract_crops_incremental(selected_person_path, video_path, output_path, exp
                 sys.stdout.flush()
         
         cap.release()
+        print(f"\n\n   📹 Video released")
+        sys.stdout.flush()
+        
         t_end = time.time()
         total_time = t_end - t_start
+        
+        print(f"   ⏱️  Time calculated: {total_time:.2f}s")
+        sys.stdout.flush()
         
         print(f"\n\n   ✅ Extraction complete!")
         print(f"   Frames: {current_frame}, Crops: {valid_crops}")
@@ -131,11 +137,16 @@ def extract_crops_incremental(selected_person_path, video_path, output_path, exp
         sys.stdout.flush()
         
         # Final save
-        print(f"\n📦 Saving final output...")
+        print(f"\n📦 Starting final save...")
         sys.stdout.flush()
         
         output_path = Path(output_path)
+        print(f"   Creating directory: {output_path.parent}")
+        sys.stdout.flush()
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        print(f"   Building crops_data dict...")
+        sys.stdout.flush()
         
         crops_data = {
             'crops': crops,
@@ -146,8 +157,15 @@ def extract_crops_incremental(selected_person_path, video_path, output_path, exp
             'video_metadata': {'width': width, 'height': height, 'fps': fps, 'total_frames': total_frames}
         }
         
+        print(f"   Opening file for write: {output_path}")
+        sys.stdout.flush()
+        
         with open(output_path, 'wb') as f:
+            print(f"   Writing pickle...")
+            sys.stdout.flush()
             pickle.dump(crops_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+            print(f"   Pickle written!")
+            sys.stdout.flush()
         
         file_size_mb = output_path.stat().st_size / (1024 * 1024)
         print(f"   ✅ Saved: {output_path}")
