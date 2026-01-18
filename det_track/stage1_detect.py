@@ -473,7 +473,7 @@ def run_detection(config):
         print(f"⚡ Running detection and crop extraction...")
     t_loop_start = time.time()
     
-    pbar = tqdm(total=num_frames, desc="  🔍 Detecting + extracting crops", mininterval=1.0)
+    pbar = tqdm(total=num_frames, desc="  🔍 Detecting + extracting crops", mininterval=1.0, miniters=200)
     
     frame_idx = 0
     while frame_idx < num_frames:
@@ -595,14 +595,12 @@ def run_detection(config):
     crops_cache_size_mb = crops_cache_path.stat().st_size / (1024 * 1024)
     avg_detections_per_frame = total_detections / num_frames if num_frames > 0 else 0
     
-    # Clean output: show only 4 key metrics
-    print(f"\n  ✅ Detection + Crop Extraction: {t_detect_extract_time:.2f}s")
-    print(f"  ✅ Saving (NPZ + crops cache): {t_save_time:.2f}s")
-    print(f"  ✅ Total time: {t_total:.2f}s")
-    print(f"  ✅ FPS: {processing_fps:.1f}")
-    print(f"\n  📊 Total detections: {total_detections}")
-    print(f"  📊 Avg detections/frame: {avg_detections_per_frame:.1f}")
-    print(f"  📊 Total crops extracted: {len(all_crops)}")
+    # Clean, simple output
+    print(f"\n  ✅ Stage 1: Detection completed in {t_total:.2f}s")
+    print(f"     - Model load: {model_load_time:.2f}s")
+    print(f"     - Detection + crop extraction: {t_detect_extract_time:.2f}s ({processing_fps:.1f} FPS)")
+    print(f"     - Saving outputs: {t_save_time:.2f}s")
+    print(f"\n  📊 Total detections: {total_detections} ({avg_detections_per_frame:.1f} per frame)")
     print(f"  💾 crops_cache.pkl: {crops_cache_size_mb:.1f} MB")
     print()
 

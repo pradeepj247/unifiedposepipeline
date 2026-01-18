@@ -248,7 +248,8 @@ def run_filter(config):
         logger.error(f"Invalid frame count from video: {total_frames}")
         return
     
-    print(f"   VIDEO METADATA: {total_frames} frames, {video_fps} fps, max_appearance_ratio=0.5 (threshold: frame {int(total_frames*0.5)})")
+    if verbose:
+        print(f"   VIDEO METADATA: {total_frames} frames, {video_fps} fps, max_appearance_ratio=0.5 (threshold: frame {int(total_frames*0.5)})")
     
     # Load canonical persons
     logger.info(f"Loading canonical persons: {Path(canonical_file).name}")
@@ -266,14 +267,17 @@ def run_filter(config):
     filtered_by_duration = [p for p in all_persons if len(p['frame_numbers']) >= min_duration_frames]
     removed_by_duration = [p for p in all_persons if len(p['frame_numbers']) < min_duration_frames]
     
-    if removed_by_duration:
+    if removed_by_duration and verbose:
         logger.info(f"Step 0: Filtering by minimum duration ({min_duration_frames} frames)...")
         # Summary only - details in sidecar JSON later
     
-    logger.stat("After min_duration filter", f"{len(filtered_by_duration)} persons (threshold: {min_duration_frames} frames)")
+    if verbose:
+        if verbose:
+        logger.stat("After min_duration filter", f"{len(filtered_by_duration)} persons (threshold: {min_duration_frames} frames)")
     
     # Step 1: Select TOP 10 persons by score (from filtered candidates)
-    logger.info(f"Step 1: Ranking all persons...")
+    if verbose:
+        logger.info(f"Step 1: Ranking all persons...")
     t_start = time.time()
     
     weights = filter_config.get('weights', {
@@ -304,7 +308,8 @@ def run_filter(config):
                   f"coverage={score['coverage']:.2f}, appearance_ratio={score['appearance_ratio']:.2f}")
     
     # Step 2: Apply late-appearance penalty to top N
-    logger.info(f"Step 2: Applying late-appearance penalty to top {len(top_persons)}...")
+    if verbose:
+        logger.info(f"Step 2: Applying late-appearance penalty to top {len(top_persons)}...")
     
     penalized_persons = []
     penalized_scores = []
@@ -426,7 +431,8 @@ def run_filter(config):
         logger.verbose_info(f"Saved filtering details: {sidecar_path.name}")
     
     # ==================== Extract Crops ====================
-    logger.step("Extracting crops from video...")
+    if verbose:
+        logger.step("Extracting crops from video...")
     
     # Get video path
     video_name = config.get('global', {}).get('current_video', 'canonical_video')
@@ -461,7 +467,8 @@ def run_filter(config):
         
         # Build lookup dict: {detection_idx: crop_dict}
         crops_by_idx = {crop['detection_idx']: crop for crop in all_crops}
-        logger.info(f"✓ Loaded {len(crops_by_idx)} crops from cache (O(1) lookup ready)")
+        if verbose:
+            logger.info(f"✓ Loaded {len(crops_by_idx)} crops from cache (O(1) lookup ready)")
         
         # Extract and score crops for each selected person
         from crop_utils import compute_crop_quality_metrics
