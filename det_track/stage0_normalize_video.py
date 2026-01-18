@@ -318,7 +318,6 @@ def normalize_video(input_path, output_path, metadata, config):
     # Output
     cmd += [str(output_path)]
     
-    print(f"    Running ffmpeg...")
     start_time = time.time()
     
     try:
@@ -329,7 +328,6 @@ def normalize_video(input_path, output_path, metadata, config):
             check=True
         )
         elapsed = time.time() - start_time
-        print(f"    ✅ Normalization complete ({elapsed:.2f}s)")
         return True, elapsed
     
     except subprocess.CalledProcessError as e:
@@ -374,9 +372,8 @@ def run_stage0_normalize(config, verbose=False):
     print("STAGE 0: VIDEO NORMALIZATION & VALIDATION")
     print("="*70)
     print(f"🎞️ Input video: {input_video}")
-    
     # Step 1: Extract metadata
-    print("\nStep A: Extracting video metadata")
+    print("    Step A: Extracting video metadata")
     metadata_start = time.time()
     if verbose:
         print(f"  Extracting metadata from: {input_video}")
@@ -397,7 +394,7 @@ def run_stage0_normalize(config, verbose=False):
         print(f"     File size: {metadata['filesize_mb']:.1f} MB")
     
     # Step 2: Validate
-    print("\nStep B: Validating video")
+    print("    Step B: Validating video")
     is_valid, checks = validate_metadata(metadata, config)
     timing['validation_time'] = time.time() - metadata_start - metadata_time
     
@@ -411,7 +408,7 @@ def run_stage0_normalize(config, verbose=False):
         sys.exit(1)
     
     # Step 3: Check if normalization needed
-    print("\nStep C: Creating canonical video")
+    print("    Step C: Creating canonical video with GPU encode")
     needs_norm, reasons = needs_normalization(metadata, config)
     
     if not needs_norm:
@@ -454,11 +451,11 @@ def run_stage0_normalize(config, verbose=False):
             sys.exit(1)
     
     # Get canonical video metadata
-    print("\nStep D: Verifying canonical video")
+    print("    Step D: Verifying canonical video")
     canonical_metadata = get_video_metadata(output_video)
     if canonical_metadata:
-        print(f"\n🎞️ Canonical video created")
-        print(f"   File size: {canonical_metadata['filesize_mb']:.1f} MB")
+        print(f"🎞️ Canonical video created")
+        print(f"    File size: {canonical_metadata['filesize_mb']:.1f} MB")
     
     # Save timing
     timing['end_time'] = time.time()
@@ -473,10 +470,8 @@ def run_stage0_normalize(config, verbose=False):
     with open(timing_file, 'w') as f:
         json.dump(timing, f, indent=2)
     
-    print(f"\n  Total time: {timing['total_time']:.2f}s")
-    print(f"  Metadata extraction: {timing['metadata_extraction_time']:.2f}s")
-    print(f"  Normalization: {timing['normalization_time']:.2f}s")
-    print(f"\n  Canonical video: {output_video}")
+    print(f"   Total time: {timing['total_time']:.2f}s")
+    print(f"   Canonical video: {output_video}")
     
     return output_video
 
