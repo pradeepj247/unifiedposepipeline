@@ -272,7 +272,6 @@ def run_filter(config):
         # Summary only - details in sidecar JSON later
     
     if verbose:
-        if verbose:
         logger.stat("After min_duration filter", f"{len(filtered_by_duration)} persons (threshold: {min_duration_frames} frames)")
     
     # Step 1: Select TOP 10 persons by score (from filtered candidates)
