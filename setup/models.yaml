@@ -23,7 +23,7 @@ models:
     subfolder: yolo/
     size_mb: 23.0
     fallback_location: /content/drive/MyDrive/pipelinemodels/yolo/yolov8s.engine
-    fetch: yes
+    fetch: no
 
   - name: VITPose
     filename: vitpose-b.pth
@@ -32,7 +32,7 @@ models:
     subfolder: vitpose/
     size_mb: 360.0
     fallback_location: /content/drive/MyDrive/pipelinemodels/vitpose/vitpose-b.pth
-    fetch: yes
+    fetch: no
 
   - name: RTMPose (COCO)
     filename: rtmpose-l-coco-384x288.onnx
@@ -50,7 +50,7 @@ models:
     subfolder: rtmlib/
     size_mb: 112.9
     fallback_location: /content/drive/MyDrive/pipelinemodels/rtmlib/rtmpose-l-halpe26-384x288.onnx
-    fetch: yes
+    fetch: no
 
   - name: MotionAGFormer
     filename: motionagformer-base-h36m.pth.tr
@@ -59,7 +59,7 @@ models:
     subfolder: motionagformer/
     size_mb: 141.9
     fallback_location: /content/drive/MyDrive/pipelinemodels/motionagformer/motionagformer-base-h36m.pth.tr
-    fetch: yes
+    fetch: no
 
   - name: RTM Wholebody
     filename: rtmw3d-l.onnx
@@ -77,7 +77,7 @@ models:
     subfolder: reid/
     size_mb: 10.9
     fallback_location: /content/drive/MyDrive/pipelinemodels/reid/osnet_x1_0_msmt17.pt
-    fetch: yes
+    fetch: no
 
   - name: OSNet x0.25 (PyTorch)
     filename: osnet_x0_25_msmt17.pt
@@ -95,4 +95,4 @@ models:
     subfolder: reid/
     size_mb: 0.9
     fallback_location: /content/drive/MyDrive/pipelinemodels/reid/osnet_x0_25_msmt17.onnx
-    fetch: yes
+    fetch: no
