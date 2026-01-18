@@ -117,6 +117,9 @@ def auto_select_best_model(model_path, verbose=False):
     
     Returns: Path to best model to use
     """
+    import os
+    import sys
+    
     # If already specifying .engine, use it
     if model_path.endswith('.engine'):
         return model_path
