@@ -11,9 +11,14 @@ Usage:
 Output:
     yolov8s.pt → yolov8s.engine
     yolov8n.pt → yolov8n.engine
+    tensorrt_metadata.json (version info for compatibility checking)
 """
 
 import argparse
+import json
+import subprocess
+import sys
+from datetime import datetime
 from pathlib import Path
 from ultralytics import YOLO
 import torch
@@ -169,6 +174,50 @@ def main():
         print(f"{r['model']:<20} {engine:<30} {status:<10}")
     
     if success_count > 0:
+        # Save metadata for compatibility checking
+        print("\n" + "="*70)
+        print("💾 Saving environment metadata for compatibility checking...")
+        print("="*70)
+        
+        env_metadata = {
+            'environment': {
+                'pytorch': torch.__version__,
+                'cuda': torch.version.cuda,
+                'cudnn': str(torch.backends.cudnn.version()),
+                'gpu_name': torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None',
+                'gpu_compute': '.'.join(map(str, torch.cuda.get_device_capability(0))) if torch.cuda.is_available() else 'None',
+            },
+            'engines': [r['engine'] for r in results if r['success']],
+            'exported_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'export_settings': {
+                'imgsz': args.imgsz,
+                'half': args.half
+            }
+        }
+        
+        # Try to get TensorRT version
+        try:
+            import tensorrt as trt
+            env_metadata['environment']['tensorrt'] = trt.__version__
+        except ImportError:
+            env_metadata['environment']['tensorrt'] = 'unknown'
+        
+        # Try to get Ultralytics version
+        try:
+            from ultralytics import __version__ as ultralytics_version
+            env_metadata['environment']['ultralytics'] = ultralytics_version
+        except ImportError:
+            env_metadata['environment']['ultralytics'] = 'unknown'
+        
+        metadata_path = models_dir / "tensorrt_metadata.json"
+        with open(metadata_path, 'w') as f:
+            json.dump(env_metadata, f, indent=2)
+        
+        print(f"✅ Metadata saved to: {metadata_path}")
+        print("\nEnvironment snapshot:")
+        for key, value in env_metadata['environment'].items():
+            print(f"  {key:15s}: {value}")
+        
         print("\n" + "="*70)
         print("✅ Export complete! You can now benchmark with:")
         print(f"   python benchmark_yolo_models.py \\")
@@ -176,6 +225,8 @@ def main():
         print(f"     --models-dir {models_dir} \\")
         print(f"     --models {' '.join([r['engine'] for r in results if r['success']])} \\")
         print(f"     --models {' '.join(args.models)}")
+        print("\n⚠️  IMPORTANT: Before using in new Colab session, run:")
+        print(f"   python check_tensorrt_compatibility.py --models-dir {models_dir}")
         print("="*70)
 
 
