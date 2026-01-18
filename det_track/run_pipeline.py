@@ -203,6 +203,9 @@ def run_stage(stage_name, stage_script, config_path, verbose=False, extra_args=N
         pass  # Will print completion with breakdown below
     else:
         print(f"✅ {stage_name} completed in {t_end - t_start:.2f}s")
+        # Add separator for Stage 0
+        if 'Stage 0' in stage_name or 'Video Normalization' in stage_name:
+            print("="*70)
     
     return True, t_end - t_start
 

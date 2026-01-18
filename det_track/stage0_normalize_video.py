@@ -98,8 +98,6 @@ def get_video_metadata(filepath):
     
     Returns dict with: width, height, fps, duration, codec, etc.
     """
-    print(f"  Extracting metadata from: {filepath}")
-    
     # Use ffprobe for reliable metadata
     cmd = [
         'ffprobe',
@@ -265,10 +263,6 @@ def normalize_video(input_path, output_path, metadata, config):
     encoding = stage_config.get('encoding', {})
     limits = stage_config.get('limits', {})
     
-    print(f"\n  Normalizing video...")
-    print(f"    Input:  {input_path}")
-    print(f"    Output: {output_path}")
-    
     # Build ffmpeg command with GPU acceleration
     # Hardware acceleration for decode
     cmd = ['ffmpeg', '-y']
@@ -277,7 +271,6 @@ def normalize_video(input_path, output_path, metadata, config):
     use_gpu = encoding.get('use_gpu', True)
     if use_gpu:
         cmd += ['-hwaccel', 'cuda', '-hwaccel_output_format', 'cuda']
-        print(f"    GPU: CUDA hardware acceleration enabled")
     
     cmd += ['-i', str(input_path)]
     
@@ -286,11 +279,9 @@ def normalize_video(input_path, output_path, metadata, config):
     if use_gpu:
         # GPU-based scaling (no format needed, handled by NVENC)
         scale_filter = f"scale_cuda={target_res[0]}:{target_res[1]}"
-        print(f"    Resolution: {metadata['width']}x{metadata['height']} → {target_res[0]}x{target_res[1]} (GPU)")
     else:
         # CPU-based scaling (fallback)
         scale_filter = f"scale={target_res[0]}:{target_res[1]}"
-        print(f"    Resolution: {metadata['width']}x{metadata['height']} → {target_res[0]}x{target_res[1]} (CPU)")
     
     cmd += ['-vf', scale_filter]
     
@@ -303,7 +294,6 @@ def normalize_video(input_path, output_path, metadata, config):
         ]
         # All I-frames for optimal seeking (no P/B frames)
         cmd += ['-g', '1', '-bf', '0']
-        print(f"    Encoder: h264_nvenc (GPU) with all I-frames")
     else:
         # CPU encoding (fallback)
         cmd += [
@@ -315,7 +305,6 @@ def normalize_video(input_path, output_path, metadata, config):
         # GOP structure for CPU
         keyint = encoding.get('keyframe_interval', 30)
         cmd += ['-x264-params', f'keyint={keyint}:scenecut=0']
-        print(f"    Encoder: libx264 (CPU), GOP keyint={keyint}")
     
     # FPS normalization
     target_fps = normalization.get('target_fps', 25)
@@ -387,7 +376,7 @@ def run_stage0_normalize(config, verbose=False):
     print(f"🎞️ Input video: {input_video}")
     
     # Step 1: Extract metadata
-    print("\n📊 Step A: Extracting video metadata")
+    print("\nStep A: Extracting video metadata")
     metadata_start = time.time()
     if verbose:
         print(f"  Extracting metadata from: {input_video}")
@@ -408,7 +397,7 @@ def run_stage0_normalize(config, verbose=False):
         print(f"     File size: {metadata['filesize_mb']:.1f} MB")
     
     # Step 2: Validate
-    print("\n🔍 Step B: Validating video")
+    print("\nStep B: Validating video")
     is_valid, checks = validate_metadata(metadata, config)
     timing['validation_time'] = time.time() - metadata_start - metadata_time
     
@@ -422,7 +411,7 @@ def run_stage0_normalize(config, verbose=False):
         sys.exit(1)
     
     # Step 3: Check if normalization needed
-    print("\n�️ Step C: Creating canonical video")
+    print("\nStep C: Creating canonical video")
     needs_norm, reasons = needs_normalization(metadata, config)
     
     if not needs_norm:
@@ -465,15 +454,10 @@ def run_stage0_normalize(config, verbose=False):
             sys.exit(1)
     
     # Get canonical video metadata
-    print("\n📊 Step D: Verifying canonical video")
-    if verbose:
-        print(f"  Extracting metadata from: {output_video}")
+    print("\nStep D: Verifying canonical video")
     canonical_metadata = get_video_metadata(output_video)
     if canonical_metadata:
         print(f"\n🎞️ Canonical video created")
-        print(f"   Resolution: {canonical_metadata['width']}x{canonical_metadata['height']}")
-        print(f"   FPS: {canonical_metadata['fps']:.2f}")
-        print(f"   Codec: {canonical_metadata['codec']}")
         print(f"   File size: {canonical_metadata['filesize_mb']:.1f} MB")
     
     # Save timing
@@ -489,15 +473,10 @@ def run_stage0_normalize(config, verbose=False):
     with open(timing_file, 'w') as f:
         json.dump(timing, f, indent=2)
     
-    print("\n" + "="*70)
-    print("✅ STAGE 0 COMPLETE")
-    print("="*70)
-    print(f"  Total time: {timing['total_time']:.2f}s")
+    print(f"\n  Total time: {timing['total_time']:.2f}s")
     print(f"  Metadata extraction: {timing['metadata_extraction_time']:.2f}s")
     print(f"  Normalization: {timing['normalization_time']:.2f}s")
     print(f"\n  Canonical video: {output_video}")
-    print(f"  Timing saved: {timing_file}")
-    print("="*70)
     
     return output_video
 
