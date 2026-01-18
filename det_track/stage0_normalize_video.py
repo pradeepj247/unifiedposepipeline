@@ -230,10 +230,10 @@ def needs_normalization(metadata, config):
     
     reasons = []
     
-    # Check resolution
-    max_res = limits.get('max_resolution', [1920, 1080])
-    if metadata['width'] > max_res[0] or metadata['height'] > max_res[1]:
-        reasons.append(f"resolution ({metadata['width']}x{metadata['height']} > {max_res[0]}x{max_res[1]})")
+    # Check resolution - ALWAYS normalize to 720p for consistency
+    target_res = normalization.get('target_resolution', [1280, 720])
+    if metadata['width'] != target_res[0] or metadata['height'] != target_res[1]:
+        reasons.append(f"resolution ({metadata['width']}x{metadata['height']} != {target_res[0]}x{target_res[1]})")
     
     # Check FPS
     target_fps = normalization.get('target_fps', 25)
