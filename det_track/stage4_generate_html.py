@@ -379,7 +379,7 @@ def main():
         print()
         logger.step("Creating dual-row HTML viewer...")
     
-    html_file = output_dir / "viewer.html"
+    html_file = output_dir / "personselector.html"
     try:
         create_dual_row_html_viewer(
             html_file, 
