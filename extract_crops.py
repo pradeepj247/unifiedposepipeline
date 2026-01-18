@@ -67,59 +67,70 @@ def extract_crops(selected_person_path, video_path, output_path, expand_bbox=0.1
     valid_crops = 0
     t_start = time.time()
     
-    for idx, (frame_num, bbox) in enumerate(zip(frame_numbers, bboxes)):
-        # Read frame
+    # Create a set of frame numbers for fast lookup
+    frame_set = set(frame_numbers)
+    frame_to_idx = {frame_num: idx for idx, frame_num in enumerate(frame_numbers)}
+    
+    # Initialize crops list with None
+    crops = [None] * len(frame_numbers)
+    
+    # Read all frames and extract crops for frames we need
+    current_frame = 0
+    while True:
         ret, frame = cap.read()
         if not ret:
-            print(f"\n   ⚠️  Warning: Could not read frame {frame_num}")
-            crops.append(None)
-            continue
+            break
         
-        # Extract crop with expansion
-        x1, y1, x2, y2 = map(int, bbox)
+        # Check if this frame is in our selection
+        if current_frame in frame_set:
+            idx = frame_to_idx[current_frame]
+            bbox = bboxes[idx]
+            
+            # Extract crop with expansion
+            x1, y1, x2, y2 = map(int, bbox)
+            
+            # Validate bbox
+            if x2 > x1 and y2 > y1:
+                # Expand bbox
+                bbox_w = x2 - x1
+                bbox_h = y2 - y1
+                expand_w = int(bbox_w * expand_bbox)
+                expand_h = int(bbox_h * expand_bbox)
+                
+                x1_exp = x1 - expand_w
+                y1_exp = y1 - expand_h
+                x2_exp = x2 + expand_w
+                y2_exp = y2 + expand_h
+                
+                # Clip to frame bounds
+                x1_exp = max(0, x1_exp)
+                y1_exp = max(0, y1_exp)
+                x2_exp = min(width, x2_exp)
+                y2_exp = min(height, y2_exp)
+                
+                # Extract crop
+                crop = frame[y1_exp:y2_exp, x1_exp:x2_exp]
+                crops[idx] = crop
+                valid_crops += 1
         
-        # Validate bbox
-        if x2 <= x1 or y2 <= y1:
-            # Invalid bbox (likely no detection)
-            crops.append(None)
-        else:
-            # Expand bbox
-            bbox_w = x2 - x1
-            bbox_h = y2 - y1
-            expand_w = int(bbox_w * expand_bbox)
-            expand_h = int(bbox_h * expand_bbox)
-            
-            x1_exp = x1 - expand_w
-            y1_exp = y1 - expand_h
-            x2_exp = x2 + expand_w
-            y2_exp = y2 + expand_h
-            
-            # Clip to frame bounds
-            x1_exp = max(0, x1_exp)
-            y1_exp = max(0, y1_exp)
-            x2_exp = min(width, x2_exp)
-            y2_exp = min(height, y2_exp)
-            
-            # Extract crop
-            crop = frame[y1_exp:y2_exp, x1_exp:x2_exp]
-            crops.append(crop)
-            valid_crops += 1
+        current_frame += 1
         
         # Progress
-        if (idx + 1) % 100 == 0:
+        if current_frame % 100 == 0:
             elapsed = time.time() - t_start
-            fps_proc = (idx + 1) / elapsed
-            print(f"   Processed {idx + 1}/{len(frame_numbers)} frames ({fps_proc:.1f} FPS)", end='\r')
+            fps_proc = current_frame / elapsed
+            print(f"   Processed {current_frame}/{total_frames} frames ({fps_proc:.1f} FPS, {valid_crops} crops)", end='\r')
     
     cap.release()
     t_end = time.time()
     total_time = t_end - t_start
     
     print(f"\n   ✅ Extraction complete!")
+    print(f"   Video frames read: {current_frame}/{total_frames}")
     print(f"   Valid crops: {valid_crops}/{len(frame_numbers)}")
     print(f"   Time: {total_time:.2f}s ({total_time / 60:.2f} min)")
-    print(f"   Processing FPS: {len(frame_numbers) / total_time:.1f}")
-    print(f"   Time per frame: {(total_time / len(frame_numbers)) * 1000:.1f} ms")
+    print(f"   Processing FPS: {current_frame / total_time:.1f}")
+    print(f"   Time per frame: {(total_time / current_frame) * 1000:.1f} ms")
     
     # Calculate storage size
     crop_sizes = [crop.nbytes for crop in crops if crop is not None]
@@ -177,12 +188,12 @@ def extract_crops(selected_person_path, video_path, output_path, expand_bbox=0.1
     print(f"   File size: {file_size_mb:.1f} MB")
     print(f"   ")
     print(f"   ⏱️  TIMING BREAKDOWN:")
-    print(f"   - Extraction: {total_time:.2f}s ({len(frame_numbers) / total_time:.1f} FPS)")
+    print(f"   - Extraction: {total_time:.2f}s ({current_frame / total_time:.1f} FPS)")
     print(f"   - Save PKL: {save_time:.2f}s")
     print(f"   - Total: {(total_time + save_time):.2f}s")
     print(f"   ")
     print(f"   📊 SPEEDUP ESTIMATE:")
-    print(f"   - Video decode/seek: ~{(total_time / len(frame_numbers)) * 1000:.1f}ms per frame")
+    print(f"   - Video decode/seek: ~{(total_time / current_frame) * 1000:.1f}ms per frame")
     print(f"   - PKL load estimate: ~2-5ms per frame")
     print(f"   - Expected speedup: 5-10x faster for pose detection")
     print(f"\n   Next: Use these crops for fast pose detection")
