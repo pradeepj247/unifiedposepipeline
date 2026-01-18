@@ -191,7 +191,7 @@ def main():
             'exported_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'export_settings': {
                 'imgsz': args.imgsz,
-                'half': args.half
+                'half': not args.fp32  # FP16 if not FP32
             }
         }
         
