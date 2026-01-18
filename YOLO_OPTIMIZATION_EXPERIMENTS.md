@@ -18,6 +18,45 @@ This document summarizes a comprehensive series of benchmarks to optimize YOLO d
 
 ---
 
+## ⚠️ PREREQUISITE: TensorRT Compatibility Check
+
+**BEFORE running any TensorRT benchmarks**, you MUST verify engine compatibility:
+
+```python
+# Run this at the start of your Colab session
+import subprocess
+import sys
+
+result = subprocess.run([
+    sys.executable,
+    "/content/unifiedposepipeline/det_track/debug/check_tensorrt_compatibility.py",
+    "--models-dir", "/content/models/yolo",
+    "--models", "yolov8n.pt", "yolov8s.pt",
+    "--auto-reexport"
+])
+
+if result.returncode == 0:
+    print("✅ TensorRT engines ready!")
+else:
+    print("⚠️ Engines may be incompatible - check logs")
+```
+
+**Why this is critical:**
+- TensorRT engines are compiled for specific CUDA/GPU versions
+- Colab can update between sessions (CUDA 12.6 → 12.4, etc.)
+- Incompatible engines fail with cryptic errors
+- This script auto-detects mismatches and re-exports if needed (5-10 min)
+
+**What it does:**
+1. Checks current CUDA, TensorRT, GPU versions
+2. Compares with `tensorrt_metadata.json` from when engines were exported
+3. Auto re-exports if versions changed
+4. Validates engines load successfully
+
+See [TENSORRT_COMPATIBILITY.md](TENSORRT_COMPATIBILITY.md) for details.
+
+---
+
 ## Experiment 1: Stage 0 Video Normalization Optimization
 
 ### Objective
@@ -384,6 +423,23 @@ else:
 ---
 
 ## Implementation Recommendations
+
+**Note:** After export, `tensorrt_metadata.json` is saved automatically with version info.
+
+### 5. Run Compatibility Check (Every New Session)
+```python
+# CRITICAL: Run before benchmarking in new Colab session
+import subprocess, sys
+
+subprocess.run([
+    sys.executable,
+    "/content/unifiedposepipeline/det_track/debug/check_tensorrt_compatibility.py",
+    "--models-dir", "/content/models/yolo",
+    "--auto-reexport"
+])
+```
+
+This ensures engines are compatible with current CUDA/GPU environment.
 
 ### 1. Stage 0: Video Normalization ✅ IMPLEMENTED
 ```yaml
