@@ -76,50 +76,68 @@ def extract_crops(selected_person_path, video_path, output_path, expand_bbox=0.1
     
     # Read all frames and extract crops for frames we need
     current_frame = 0
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        
-        # Check if this frame is in our selection
-        if current_frame in frame_set:
-            idx = frame_to_idx[current_frame]
-            bbox = bboxes[idx]
+    
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
             
-            # Extract crop with expansion
-            x1, y1, x2, y2 = map(int, bbox)
+            # Check if this frame is in our selection
+            if current_frame in frame_set:
+                idx = frame_to_idx[current_frame]
+                bbox = bboxes[idx]
+                
+                # Extract crop with expansion
+                x1, y1, x2, y2 = map(int, bbox)
+                
+                # Validate bbox
+                if x2 > x1 and y2 > y1:
+                    # Expand bbox
+                    bbox_w = x2 - x1
+                    bbox_h = y2 - y1
+                    expand_w = int(bbox_w * expand_bbox)
+                    expand_h = int(bbox_h * expand_bbox)
+                    
+                    x1_exp = x1 - expand_w
+                    y1_exp = y1 - expand_h
+                    x2_exp = x2 + expand_w
+                    y2_exp = y2 + expand_h
+                    
+                    # Clip to frame bounds
+                    x1_exp = max(0, x1_exp)
+                    y1_exp = max(0, y1_exp)
+                    x2_exp = min(width, x2_exp)
+                    y2_exp = min(height, y2_exp)
+                    
+                    # Extract crop
+                    try:
+                        crop = frame[y1_exp:y2_exp, x1_exp:x2_exp]
+                        if crop.size > 0:
+                            crops[idx] = crop
+                            valid_crops += 1
+                    except Exception as e:
+                        print(f"\n   ⚠️  Error extracting crop at frame {current_frame}: {e}")
             
-            # Validate bbox
-            if x2 > x1 and y2 > y1:
-                # Expand bbox
-                bbox_w = x2 - x1
-                bbox_h = y2 - y1
-                expand_w = int(bbox_w * expand_bbox)
-                expand_h = int(bbox_h * expand_bbox)
-                
-                x1_exp = x1 - expand_w
-                y1_exp = y1 - expand_h
-                x2_exp = x2 + expand_w
-                y2_exp = y2 + expand_h
-                
-                # Clip to frame bounds
-                x1_exp = max(0, x1_exp)
-                y1_exp = max(0, y1_exp)
-                x2_exp = min(width, x2_exp)
-                y2_exp = min(height, y2_exp)
-                
-                # Extract crop
-                crop = frame[y1_exp:y2_exp, x1_exp:x2_exp]
-                crops[idx] = crop
-                valid_crops += 1
-        
-        current_frame += 1
-        
-        # Progress
-        if current_frame % 100 == 0:
-            elapsed = time.time() - t_start
-            fps_proc = current_frame / elapsed
-            print(f"   Processed {current_frame}/{total_frames} frames ({fps_proc:.1f} FPS, {valid_crops} crops)", end='\r')
+            current_frame += 1
+            
+            # Progress
+            if current_frame % 100 == 0:
+                elapsed = time.time() - t_start
+                fps_proc = current_frame / elapsed
+                print(f"   Processed {current_frame}/{total_frames} frames ({fps_proc:.1f} FPS, {valid_crops} crops)", end='\r')
+    
+    except KeyboardInterrupt:
+        print(f"\n\n   ⚠️  Process interrupted by user at frame {current_frame}")
+        print(f"   Extracted {valid_crops} crops before interruption")
+        cap.release()
+        return None, 0
+    except Exception as e:
+        print(f"\n\n   ❌ Error during extraction: {e}")
+        import traceback
+        traceback.print_exc()
+        cap.release()
+        return None, 0
     
     cap.release()
     t_end = time.time()
