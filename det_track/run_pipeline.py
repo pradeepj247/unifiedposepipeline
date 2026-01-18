@@ -252,11 +252,6 @@ def run_pipeline(config_path, stages_to_run=None, mode=None, verbose=False, forc
     # Apply mode overrides (modifies config in-place)
     config = apply_mode_overrides(config, active_mode, verbose=verbose)
     
-    # Check for experimental stage3c variant (on-demand crop extraction)
-    use_stage3c_new = config.get('stage3c_filter', {}).get('advanced', {}).get('use_ondemand_extraction', False)
-    stage3c_script = 'stage3c_new.py' if use_stage3c_new else 'stage3c_filter_persons.py'
-    stage3c_label = 'Stage 3c: Filter Persons & Extract Crops (ON-DEMAND)' if use_stage3c_new else 'Stage 3c: Filter Persons & Extract Crops'
-    
     # Simplified 5-stage pipeline: 0→1→2→3→4
     # Stage 3 splits into 3a (analyze) → 3b (group) → 3c (filter) → 3d (refine)
     # Usage: --stages 0,1,2,3a,3b,3c,3d,4  or  --stages stage0,stage1,stage4
@@ -266,7 +261,7 @@ def run_pipeline(config_path, stages_to_run=None, mode=None, verbose=False, forc
         ('Stage 2: Tracking', 'stage2_track.py', 'stage2'),
         ('Stage 3a: Tracklet Analysis', 'stage3a_analyze_tracklets.py', 'stage3a'),
         ('Stage 3b: Canonical Grouping', 'stage3b_group_canonical.py', 'stage3b'),
-        (stage3c_label, stage3c_script, 'stage3c'),
+        ('Stage 3c: Filter Persons & Extract Crops', 'stage3c_filter_persons.py', 'stage3c'),
         ('Stage 3d: Visual Refinement (OSNet)', 'stage3d_refine_visual.py', 'stage3d'),
         ('Stage 4: Generate HTML Viewer', 'stage4_generate_html.py', 'stage4'),
     ]
