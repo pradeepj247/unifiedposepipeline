@@ -284,8 +284,8 @@ def normalize_video(input_path, output_path, metadata, config):
     # Resolution normalization with GPU scaling
     target_res = normalization.get('target_resolution', [1280, 720])
     if use_gpu:
-        # GPU-based scaling with format conversion
-        scale_filter = f"scale_cuda={target_res[0]}:{target_res[1]}:format=yuv420p"
+        # GPU-based scaling (no format needed, handled by NVENC)
+        scale_filter = f"scale_cuda={target_res[0]}:{target_res[1]}"
         print(f"    Resolution: {metadata['width']}x{metadata['height']} → {target_res[0]}x{target_res[1]} (GPU)")
     else:
         # CPU-based scaling (fallback)
@@ -296,11 +296,10 @@ def normalize_video(input_path, output_path, metadata, config):
     
     # Video codec and settings
     if use_gpu:
-        # NVENC GPU encoding
+        # NVENC GPU encoding (don't specify pix_fmt, it breaks CUDA pipeline)
         cmd += [
             '-c:v', 'h264_nvenc',
             '-preset', encoding.get('gpu_preset', 'p4'),  # p1-p7, p4=balanced
-            '-pix_fmt', encoding.get('pix_fmt', 'yuv420p'),
         ]
         # All I-frames for optimal seeking (no P/B frames)
         cmd += ['-g', '1', '-bf', '0']
