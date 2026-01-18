@@ -288,7 +288,7 @@ def main():
     
     # Warmup
     print(f"\n🔥 Warming up GPU...")
-    dummy = torch.randn(1, 3, 640, 640).cuda()
+    dummy = torch.rand(1, 3, 640, 640).cuda()  # rand (not randn) creates 0-1 values
     for _ in range(10):
         _ = model(dummy, verbose=False)
     print(f"✅ Warmup complete")
