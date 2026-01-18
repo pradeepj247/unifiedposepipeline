@@ -269,35 +269,54 @@ def normalize_video(input_path, output_path, metadata, config):
     print(f"    Input:  {input_path}")
     print(f"    Output: {output_path}")
     
-    # Build ffmpeg command
-    cmd = ['ffmpeg', '-y', '-i', str(input_path)]
+    # Build ffmpeg command with GPU acceleration
+    # Hardware acceleration for decode
+    cmd = ['ffmpeg', '-y']
     
-    # Video filters
-    filters = []
+    # Check if GPU encoding is enabled
+    use_gpu = encoding.get('use_gpu', True)
+    if use_gpu:
+        cmd += ['-hwaccel', 'cuda', '-hwaccel_output_format', 'cuda']
+        print(f"    GPU: CUDA hardware acceleration enabled")
     
-    # Resolution normalization (downscale if needed)
-    max_res = limits.get('max_resolution', [1920, 1080])
-    if metadata['width'] > max_res[0] or metadata['height'] > max_res[1]:
-        scale_filter = f"scale='min({max_res[0]},iw)':'min({max_res[1]},ih)':force_original_aspect_ratio=decrease"
-        filters.append(scale_filter)
-        print(f"    Resolution: {metadata['width']}x{metadata['height']} → ≤{max_res[0]}x{max_res[1]}")
+    cmd += ['-i', str(input_path)]
     
-    # Apply filters if any
-    if filters:
-        cmd += ['-vf', ','.join(filters)]
+    # Resolution normalization with GPU scaling
+    target_res = normalization.get('target_resolution', [1280, 720])
+    if use_gpu:
+        # GPU-based scaling
+        scale_filter = f"scale_cuda={target_res[0]}:{target_res[1]}"
+        print(f"    Resolution: {metadata['width']}x{metadata['height']} → {target_res[0]}x{target_res[1]} (GPU)")
+    else:
+        # CPU-based scaling (fallback)
+        scale_filter = f"scale={target_res[0]}:{target_res[1]}"
+        print(f"    Resolution: {metadata['width']}x{metadata['height']} → {target_res[0]}x{target_res[1]} (CPU)")
+    
+    cmd += ['-vf', scale_filter]
     
     # Video codec and settings
-    cmd += [
-        '-c:v', encoding.get('codec', 'libx264'),
-        '-preset', encoding.get('preset', 'veryfast'),
-        '-profile:v', encoding.get('profile', 'main'),
-        '-pix_fmt', encoding.get('pix_fmt', 'yuv420p'),
-    ]
-    
-    # GOP structure
-    keyint = encoding.get('keyframe_interval', 30)
-    cmd += ['-x264-params', f'keyint={keyint}:scenecut=0']
-    print(f"    GOP: Setting keyframe interval = {keyint}")
+    if use_gpu:
+        # NVENC GPU encoding
+        cmd += [
+            '-c:v', 'h264_nvenc',
+            '-preset', encoding.get('gpu_preset', 'p4'),  # p1-p7, p4=balanced
+            '-pix_fmt', encoding.get('pix_fmt', 'yuv420p'),
+        ]
+        # All I-frames for optimal seeking (no P/B frames)
+        cmd += ['-g', '1', '-bf', '0']
+        print(f"    Encoder: h264_nvenc (GPU) with all I-frames")
+    else:
+        # CPU encoding (fallback)
+        cmd += [
+            '-c:v', encoding.get('codec', 'libx264'),
+            '-preset', encoding.get('preset', 'veryfast'),
+            '-profile:v', encoding.get('profile', 'main'),
+            '-pix_fmt', encoding.get('pix_fmt', 'yuv420p'),
+        ]
+        # GOP structure for CPU
+        keyint = encoding.get('keyframe_interval', 30)
+        cmd += ['-x264-params', f'keyint={keyint}:scenecut=0']
+        print(f"    Encoder: libx264 (CPU), GOP keyint={keyint}")
     
     # FPS normalization
     target_fps = normalization.get('target_fps', 25)
