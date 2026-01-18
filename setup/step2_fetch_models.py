@@ -214,8 +214,12 @@ def main():
     
     try:
         for i, model in enumerate(models, 1):
-            # Check if fetch is disabled
-            fetch_enabled = model.get('fetch', 'yes').lower() in ['yes', 'true', '1']
+            # Check if fetch is disabled (handle both boolean and string values)
+            fetch_value = model.get('fetch', 'yes')
+            if isinstance(fetch_value, bool):
+                fetch_enabled = fetch_value
+            else:
+                fetch_enabled = str(fetch_value).lower() in ['yes', 'true', '1']
             
             if not fetch_enabled:
                 print(f"  ⏭️  [{i}/{len(models)}] Skipping: {model['name']} (fetch=no)")
