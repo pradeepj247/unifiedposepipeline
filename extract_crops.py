@@ -36,18 +36,25 @@ def extract_crops(selected_person_path, video_path, output_path, expand_bbox=0.1
     print("🎬 EXTRACTING PERSON CROPS FROM VIDEO")
     print("=" * 70)
     print(f"   Bbox expansion: {expand_bbox * 100:.0f}%")
+    import sys
+    sys.stdout.flush()
     
     # Load selected person data
     print(f"📦 Loading selected person data...")
+    import sys
+    sys.stdout.flush()
     data = np.load(selected_person_path)
     frame_numbers = data['frame_numbers']
     bboxes = data['bboxes']
     
     print(f"   Frames: {len(frame_numbers)}")
     print(f"   Person ID: {data.get('person_id', 'N/A')}")
+    sys.stdout.flush()
     
     # Open video
     print(f"\n📹 Opening video: {Path(video_path).name}")
+    import sys
+    sys.stdout.flush()
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise ValueError(f"Could not open video: {video_path}")
@@ -60,9 +67,14 @@ def extract_crops(selected_person_path, video_path, output_path, expand_bbox=0.1
     print(f"   Resolution: {width}×{height}")
     print(f"   FPS: {fps:.2f}")
     print(f"   Total frames: {total_frames}")
+    sys.stdout.flush()
     
     # Extract crops
     print(f"\n🔪 Extracting crops...")
+    print(f"   Starting frame-by-frame extraction...")
+    import sys
+    sys.stdout.flush()
+    
     crops = []
     valid_crops = 0
     t_start = time.time()
@@ -118,14 +130,16 @@ def extract_crops(selected_person_path, video_path, output_path, expand_bbox=0.1
                             valid_crops += 1
                     except Exception as e:
                         print(f"\n   ⚠️  Error extracting crop at frame {current_frame}: {e}")
+                        sys.stdout.flush()
             
             current_frame += 1
             
-            # Progress
+            # Progress every 100 frames
             if current_frame % 100 == 0:
                 elapsed = time.time() - t_start
                 fps_proc = current_frame / elapsed
-                print(f"   Processed {current_frame}/{total_frames} frames ({fps_proc:.1f} FPS, {valid_crops} crops)", end='\r')
+                print(f"\n   ✅ Progress: {current_frame}/{total_frames} frames | {fps_proc:.1f} FPS | {valid_crops} crops extracted")
+                sys.stdout.flush()
     
     except KeyboardInterrupt:
         print(f"\n\n   ⚠️  Process interrupted by user at frame {current_frame}")
