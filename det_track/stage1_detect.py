@@ -166,7 +166,7 @@ def auto_select_best_model(model_path, verbose=False):
             print(f"  ✅ TensorRT engine compatible - using yolov8n.engine (121 FPS)")
             print(f"  🚀 Performance boost: ~45% faster than PyTorch")
         else:
-            print(f"  🚀 Auto-selected TensorRT engine: yolov8n.engine (121 FPS, 45% faster)")
+            print(f"  🚀 Auto-selected TensorRT engine: yolov8n.engine (45% faster)")
         
         return yolov8n_engine
         
@@ -226,11 +226,13 @@ def load_yolo_detector(model_path, device='cuda', verbose=False):
         model_type = "TensorRT engine" if model_path.endswith('.engine') else "PyTorch model"
         print(f"  ✅ Loading {model_type}: {model_path}")
     
-    # Suppress TensorRT verbose output during model loading
+    # Suppress ultralytics and TensorRT verbose output during model loading
     import sys
     import os
+    old_stdout = sys.stdout
     old_stderr = sys.stderr
     if not verbose and model_path.endswith('.engine'):
+        sys.stdout = open(os.devnull, 'w')
         sys.stderr = open(os.devnull, 'w')
     
     try:
@@ -238,7 +240,9 @@ def load_yolo_detector(model_path, device='cuda', verbose=False):
         model = YOLO(model_path, task="detect")
     finally:
         if not verbose and model_path.endswith('.engine'):
+            sys.stdout.close()
             sys.stderr.close()
+            sys.stdout = old_stdout
             sys.stderr = old_stderr
     
     if model_path.endswith('.engine'):
