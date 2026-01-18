@@ -22,6 +22,7 @@ from pathlib import Path
 import os
 import contextlib
 from tqdm import tqdm
+import torch  # Pre-import to speed up boxmot (reduces import from 4s → 2.4s)
 
 
 def resolve_path_variables(config):
