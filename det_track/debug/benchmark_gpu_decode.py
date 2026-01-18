@@ -266,7 +266,7 @@ def main():
     parser = argparse.ArgumentParser(description='Benchmark CPU vs GPU decode for YOLO')
     parser.add_argument('--video', required=True, help='Path to video file (preferably all-I-frame from Stage 0)')
     parser.add_argument('--model', default='yolov8s.pt', help='YOLO model path')
-    parser.add_argument('--max-frames', type=int, default=500, help='Limit frames for quick test (default: 500)')
+    parser.add_argument('--max-frames', type=int, default=800, help='Limit frames for quick test (default: 800, multiple of 200)')
     parser.add_argument('--full', action='store_true', help='Process entire video (ignore max-frames)')
     args = parser.parse_args()
     
@@ -304,6 +304,7 @@ def main():
     print(f"✅ Warmup complete")
     
     # Benchmark 1: CPU decode
+    # Note: Timing starts AFTER model load and warmup (excludes initialization overhead)
     cpu_results = benchmark_cpu_decode(model, video_path, max_frames)
     
     # Wait a bit between tests

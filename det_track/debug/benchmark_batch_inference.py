@@ -253,7 +253,7 @@ def main():
     parser = argparse.ArgumentParser(description='Benchmark single-frame vs batch inference for YOLO')
     parser.add_argument('--video', required=True, help='Path to video file')
     parser.add_argument('--model', default='yolov8s.pt', help='YOLO model path')
-    parser.add_argument('--max-frames', type=int, default=500, help='Limit frames for quick test (default: 500)')
+    parser.add_argument('--max-frames', type=int, default=800, help='Limit frames for quick test (default: 800, multiple of 200)')
     parser.add_argument('--batch-sizes', type=int, nargs='+', default=[4, 8], 
                         help='Batch sizes to test (default: 4 8)')
     parser.add_argument('--full', action='store_true', help='Process entire video (ignore max-frames)')
@@ -296,6 +296,7 @@ def main():
     results_list = []
     
     # Benchmark 1: Single-frame (baseline)
+    # Note: Timing starts AFTER model load and warmup (excludes initialization overhead)
     single_results = benchmark_single_frame(model, video_path, max_frames)
     results_list.append(single_results)
     
