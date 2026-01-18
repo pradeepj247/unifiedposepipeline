@@ -190,16 +190,17 @@ def load_yolo_detector(model_path, device='cuda', verbose=False):
     except ImportError:
         raise ImportError("ultralytics or torch not found. Install with: pip install ultralytics torch")
     
-    # Suppress TensorRT verbose logging
+    # Suppress TensorRT verbose logging by redirecting stderr temporarily
     if model_path.endswith('.engine'):
         try:
             import tensorrt as trt
-            # Set TensorRT logger to ERROR level only (suppresses INFO and WARNING)
-            trt.init_libnvinfer_plugins(None, "")
+            import sys
+            import os
+            # Set TensorRT logger to ERROR level
             logger = trt.Logger(trt.Logger.ERROR)
             trt.init_libnvinfer_plugins(logger, "")
         except:
-            pass  # TensorRT not available yet, will be auto-installed
+            pass  # TensorRT not available, will be handled by ultralytics
     
     # Auto-select best model (prefers TensorRT if available)
     original_model_path = model_path
@@ -225,8 +226,23 @@ def load_yolo_detector(model_path, device='cuda', verbose=False):
         model_type = "TensorRT engine" if model_path.endswith('.engine') else "PyTorch model"
         print(f"  ✅ Loading {model_type}: {model_path}")
     
-    # Load model with task="detect" to avoid warning
-    model = YOLO(model_path, task="detect")
+    # Suppress TensorRT verbose output during model loading
+    import sys
+    import os
+    old_stderr = sys.stderr
+    if not verbose and model_path.endswith('.engine'):
+        sys.stderr = open(os.devnull, 'w')
+    
+    try:
+        # Load model with task="detect" to avoid warning
+        model = YOLO(model_path, task="detect")
+    finally:
+        if not verbose and model_path.endswith('.engine'):
+            sys.stderr.close()
+            sys.stderr = old_stderr
+    
+    if model_path.endswith('.engine'):
+        print(f"  ✅ Detection model loaded")
     
     # Only call .to(device) for PyTorch models
     # TensorRT engines don't support .to() - device is specified in predict()
