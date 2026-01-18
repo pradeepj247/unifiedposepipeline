@@ -151,15 +151,29 @@ def auto_select_best_model(model_path, verbose=False):
         torch.cuda.set_device(0)
         _ = torch.zeros(1, device="cuda")
         
-        # Try to load engine (suppress output)
+        # Try to load engine - suppress all ultralytics and TensorRT output
         import warnings
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            test_model = YOLO(yolov8n_engine, task="detect")
-            
-            # Quick inference test
-            dummy = np.zeros((640, 640, 3), dtype=np.uint8)
-            _ = test_model.predict(source=dummy, conf=0.5, device=0, verbose=False)
+        import sys
+        import os
+        
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        sys.stdout = open(os.devnull, 'w')
+        sys.stderr = open(os.devnull, 'w')
+        
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                test_model = YOLO(yolov8n_engine, task="detect")
+                
+                # Quick inference test
+                dummy = np.zeros((640, 640, 3), dtype=np.uint8)
+                _ = test_model.predict(source=dummy, conf=0.5, device=0, verbose=False)
+        finally:
+            sys.stdout.close()
+            sys.stderr.close()
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
         
         # Success! Engine is compatible
         if verbose:
@@ -167,6 +181,7 @@ def auto_select_best_model(model_path, verbose=False):
             print(f"  🚀 Performance boost: ~45% faster than PyTorch")
         else:
             print(f"  🚀 Auto-selected TensorRT engine: yolov8n.engine (45% faster)")
+            print(f"  ✅ Detection model loaded")
         
         return yolov8n_engine
         
@@ -214,14 +229,10 @@ def load_yolo_detector(model_path, device='cuda', verbose=False):
     # TensorRT cannot bootstrap CUDA by itself in Python
     # This MUST happen before YOLO() constructor for .engine files
     if model_path.endswith('.engine'):
-        print(f"  🔧 Initializing CUDA via PyTorch (required for TensorRT)...")
-        
-        # Force CUDA initialization FIRST
+        # Force CUDA initialization FIRST (silent)
         assert torch.cuda.is_available(), "CUDA not available"
         torch.cuda.set_device(0)
         _ = torch.zeros(1, device="cuda")  # Dummy tensor to ensure CUDA is fully initialized
-        
-        print(f"  ✅ CUDA initialized: {torch.cuda.get_device_name(0)}")
     
     if verbose:
         model_type = "TensorRT engine" if model_path.endswith('.engine') else "PyTorch model"
@@ -244,7 +255,8 @@ def load_yolo_detector(model_path, device='cuda', verbose=False):
             sys.stdout = old_stdout
             sys.stderr = old_stderr
     
-    if model_path.endswith('.engine'):
+    # Print confirmation only if not TensorRT (TensorRT already printed by auto_select)
+    if not model_path.endswith('.engine'):
         print(f"  ✅ Detection model loaded")
     
     # Only call .to(device) for PyTorch models
