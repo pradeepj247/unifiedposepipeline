@@ -258,32 +258,55 @@ def main():
         print(f"⏱️  TOTAL TIME TAKEN: {total_time:.2f}s")
         print("=" * 70 + "\n")
         
-        # Copy optimized yolov8n.engine from Drive backup (if available)
-        drive_yolo_backup = "/content/drive/MyDrive/yolomodels/new/yolov8n.engine"
+        # Copy optimized YOLO TensorRT engines from Drive backup (if available)
         yolo_dest = os.path.join(base_dir, "yolo")
+        drive_backup_dir = "/content/drive/MyDrive/yolomodels/new"
         
-        if os.path.exists(drive_yolo_backup) and os.path.exists(yolo_dest):
-            print("=" * 70)
-            print(f"{COLOR_BLUE}📦 Copying optimized YOLOv8n TensorRT engine from Drive backup{COLOR_RESET}")
-            print("=" * 70 + "\n")
-            print(f"  📂 Source: {drive_yolo_backup}")
-            print(f"  📂 Destination: {yolo_dest}")
-            print(f"  💡 Best model: yolov8n.engine (121.7 FPS, 45% faster than PyTorch)\n")
+        # Try to copy yolov8n.engine first (best: 121.7 FPS), then yolov8s_b4_640.engine (fallback: 113.8 FPS)
+        engine_files = [
+            ("yolov8n.engine", "121.7 FPS, 45% faster than PyTorch"),
+            ("yolov8s_b4_640.engine", "113.8 FPS, 40% faster than PyTorch (batch=4)")
+        ]
+        
+        if os.path.exists(drive_backup_dir) and os.path.exists(yolo_dest):
+            copied_any = False
             
-            dest_file = os.path.join(yolo_dest, "yolov8n.engine")
-            copy_cmd = f"cp '{drive_yolo_backup}' '{dest_file}'"
-            try:
-                subprocess.run(copy_cmd, shell=True, check=True, capture_output=True)
-                file_size_mb = os.path.getsize(dest_file) / (1024 * 1024)
+            for engine_name, description in engine_files:
+                source_file = os.path.join(drive_backup_dir, engine_name)
                 
-                print(f"  ✅ Copied yolov8n.engine ({file_size_mb:.1f} MB)")
+                if os.path.exists(source_file):
+                    if not copied_any:
+                        print("=" * 70)
+                        print(f"{COLOR_BLUE}📦 Copying optimized YOLO TensorRT engine from Drive backup{COLOR_RESET}")
+                        print("=" * 70 + "\n")
+                    
+                    dest_file = os.path.join(yolo_dest, engine_name)
+                    copy_cmd = f"cp '{source_file}' '{dest_file}'"
+                    
+                    try:
+                        subprocess.run(copy_cmd, shell=True, check=True, capture_output=True)
+                        file_size_mb = os.path.getsize(dest_file) / (1024 * 1024)
+                        
+                        print(f"  ✅ Copied {engine_name} ({file_size_mb:.1f} MB)")
+                        print(f"     💡 Performance: {description}")
+                        copied_any = True
+                        
+                        # If we got yolov8n.engine (best), don't need fallback
+                        if engine_name == "yolov8n.engine":
+                            break
+                            
+                    except subprocess.CalledProcessError as e:
+                        print_warning(f"Could not copy {engine_name}: {e}")
+            
+            if copied_any:
                 print(f"\n  {COLOR_GREEN}✔️ Optimized YOLO model restored!{COLOR_RESET}")
                 print("=" * 70 + "\n")
-            except subprocess.CalledProcessError as e:
-                print_warning(f"Could not copy backup model: {e}")
+            else:
+                print_warning(f"No TensorRT engines found in backup: {drive_backup_dir}")
                 print("  (Not critical - can be re-exported later with det_track/debug/export_yolo_tensorrt.py)\n")
-        elif os.path.exists(os.path.dirname(drive_yolo_backup)):
-            print_warning(f"Drive backup directory found but yolov8n.engine not found: {drive_yolo_backup}")
+                
+        elif os.path.exists(drive_backup_dir):
+            print_warning(f"Drive backup found but destination not created: {yolo_dest}")
         
         if not failed_models:
             print("📌 Next steps to try:")
