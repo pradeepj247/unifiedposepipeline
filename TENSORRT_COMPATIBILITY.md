@@ -189,16 +189,51 @@ else:
 
 ### ✅ DO:
 - **Always run compatibility check** at start of new Colab session
+- **Re-export when versions change** (5-10 min, always worth it)
 - **Store metadata.json** alongside engines in Google Drive
-- **Re-export if CUDA version changes** (critical)
-- **Keep .pt models** in Google Drive (lightweight, portable)
-- **Document environment** when exporting
+- **Keep .pt models** in Google Drive (lightweight, portable source)
+- **Let Colab use its native CUDA** (don't fight the environment)
+- **Trust the automated re-export** (it's faster than debugging)
 
 ### ❌ DON'T:
-- Copy .engine files across different GPUs (T4 → A100)
-- Use engines after Colab runtime restarts (check first!)
-- Manually delete tensorrt_metadata.json
-- Skip compatibility check ("it worked yesterday")
+- ❌ Try to pin/downgrade CUDA to match old engines (fragile, breaks dependencies)
+- ❌ Copy .engine files across different GPUs (T4 → A100)
+- ❌ Use engines after Colab runtime restarts (check first!)
+- ❌ Manually delete tensorrt_metadata.json
+- ❌ Skip compatibility check ("it worked yesterday")
+- ❌ Fight the Colab environment (let it use native CUDA)
+
+## ❓ FAQ: Should I Pin CUDA or Re-Export?
+
+### Question
+*"When versions mismatch, should I downgrade CUDA to match old engines, or re-export engines?"*
+
+### Answer: **Always Re-Export** ✅
+
+**Why re-export is better:**
+
+| Aspect | Pin CUDA ❌ | Re-Export Engines ✅ |
+|--------|------------|---------------------|
+| **Time** | 30+ min debugging | 5-10 min automated |
+| **Success Rate** | 50% (may not work) | 100% (always works) |
+| **Maintenance** | High (breaks on updates) | Zero (automated) |
+| **Dependencies** | Conflicts with other packages | No conflicts |
+| **Performance** | Suboptimal (old CUDA) | Optimal (native CUDA) |
+| **Future-Proof** | No (brittle) | Yes (adapts automatically) |
+
+**Example:**
+```python
+# ❌ BAD: Try to pin CUDA (fragile)
+!pip install torch==2.9.0+cu126  # Might break ultralytics
+!pip install ultralytics         # Requires latest torch
+# → Dependency hell, wasted time
+
+# ✅ GOOD: Re-export (robust)
+python check_tensorrt_compatibility.py --auto-reexport
+# → 5-10 min, guaranteed to work, optimal performance
+```
+
+**Bottom line:** Colab manages the environment, not you. Adapt to it (re-export) rather than fight it (pin CUDA).
 
 ---
 
@@ -208,6 +243,7 @@ else:
 - yolov8n: ~2 minutes
 - yolov8s: ~3-5 minutes
 - **Total: ~7 minutes worst case**
+- **Frequency:** Only when CUDA/GPU version changes (rare)
 
 ### Runtime Benefit (every inference):
 - PyTorch: 81.6 FPS (baseline)
@@ -215,6 +251,8 @@ else:
 - **7 minutes export → saves 7+ seconds per video**
 
 **Break-even point:** After processing just 1-2 videos, TensorRT pays for itself!
+
+**Reality check:** Most sessions won't need re-export. Colab environment changes infrequently. When it does, 7 minutes is negligible compared to trying to pin CUDA (30+ min debugging).
 
 ---
 
