@@ -122,7 +122,7 @@ stage0_normalize:
 # ============================================================================
 stage1_detect:
   detector:
-    model_path: ${models_dir}/yolo/yolov8s.pt  # Use .engine for TensorRT (requires tensorrt package)
+    model_path: ${models_dir}/yolo/yolov8n.pt  # PyTorch model (Colab-compatible)
     confidence: 0.3
     device: cuda
     detect_only_humans: true

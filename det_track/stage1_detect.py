@@ -221,9 +221,10 @@ def load_yolo_detector(model_path, device='cuda', verbose=False):
         except:
             pass  # TensorRT not available, will be handled by ultralytics
     
-    # Auto-select best model (prefers TensorRT if available)
+    # DISABLED: Auto-select best model (TensorRT compatibility issues in Colab)
+    # Use the model specified in config directly
     original_model_path = model_path
-    model_path = auto_select_best_model(model_path, verbose)
+    # model_path = auto_select_best_model(model_path, verbose)
     
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"YOLO model not found: {model_path}")
