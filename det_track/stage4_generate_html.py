@@ -304,42 +304,15 @@ def main():
         import imageio
         import cv2
         import base64
+        from concurrent.futures import ThreadPoolExecutor, as_completed
         
         webp_base64_dict_3c = {}  # Store base64 encoded WebPs for 3c
         webp_base64_dict_3d = {}  # Store base64 encoded WebPs for 3d
         
-        # Generate WebPs for Stage 3c (only if dual-row mode enabled)
-        if dual_row_mode:
-            for person_id, crops in sorted(person_buckets_3c.items()):
-                if crops is None or len(crops) == 0:
-                    continue
-                
-                crops_to_use = crops[:50] if len(crops) > 50 else crops
-                
-                resized = []
-                for crop in crops_to_use:
-                    resized_crop = cv2.resize(crop, resize_to)
-                    resized_crop = cv2.cvtColor(resized_crop, cv2.COLOR_BGR2RGB)
-                    resized.append(resized_crop)
-                
-                output_file = output_dir / f"person_3c_{person_id}.webp"
-                imageio.mimsave(output_file, resized, format='WEBP', duration=webp_duration_ms, loop=0)
-                
-                with open(output_file, 'rb') as f:
-                    webp_data = f.read()
-                webp_base64_dict_3c[person_id] = base64.b64encode(webp_data).decode('utf-8')
-                
-                if verbose:
-                    file_size_kb = output_file.stat().st_size / 1024
-                    logger.info(f"3c Person {person_id}: {len(crops_to_use)}/{len(crops)} crops → {output_file.name} ({file_size_kb:.0f} KB)")
-        else:
-            if verbose:
-                logger.info("⏭️  Skipping Stage 3c WebP generation (single-row mode)")
-        
-        # Generate WebPs for Stage 3d (limit to 50 crops per person)
-        for person_id, crops in sorted(person_buckets_3d.items()):
+        def generate_webp_for_person(person_id, crops, output_dir, prefix, resize_to, webp_duration_ms):
+            """Generate WebP for a single person (parallelizable)"""
             if crops is None or len(crops) == 0:
-                continue
+                return None
             
             crops_to_use = crops[:50] if len(crops) > 50 else crops
             
@@ -349,16 +322,58 @@ def main():
                 resized_crop = cv2.cvtColor(resized_crop, cv2.COLOR_BGR2RGB)
                 resized.append(resized_crop)
             
-            output_file = output_dir / f"person_3d_{person_id}.webp"
+            output_file = output_dir / f"person_{prefix}_{person_id}.webp"
             imageio.mimsave(output_file, resized, format='WEBP', duration=webp_duration_ms, loop=0)
             
             with open(output_file, 'rb') as f:
                 webp_data = f.read()
-            webp_base64_dict_3d[person_id] = base64.b64encode(webp_data).decode('utf-8')
+            base64_data = base64.b64encode(webp_data).decode('utf-8')
             
-            if verbose:
-                file_size_kb = output_file.stat().st_size / 1024
-                logger.info(f"3d Person {person_id}: {len(crops_to_use)}/{len(crops)} crops → {output_file.name} ({file_size_kb:.0f} KB)")
+            file_size_kb = output_file.stat().st_size / 1024
+            return person_id, base64_data, len(crops_to_use), len(crops), output_file.name, file_size_kb
+        
+        # Use ThreadPoolExecutor for parallel processing (I/O-bound task)
+        max_workers = 4  # Optimal for I/O-bound tasks
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = []
+            
+            # Submit Stage 3c jobs (only if dual-row mode enabled)
+            if dual_row_mode:
+                for person_id, crops in person_buckets_3c.items():
+                    if crops is not None and len(crops) > 0:
+                        future = executor.submit(
+                            generate_webp_for_person,
+                            person_id, crops, output_dir, '3c', resize_to, webp_duration_ms
+                        )
+                        futures.append(('3c', future))
+            
+            # Submit Stage 3d jobs
+            for person_id, crops in person_buckets_3d.items():
+                if crops is not None and len(crops) > 0:
+                    future = executor.submit(
+                        generate_webp_for_person,
+                        person_id, crops, output_dir, '3d', resize_to, webp_duration_ms
+                    )
+                    futures.append(('3d', future))
+            
+            # Collect results as they complete
+            for stage_prefix, future in futures:
+                result = future.result()
+                if result is not None:
+                    person_id, base64_data, used, total, filename, size_kb = result
+                    
+                    if stage_prefix == '3c':
+                        webp_base64_dict_3c[person_id] = base64_data
+                        if verbose:
+                            logger.info(f"3c Person {person_id}: {used}/{total} crops → {filename} ({size_kb:.0f} KB)")
+                    else:
+                        webp_base64_dict_3d[person_id] = base64_data
+                        if verbose:
+                            logger.info(f"3d Person {person_id}: {used}/{total} crops → {filename} ({size_kb:.0f} KB)")
+        
+        if not dual_row_mode and verbose:
+            logger.info("⏭️  Skipping Stage 3c WebP generation (single-row mode)")
         
         webp_time = time.time() - webp_start
         
