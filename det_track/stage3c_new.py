@@ -248,7 +248,9 @@ def run_stage3c_new(config_path, verbose=True):
     # Get paths
     canonical_video = config['stage0_normalize']['output']['canonical_video_file']
     canonical_persons_filtered_file = config['stage3c_filter']['output']['canonical_persons_filtered_file']
-    output_dir = Path(config['global']['output_dir'])
+    
+    # Derive output directory from filtered file path
+    output_dir = Path(canonical_persons_filtered_file).parent
     
     # NEW output file (don't overwrite existing)
     crops_output = output_dir / 'final_crops_3c_new.pkl'
