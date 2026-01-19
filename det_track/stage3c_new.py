@@ -291,7 +291,7 @@ def run_stage3c_new(config_path, verbose=True):
     
     # Get paths - use canonical_persons.npz from stage3b (unfiltered)
     canonical_video = config['stage0_normalize']['output']['canonical_video_file']
-    canonical_persons_file = config['stage3b_grouping']['output']['canonical_persons_file']
+    canonical_persons_file = config['stage3b_group']['output']['canonical_persons_file']
     
     # Output directory
     output_dir = Path(canonical_persons_file).parent
