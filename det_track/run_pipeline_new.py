@@ -28,14 +28,13 @@ from pathlib import Path
 import torch
 
 # Import stage functions directly (no subprocess overhead)
-from stage0_normalize_video import run_normalization
+from stage0_normalize_video import run_stage0_normalize
 from stage1_detect import run_detection
 from stage2_track import run_tracking
 from stage3a_analyze_tracklets import run_analysis
-from stage3b_group_canonical import run_grouping
-from stage3c_filter_persons import run_filtering
-from stage3d_refine_visual import run_refinement
-from stage4_generate_html import run_html_generation
+from stage3b_group_canonical import run_enhanced_grouping
+from stage3c_filter_persons import run_filter
+from stage3d_refine_visual import run_refine
 
 
 def resolve_path_variables(config):
@@ -136,9 +135,17 @@ def run_stage(stage_name, stage_func, config, verbose=False):
     t_start = time.time()
     
     try:
-        # Call stage function directly
-        stage_func(config)
-        success = True
+        # Stage 4 doesn't have a separate run function - call main() from subprocess
+        if stage_func is None:
+            # For Stage 4, we still need to use subprocess since it doesn't expose a run function
+            import subprocess
+            cmd = [sys.executable, '-u', 'stage4_generate_html.py', '--config', 'configs/pipeline_config.yaml']
+            result = subprocess.run(cmd, capture_output=False, text=True)
+            success = result.returncode == 0
+        else:
+            # Call stage function directly
+            stage_func(config)
+            success = True
     except Exception as e:
         print(f"❌ {stage_name} failed with error: {e}")
         import traceback
@@ -217,14 +224,14 @@ def run_pipeline(config_path, stages_to_run=None, mode=None, verbose=False, forc
     
     # Define all stages with their functions
     all_stages = [
-        ('Stage 0: Video Normalization', run_normalization, 'stage0'),
+        ('Stage 0: Video Normalization', run_stage0_normalize, 'stage0'),
         ('Stage 1: Detection', run_detection, 'stage1'),
         ('Stage 2: Tracking', run_tracking, 'stage2'),
         ('Stage 3a: Tracklet Analysis', run_analysis, 'stage3a'),
-        ('Stage 3b: Canonical Grouping', run_grouping, 'stage3b'),
-        ('Stage 3c: Filter Persons & Extract Crops', run_filtering, 'stage3c'),
-        ('Stage 3d: Visual Refinement (OSNet)', run_refinement, 'stage3d'),
-        ('Stage 4: Generate HTML Viewer', run_html_generation, 'stage4'),
+        ('Stage 3b: Canonical Grouping', run_enhanced_grouping, 'stage3b'),
+        ('Stage 3c: Filter Persons & Extract Crops', run_filter, 'stage3c'),
+        ('Stage 3d: Visual Refinement (OSNet)', run_refine, 'stage3d'),
+        ('Stage 4: Generate HTML Viewer', None, 'stage4'),  # Stage 4 handled specially
     ]
     
     print(f"\n{'='*70}")
