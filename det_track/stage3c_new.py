@@ -229,12 +229,49 @@ def extract_crops_sequential(persons, video_path, max_crops_per_person=120, vide
     return crop_buckets, t_total
 
 
+def filter_top_persons(all_persons, top_n=10, min_duration_frames=150, verbose=True):
+    """
+    Filter to top N persons based on duration.
+    Simplified version - just picks longest-appearing persons.
+    
+    Args:
+        all_persons: List of person dicts from canonical_persons.npz
+        top_n: Number of top persons to keep (default 10)
+        min_duration_frames: Minimum frames to be considered (default 150)
+        verbose: Print filtering info
+    
+    Returns:
+        List of filtered person dicts (top N)
+    """
+    # Filter by minimum duration
+    candidates = [p for p in all_persons if len(p['frame_numbers']) >= min_duration_frames]
+    
+    if verbose:
+        print(f"   🔍 Filtering: {len(all_persons)} → {len(candidates)} persons (min {min_duration_frames} frames)")
+    
+    # Sort by duration (number of frames)
+    candidates_sorted = sorted(candidates, key=lambda p: len(p['frame_numbers']), reverse=True)
+    
+    # Take top N
+    top_persons = candidates_sorted[:top_n]
+    
+    if verbose:
+        print(f"   ✅ Selected top {len(top_persons)} persons by duration")
+        for i, p in enumerate(top_persons[:5]):  # Show top 5
+            duration = len(p['frame_numbers'])
+            print(f"      #{i+1}: Person {p['person_id']} - {duration} frames")
+        if len(top_persons) > 5:
+            print(f"      ... and {len(top_persons)-5} more")
+    
+    return top_persons
+
+
 def run_stage3c_new(config_path, verbose=True):
     """
-    Main entry point for Stage 3c NEW (fast crop extraction)
+    Main entry point for Stage 3c NEW (filter + fast crop extraction)
     """
     print("\n" + "="*70)
-    print("📍 STAGE 3C NEW: FAST CROP EXTRACTION (SEQUENTIAL)")
+    print("📍 STAGE 3C NEW: FILTER & FAST CROP EXTRACTION")
     print("="*70)
     
     t_start = time.time()
@@ -252,25 +289,32 @@ def run_stage3c_new(config_path, verbose=True):
     
     config = resolve_path_variables(config)
     
-    # Get paths
+    # Get paths - use canonical_persons.npz from stage3b (unfiltered)
     canonical_video = config['stage0_normalize']['output']['canonical_video_file']
-    canonical_persons_filtered_file = config['stage3c_filter']['output']['canonical_persons_filtered_file']
+    canonical_persons_file = config['stage3b_grouping']['output']['canonical_persons_file']
     
-    # Derive output directory from filtered file path
-    output_dir = Path(canonical_persons_filtered_file).parent
+    # Output directory
+    output_dir = Path(canonical_persons_file).parent
     
-    # NEW output file (don't overwrite existing)
+    # NEW output files (don't overwrite existing)
     crops_output = output_dir / 'final_crops_3c_new.pkl'
+    persons_output = output_dir / 'canonical_persons_3c_new.npz'
     
-    # Load filtered persons (10 persons from original stage3c)
+    # Load all canonical persons (from stage3b)
     if verbose:
-        print(f"\n   📂 Loading filtered persons: {Path(canonical_persons_filtered_file).name}")
+        print(f"\n   📂 Loading canonical persons: {Path(canonical_persons_file).name}")
     
-    data = np.load(canonical_persons_filtered_file, allow_pickle=True)
-    persons = data['persons']
+    data = np.load(canonical_persons_file, allow_pickle=True)
+    all_persons = list(data['persons'])
     
     if verbose:
-        print(f"   ✅ Loaded {len(persons)} persons")
+        print(f"   ✅ Loaded {len(all_persons)} persons")
+    
+    # Filter to top 10
+    if verbose:
+        print(f"\n   🔍 Filtering to top 10 persons...")
+    
+    persons = filter_top_persons(all_persons, top_n=10, min_duration_frames=150, verbose=verbose)
     
     # Extract crops sequentially
     if verbose:
@@ -293,18 +337,30 @@ def run_stage3c_new(config_path, verbose=True):
     with open(crops_output, 'wb') as f:
         pickle.dump(crop_buckets, f, protocol=pickle.HIGHEST_PROTOCOL)
     
-    t_save = time.time() - t_save_start
+    t_save_crops = time.time() - t_save_start
     crops_size_mb = crops_output.stat().st_size / (1024 * 1024)
     
     if verbose:
-        print(f"   ✅ Saved {crops_size_mb:.1f} MB in {t_save:.2f}s")
+        print(f"   ✅ Saved {crops_size_mb:.1f} MB in {t_save_crops:.2f}s")
+    
+    # Save filtered persons NPZ
+    if verbose:
+        print(f"\n   💾 Saving filtered persons to: {persons_output.name}")
+    
+    np.savez_compressed(persons_output, persons=persons)
+    
+    t_save_npz = time.time() - t_save_start - t_save_crops
+    
+    if verbose:
+        print(f"   ✅ Saved filtered persons ({len(persons)} persons)")
     
     t_total = time.time() - t_start
     
     # Summary
     print(f"\n   ⏱️  TIMING:")
+    print(f"      Filtering: <0.01s")
     print(f"      Extraction: {extraction_time:.2f}s")
-    print(f"      Saving: {t_save:.2f}s")
+    print(f"      Saving: {t_save_crops + t_save_npz:.2f}s")
     print(f"      Total: {t_total:.2f}s")
     
     print(f"\n   ✅ Stage 3c NEW completed in {t_total:.2f}s")
