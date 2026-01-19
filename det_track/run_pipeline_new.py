@@ -356,7 +356,7 @@ def run_pipeline(config_path, stages_to_run=None, mode=None, verbose=False, forc
         'stage2': config['stage2_track']['output']['tracklets_file'],
         'stage3a': config['stage3a_analyze']['output']['tracklet_stats_file'],
         'stage3b': config['stage3b_group']['output']['canonical_persons_file'],
-        'stage3c': config['stage3c_filter']['output']['canonical_persons_3c_file'],
+        'stage3c': config['stage3c_filter']['output']['canonical_persons_filtered_file'],
         'stage3d': config.get('stage3d_refine', {}).get('output', {}).get('canonical_persons_merged_file', ''),
         'stage4': config.get('stage4_html', {}).get('output', {}).get('webp_output_dir', ''),
     }
