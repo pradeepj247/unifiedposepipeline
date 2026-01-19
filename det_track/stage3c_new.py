@@ -243,6 +243,13 @@ def run_stage3c_new(config_path, verbose=True):
     with open(config_path) as f:
         config = yaml.safe_load(f)
     
+    # Auto-extract current_video from video_file (needed for path resolution)
+    video_file = config.get('global', {}).get('video_file', '')
+    if video_file:
+        import os
+        video_name = os.path.splitext(os.path.basename(video_file))[0]
+        config['global']['current_video'] = video_name
+    
     config = resolve_path_variables(config)
     
     # Get paths
