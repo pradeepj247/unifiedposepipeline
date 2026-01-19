@@ -109,21 +109,43 @@ def apply_mode_overrides(config, mode, verbose=False):
     if mode not in ['fast', 'balanced', 'full']:
         return config
     
-    mode_config = config.get('modes', {}).get(mode, {})
-    
-    if not mode_config:
+    if 'modes' not in config or mode not in config['modes']:
+        if verbose:
+            print(f"⚙️  No mode '{mode}' defined in config, using settings as-is")
         return config
     
-    # Apply stage-specific overrides
-    for stage_key, stage_overrides in mode_config.items():
-        if stage_key in config:
-            # Deep merge overrides into stage config
-            for key, value in stage_overrides.items():
-                if isinstance(value, dict) and key in config[stage_key]:
-                    config[stage_key][key].update(value)
-                else:
-                    config[stage_key][key] = value
+    mode_settings = config['modes'][mode]
+    description = mode_settings.get('description', '')
     
+    print(f"\n⚙️  Pipeline Mode: {mode.upper()}")
+    print(f"   {description}")
+    
+    # Override Stage 3c: crops_per_person
+    if 'stage3c_filter' in config and 'filtering' in config['stage3c_filter']:
+        old_crops = config['stage3c_filter']['filtering'].get('crops_per_person', 50)
+        new_crops = mode_settings['crops_per_person']
+        config['stage3c_filter']['filtering']['crops_per_person'] = new_crops
+        if verbose:
+            print(f"   └─ Stage 3c crops_per_person: {old_crops} → {new_crops}")
+    
+    # Override Stage 3d: enabled flag
+    if 'pipeline' in config and 'stages' in config['pipeline']:
+        old_enabled = config['pipeline']['stages'].get('stage3d', True)
+        new_enabled = mode_settings['enable_stage3d']
+        config['pipeline']['stages']['stage3d'] = new_enabled
+        if verbose:
+            print(f"   └─ Stage 3d enabled: {old_enabled} → {new_enabled}")
+    
+    # Override Stage 4: dual_row mode (create section if needed)
+    if 'stage4_html' not in config:
+        config['stage4_html'] = {}
+    old_dual = config['stage4_html'].get('dual_row', True)
+    new_dual = mode_settings['stage4_dual_row']
+    config['stage4_html']['dual_row'] = new_dual
+    if verbose:
+        print(f"   └─ Stage 4 dual_row: {old_dual} → {new_dual}")
+    
+    print()  # Blank line for readability
     return config
 
 
