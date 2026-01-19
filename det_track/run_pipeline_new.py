@@ -127,7 +127,7 @@ def apply_mode_overrides(config, mode, verbose=False):
     return config
 
 
-def run_stage(stage_name, stage_func, config, verbose=False):
+def run_stage(stage_name, stage_func, config, config_path, verbose=False):
     """Run a single stage function directly (no subprocess)"""
     if verbose:
         print(f"\n🚀 Running {stage_name}...")
@@ -138,8 +138,11 @@ def run_stage(stage_name, stage_func, config, verbose=False):
         # Stage 4 doesn't have a separate run function - call main() from subprocess
         if stage_func is None:
             # For Stage 4, we still need to use subprocess since it doesn't expose a run function
+            # Pass dual_row argument based on config
             import subprocess
-            cmd = [sys.executable, '-u', 'stage4_generate_html.py', '--config', 'configs/pipeline_config.yaml']
+            dual_row = config.get('stage4_html', {}).get('dual_row', True)
+            cmd = [sys.executable, '-u', 'stage4_generate_html.py', '--config', config_path,
+                   '--dual-row', 'true' if dual_row else 'false']
             result = subprocess.run(cmd, capture_output=False, text=True)
             success = result.returncode == 0
         else:
@@ -291,7 +294,7 @@ def run_pipeline(config_path, stages_to_run=None, mode=None, verbose=False, forc
         print(f"{'='*70}\n")
         
         # Run stage
-        success, duration = run_stage(stage_name, stage_func, config, verbose)
+        success, duration = run_stage(stage_name, stage_func, config, config_path, verbose)
         
         if not success:
             print(f"\n❌ Pipeline failed at {stage_name}")
