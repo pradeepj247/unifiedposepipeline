@@ -311,9 +311,11 @@ def run_pipeline(config_path, stages_to_run=None, mode=None, verbose=False, forc
             print(f"\n{'='*70}")
             continue
         
-        print(f"\n{'='*70}")
-        print(f"📍 {stage_name.upper()}")
-        print(f"{'='*70}\n")
+        # Stage 4 prints its own header (via subprocess), skip duplicate
+        if stage_key != 'stage4':
+            print(f"\n{'='*70}")
+            print(f"📍 {stage_name.upper()}")
+            print(f"{'='*70}\n")
         
         # Run stage
         success, duration = run_stage(stage_name, stage_func, config, config_path, verbose)
