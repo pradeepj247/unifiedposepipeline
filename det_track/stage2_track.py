@@ -249,6 +249,8 @@ def run_tracking(config):
     dummy_frame = np.zeros((100, 100, 3), dtype=np.uint8)
     
     pbar = tqdm(total=num_frames, desc="Tracking", mininterval=1.0, disable=not verbose)
+    halfway_point = num_frames // 2
+    updated_halfway = False
     
     debug_first_frame = bool(verbose)
     debug_first_tracking = bool(verbose)
@@ -327,8 +329,12 @@ def run_tracking(config):
                 print(f"\n⚠️  Tracker error at frame {frame_id}: {e}")
         
         frame_count += 1
-        if frame_count % 100 == 0 or frame_count == num_frames:
-            pbar.update(100 if frame_count + 100 <= num_frames else num_frames - frame_count + 100)
+        # Update progress bar only at 50% and 100%
+        if frame_count == halfway_point and not updated_halfway:
+            pbar.update(halfway_point)
+            updated_halfway = True
+        elif frame_count == num_frames:
+            pbar.update(num_frames - halfway_point)
     
     pbar.close()
     

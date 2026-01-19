@@ -481,18 +481,19 @@ def run_detection(config):
     all_detection_indices = []  # NEW: Sequential detection IDs
     num_detections_per_frame = []
     
+    # === CROP EXTRACTION DISABLED FOR A/B TESTING ===
     # Crop storage for cache
-    all_crops = []  # Will store all crops with metadata
+    # all_crops = []  # Will store all crops with metadata
     
     # Global detection counter for linking detections to crops
     detection_global_idx = 0
     
     # Process frames
     if verbose:
-        print(f"⚡ Running detection and crop extraction...")
+        print(f"⚡ Running detection (crop extraction DISABLED for testing)...")
     t_loop_start = time.time()
     
-    pbar = tqdm(total=num_frames, desc="  🔍 Detecting + extracting crops", mininterval=1.0, miniters=200)
+    pbar = tqdm(total=num_frames, desc="  🔍 Detecting (crops disabled)", mininterval=1.0, miniters=200)
     
     frame_idx = 0
     while frame_idx < num_frames:
@@ -523,38 +524,39 @@ def run_detection(config):
             all_classes.append(classes[i])
             all_detection_indices.append(detection_global_idx)  # NEW: Store sequential ID
             
-            # Extract crop immediately
-            x1, y1, x2, y2 = detections[i, :4]
-            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-            
-            # Clamp to frame boundaries
-            x1 = max(0, min(x1, width))
-            x2 = max(0, min(x2, width))
-            y1 = max(0, min(y1, height))
-            y2 = max(0, min(y2, height))
-            
-            if x2 > x1 and y2 > y1:
-                crop = frame[y1:y2, x1:x2].copy()
-                
-                # Resize maintaining aspect ratio (max dimension = 192px)
-                h, w = crop.shape[:2]
-                max_dim = 192
-                if max(h, w) > max_dim:
-                    scale = max_dim / max(h, w)
-                    new_w = int(w * scale)
-                    new_h = int(h * scale)
-                    crop_resized = cv2.resize(crop, (new_w, new_h))
-                else:
-                    crop_resized = crop  # Don't upscale small crops
-                
-                all_crops.append({
-                    'detection_idx': detection_global_idx,  # NEW: Link to detection
-                    'frame_idx': frame_idx,
-                    'bbox': [x1, y1, x2, y2],
-                    'confidence': detections[i, 4],
-                    'class_id': classes[i],
-                    'crop': crop_resized  # Store resized version (aspect ratio preserved)
-                })
+            # === CROP EXTRACTION COMMENTED OUT FOR A/B TESTING ===
+            # # Extract crop immediately
+            # x1, y1, x2, y2 = detections[i, :4]
+            # x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+            # 
+            # # Clamp to frame boundaries
+            # x1 = max(0, min(x1, width))
+            # x2 = max(0, min(x2, width))
+            # y1 = max(0, min(y1, height))
+            # y2 = max(0, min(y2, height))
+            # 
+            # if x2 > x1 and y2 > y1:
+            #     crop = frame[y1:y2, x1:x2].copy()
+            #     
+            #     # Resize maintaining aspect ratio (max dimension = 192px)
+            #     h, w = crop.shape[:2]
+            #     max_dim = 192
+            #     if max(h, w) > max_dim:
+            #         scale = max_dim / max(h, w)
+            #         new_w = int(w * scale)
+            #         new_h = int(h * scale)
+            #         crop_resized = cv2.resize(crop, (new_w, new_h))
+            #     else:
+            #         crop_resized = crop  # Don't upscale small crops
+            #     
+            #     all_crops.append({
+            #         'detection_idx': detection_global_idx,  # NEW: Link to detection
+            #         'frame_idx': frame_idx,
+            #         'bbox': [x1, y1, x2, y2],
+            #         'confidence': detections[i, 4],
+            #         'class_id': classes[i],
+            #         'crop': crop_resized  # Store resized version (aspect ratio preserved)
+            #     })
             
             # Increment global detection counter
             detection_global_idx += 1
@@ -566,7 +568,7 @@ def run_detection(config):
     cap.release()
     
     t_loop_end = time.time()
-    t_detect_extract_time = t_loop_end - t_loop_start  # t1: detection + crop extraction
+    t_detect_only_time = t_loop_end - t_loop_start  # t1: detection only (crops disabled)
     
     # Convert to numpy arrays
     frame_numbers = np.array(all_frame_numbers, dtype=np.int64)
@@ -595,32 +597,33 @@ def run_detection(config):
         num_detections_per_frame=num_detections_per_frame
     )
     
-    # Save crops cache
-    import pickle
-    crops_cache_path = output_path.parent / 'crops_cache.pkl'
-    print(f"  💾 Saving crops_cache to: {crops_cache_path}")
-    with open(crops_cache_path, 'wb') as f:
-        pickle.dump(all_crops, f, protocol=pickle.HIGHEST_PROTOCOL)
+    # === CROPS CACHE SAVING DISABLED FOR A/B TESTING ===
+    # # Save crops cache
+    # import pickle
+    # crops_cache_path = output_path.parent / 'crops_cache.pkl'
+    # print(f"  💾 Saving crops_cache to: {crops_cache_path}")
+    # with open(crops_cache_path, 'wb') as f:
+    #     pickle.dump(all_crops, f, protocol=pickle.HIGHEST_PROTOCOL)
     
     t_save_end = time.time()
-    t_save_time = t_save_end - t_save_start  # t2: saving time
+    t_save_time = t_save_end - t_save_start  # t2: saving NPZ only (no crops)
     
     # Total time (t1 + t2)
-    t_total = t_detect_extract_time + t_save_time
+    t_total = t_detect_only_time + t_save_time
     
     # FPS calculation
     processing_fps = num_frames / t_total if t_total > 0 else 0
     
-    crops_cache_size_mb = crops_cache_path.stat().st_size / (1024 * 1024)
+    # crops_cache_size_mb = crops_cache_path.stat().st_size / (1024 * 1024)
     avg_detections_per_frame = total_detections / num_frames if num_frames > 0 else 0
     
     # Clean, simple output
-    print(f"\n  ✅ Stage 1: Detection completed in {t_total:.2f}s")
+    print(f"\n  ✅ Stage 1: Detection completed in {t_total:.2f}s (CROPS DISABLED)")
     print(f"     - Model load: {model_load_time:.2f}s")
-    print(f"     - Detection + crop extraction: {t_detect_extract_time:.2f}s ({processing_fps:.1f} FPS)")
-    print(f"     - Saving outputs: {t_save_time:.2f}s")
+    print(f"     - Detection only: {t_detect_only_time:.2f}s ({processing_fps:.1f} FPS)")
+    print(f"     - Saving NPZ: {t_save_time:.2f}s")
     print(f"\n  📊 Total detections: {total_detections} ({avg_detections_per_frame:.1f} per frame)")
-    print(f"  💾 crops_cache.pkl: {crops_cache_size_mb:.1f} MB")
+    print(f"  ⚠️  crops_cache.pkl: NOT GENERATED (testing detection-only speed)")
     print()
 
     # Write a sidecar JSON with timings
