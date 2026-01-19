@@ -409,7 +409,8 @@ def main():
         results["cuda"] = verify_cuda_gpu()
         results["models"] = verify_model_files()
         results["demo_data"] = verify_demo_data()
-        results["tensorrt_engine"] = verify_tensorrt_engine()
+        # DISABLED: TensorRT verification (using PyTorch models for Colab compatibility)
+        # results["tensorrt_engine"] = verify_tensorrt_engine()
         
         # Summary
         print("\n" + "  " + "=" * 66)
