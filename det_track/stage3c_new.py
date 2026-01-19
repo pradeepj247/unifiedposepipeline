@@ -246,8 +246,8 @@ def run_stage3c_new(config_path, verbose=True):
     config = resolve_path_variables(config)
     
     # Get paths
-    canonical_video = config['stage0_normalize']['canonical_video_file']
-    canonical_persons_filtered_file = config['stage3c_filter']['canonical_persons_filtered_file']
+    canonical_video = config['stage0_normalize']['output']['canonical_video_file']
+    canonical_persons_filtered_file = config['stage3c_filter']['output']['canonical_persons_filtered_file']
     output_dir = Path(config['global']['output_dir'])
     
     # NEW output file (don't overwrite existing)
