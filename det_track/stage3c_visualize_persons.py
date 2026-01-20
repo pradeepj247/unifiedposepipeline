@@ -99,7 +99,8 @@ def main():
         person_id = person['person_id']
         frame_nums = person['frame_numbers']
         bboxes = person['bboxes']
-        tracklet_ids = person['tracklet_ids']
+        # Stage 3b uses 'original_tracklet_ids', stage 3c might have simplified structure
+        tracklet_ids = person.get('original_tracklet_ids', person.get('tracklet_ids', [person_id]))
         
         for frame_num, bbox in zip(frame_nums, bboxes):
             if frame_num not in frame_persons:
