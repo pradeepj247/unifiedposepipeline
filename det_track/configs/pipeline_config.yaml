@@ -192,6 +192,7 @@ stage3b_group:
       # NEW motion-based checks
       min_motion_alignment: 0.6         # Cosine similarity of velocity vectors (>0.6 = same direction)
       max_jitter_difference: 40.0       # Max difference in center_jitter (pixels)
+      max_overlap_frames: 50            # Max overlap allowed for ByteTrack ID switches
   
   input:
     tracklet_stats_file: ${outputs_dir}/${current_video}/tracklet_stats.npz

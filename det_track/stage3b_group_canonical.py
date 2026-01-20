@@ -110,14 +110,22 @@ def can_merge_enhanced(stat1, stat2, criteria):
     area_ratio_range = criteria['area_ratio_range']
     min_motion_alignment = criteria.get('min_motion_alignment', 0.6)
     max_jitter_difference = criteria.get('max_jitter_difference', 40.0)
+    max_overlap = criteria.get('max_overlap_frames', 50)  # Allow ByteTrack ID switches
     
-    # Check 1: Temporal order (stat1 should end before stat2 starts)
-    if stat1['end_frame'] >= stat2['start_frame']:
+    # Check 1: Temporal order - stat1 must start before stat2 (allow overlaps)
+    if stat1['start_frame'] >= stat2['start_frame']:
         return False
     
+    # Calculate gap (negative = overlap)
     gap = stat2['start_frame'] - stat1['end_frame']
-    if gap > max_temporal_gap:
-        return False
+    
+    if gap > 0:  # No overlap - check temporal gap
+        if gap > max_temporal_gap:
+            return False
+    else:  # Overlap exists (gap is negative)
+        overlap_frames = abs(gap)
+        if overlap_frames > max_overlap:
+            return False  # Reject unrealistic overlaps
     
     # Check 2: Spatial proximity (last bbox of stat1 vs first bbox of stat2)
     last_bbox_1 = np.array(stat1['last_bbox'])
