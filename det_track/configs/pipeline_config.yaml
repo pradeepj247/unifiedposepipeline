@@ -307,7 +307,7 @@ stage4_generate_html:
   output_dir: ${outputs_dir}/${current_video}/webp_viewer
   
   # WebP generation parameters
-  resize_to: [384, 384]                   # Resize crops to this size (width, height) - increased for better quality
+  resize_to: [128, 256]                   # Resize crops to this size (width, height)
   webp_duration_ms: 200                   # Frame duration in WebP (200ms = 5 FPS, 60 frames = 12s loop)
   
   # Logging
