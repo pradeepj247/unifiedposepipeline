@@ -192,14 +192,11 @@ def group_tracklets_enhanced(tracklets, stats, criteria):
             if j in assigned:
                 continue
             
-            # Check if j can merge with any member of current group
-            can_add = False
-            for member_idx in current_group:
-                if can_merge_enhanced(stats[member_idx], stats[j], criteria):
-                    can_add = True
-                    break
+            # Check if j can merge with the LAST member of current group (by end_frame)
+            # This ensures temporal ordering: we extend the group chronologically
+            last_member_idx = max(current_group, key=lambda idx: stats[idx]['end_frame'])
             
-            if can_add:
+            if can_merge_enhanced(stats[last_member_idx], stats[j], criteria):
                 current_group.append(j)
                 assigned.add(j)
         
