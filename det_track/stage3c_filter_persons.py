@@ -173,9 +173,9 @@ def extract_crops_sequential(persons, video_path, max_crops_per_person=120, vide
                 if x2 > x1 and y2 > y1:
                     crop = frame[y1:y2, x1:x2].copy()
                     
-                    # Resize maintaining aspect ratio (max dimension = 192px)
+                    # Resize maintaining aspect ratio (max dimension = 384px for better quality)
                     h, w = crop.shape[:2]
-                    max_dim = 192
+                    max_dim = 384
                     if max(h, w) > max_dim:
                         scale = max_dim / max(h, w)
                         new_w = int(w * scale)
