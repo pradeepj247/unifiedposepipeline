@@ -25,6 +25,11 @@ def resolve_paths(config, max_iterations=5):
     """Resolve ${variable} references in config"""
     global_vars = config.get('global', {})
     
+    # Add current_video if not present
+    if 'current_video' not in global_vars:
+        video_file = global_vars.get('video_file', 'kohli_nets.mp4')
+        global_vars['current_video'] = Path(video_file).stem
+    
     for _ in range(max_iterations):
         updated = False
         for key, value in global_vars.items():
@@ -51,8 +56,14 @@ def main():
     config = resolve_paths(config)
     
     # Get paths
-    video_path = config['global']['video_file']
-    output_dir = Path(config['global']['output_dir'])
+    video_dir = config['global'].get('video_dir', '')
+    video_file = config['global']['video_file']
+    video_path = str(Path(video_dir) / video_file) if video_dir else video_file
+    
+    outputs_dir = config['global']['outputs_dir']
+    current_video = config['global']['current_video']
+    output_dir = Path(outputs_dir) / current_video
+    
     persons_file = output_dir / 'canonical_persons.npz'
     output_video = output_dir / 'stage3c_persons_visualization.mp4'
     
