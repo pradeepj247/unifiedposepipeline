@@ -418,6 +418,17 @@ def run_tracking(config):
     print(f"    Unique tracklets: {num_tracklets}")
     print(f"    Total tracked detections: {total_tracked_detections}")
     print(f"    Tracking FPS: {tracking_fps:.1f}")
+    
+    # Print tracklet summary table
+    print(f"\n📋 TRACKLET SUMMARY TABLE:")
+    print(f"{'TrackletID':<12} {'Start Frame':<12} {'End Frame':<12} {'# Frames':<12}")
+    print(f"{'-'*48}")
+    for t in tracklets:
+        tracklet_id = t['tracklet_id']
+        start_frame = int(t['frame_numbers'][0])
+        end_frame = int(t['frame_numbers'][-1])
+        num_frames_track = len(t['frame_numbers'])
+        print(f"{tracklet_id:<12} {start_frame:<12} {end_frame:<12} {num_frames_track:<12}")
     print(f"    Overall FPS (including overheads): {overall_fps:.1f}")
     print()
 
