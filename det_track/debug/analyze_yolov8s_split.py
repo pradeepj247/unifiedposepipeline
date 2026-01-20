@@ -127,47 +127,44 @@ def analyze_new_split(output_dir):
             
             criteria = config['stage3b_group']['grouping']['enhanced_criteria']
             
-            # Test against first BRIDGE tracklet (not first in gap)
-            if len(bridge_tracklets) > 0:
-                bridge_tid = bridge_tracklets[0][0]
+            # Test ALL bridge tracklets
+            print(f"\n   🔬 TESTING MERGE WITH ALL BRIDGE TRACKLETS:")
+            for bridge_tid, _, _, _ in bridge_tracklets:
                 idx_bridge = tracklet_id_to_idx.get(bridge_tid)
                 
                 if idx_bridge is not None:
                     stat_bridge = all_stats[idx_bridge]
                     
-                    print(f"\n   vs Bridge tracklet (ID {bridge_tid})")
-                    print(f"   Frames: {stat_bridge['start_frame']}-{stat_bridge['end_frame']}")
-                    print(f"   First bbox: {stat_bridge['first_bbox']}")
-                    print(f"   Mean velocity: {stat_bridge['mean_velocity']}")
-                    print(f"   Jitter: {stat_bridge['center_jitter']:.2f}")
+                    print(f"\n   📍 Bridge tracklet ID {bridge_tid}:")
+                    print(f"      Frames: {stat_bridge['start_frame']}-{stat_bridge['end_frame']}")
                     
                     # Test merge checks
                     gap = stat_bridge['start_frame'] - stat_3['end_frame']
-                    print(f"\n   📋 MERGE CHECKS:")
-                    print(f"   1. Temporal gap: {gap} frames (max: {criteria['max_temporal_gap']})")
-                    if gap > criteria['max_temporal_gap']:
-                        print(f"      ❌ FAILED - gap too large")
-                    else:
-                        print(f"      ✅ PASSED")
-                    
-                    # Spatial distance
                     last_center_3 = (np.array(stat_3['last_bbox'][:2]) + np.array(stat_3['last_bbox'][2:])) / 2
                     first_center_bridge = (np.array(stat_bridge['first_bbox'][:2]) + np.array(stat_bridge['first_bbox'][2:])) / 2
                     distance = np.linalg.norm(last_center_3 - first_center_bridge)
-                    
-                    print(f"   2. Spatial distance: {distance:.1f} px (max: {criteria['max_spatial_distance']})")
-                    if distance > criteria['max_spatial_distance']:
-                        print(f"      ❌ FAILED - too far apart")
-                    else:
-                        print(f"      ✅ PASSED")
-                    
-                    # Jitter difference
                     jitter_diff = abs(stat_3['center_jitter'] - stat_bridge['center_jitter'])
-                    print(f"   3. Jitter difference: {jitter_diff:.2f} (max: {criteria['max_jitter_difference']})")
-                    if jitter_diff > criteria['max_jitter_difference']:
-                        print(f"      ❌ FAILED - jitter too different")
+                    
+                    # Compact check results
+                    checks = []
+                    checks.append(f"Gap={gap}f ({'✅' if abs(gap) <= criteria.get('max_overlap_frames', 50) if gap < 0 else gap <= criteria['max_temporal_gap'] else '❌'})")
+                    checks.append(f"Dist={distance:.0f}px ({'✅' if distance <= criteria['max_spatial_distance'] else '❌'})")
+                    checks.append(f"Jitter={jitter_diff:.1f} ({'✅' if jitter_diff <= criteria['max_jitter_difference'] else '❌'})")
+                    
+                    print(f"      {' | '.join(checks)}")
+                    
+                    # Count failures
+                    failed = sum([
+                        gap > 0 and gap > criteria['max_temporal_gap'],
+                        gap < 0 and abs(gap) > criteria.get('max_overlap_frames', 50),
+                        distance > criteria['max_spatial_distance'],
+                        jitter_diff > criteria['max_jitter_difference']
+                    ])
+                    
+                    if failed == 0:
+                        print(f"      ✅✅✅ ALL CHECKS PASSED - Should have merged!")
                     else:
-                        print(f"      ✅ PASSED")
+                        print(f"      ⚠️ {failed} check(s) failed")
     
     print(f"\n{'='*70}")
     print(f"🎯 CONCLUSION:")
