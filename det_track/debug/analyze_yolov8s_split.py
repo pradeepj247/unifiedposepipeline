@@ -147,9 +147,21 @@ def analyze_new_split(output_dir):
                     
                     # Compact check results
                     checks = []
-                    checks.append(f"Gap={gap}f ({'✅' if abs(gap) <= criteria.get('max_overlap_frames', 50) if gap < 0 else gap <= criteria['max_temporal_gap'] else '❌'})")
-                    checks.append(f"Dist={distance:.0f}px ({'✅' if distance <= criteria['max_spatial_distance'] else '❌'})")
-                    checks.append(f"Jitter={jitter_diff:.1f} ({'✅' if jitter_diff <= criteria['max_jitter_difference'] else '❌'})")
+                    
+                    # Gap check
+                    if gap < 0:  # Overlap
+                        gap_pass = abs(gap) <= criteria.get('max_overlap_frames', 50)
+                    else:  # Positive gap
+                        gap_pass = gap <= criteria['max_temporal_gap']
+                    checks.append(f"Gap={gap}f ({'✅' if gap_pass else '❌'})")
+                    
+                    # Distance check
+                    dist_pass = distance <= criteria['max_spatial_distance']
+                    checks.append(f"Dist={distance:.0f}px ({'✅' if dist_pass else '❌'})")
+                    
+                    # Jitter check
+                    jitter_pass = jitter_diff <= criteria['max_jitter_difference']
+                    checks.append(f"Jitter={jitter_diff:.1f} ({'✅' if jitter_pass else '❌'})")
                     
                     print(f"      {' | '.join(checks)}")
                     
