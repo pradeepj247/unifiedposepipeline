@@ -56,13 +56,12 @@ def main():
     config = resolve_paths(config)
     
     # Get paths
-    video_dir = config['global'].get('video_dir', '')
-    video_file = config['global']['video_file']
-    video_path = str(Path(video_dir) / video_file) if video_dir else video_file
-    
     outputs_dir = config['global']['outputs_dir']
     current_video = config['global']['current_video']
     output_dir = Path(outputs_dir) / current_video
+    
+    # Use canonical (normalized) video from Stage 0, not original video
+    video_path = str(output_dir / 'canonical_video.mp4')
     
     persons_file = output_dir / 'canonical_persons.npz'
     output_video = output_dir / 'stage3c_persons_visualization.mp4'
