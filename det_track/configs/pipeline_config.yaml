@@ -147,10 +147,10 @@ stage1_detect:
 # NOTE: Only ByteTrack is currently supported (hardcoded in stage2_track.py)
 stage2_track:
   params:
-    track_thresh: 0.15     # Confidence threshold for tracking (lowered for better recall)
-    track_buffer: 30       # Buffer size for lost tracks (frames)
-    match_thresh: 0.8      # IOU threshold for matching
-    min_hits: 1            # Minimum consecutive detections to create track (1=immediate)
+    track_thresh: 0.4      # Confidence threshold - higher = cleaner tracks, fewer false positives
+    track_buffer: 50       # Buffer size for lost tracks - longer = better recovery from occlusions
+    match_thresh: 0.6      # IOU threshold - lower = more lenient matching for fast motion
+    min_hits: 3            # Require 3 consecutive detections before creating track (filters noise)
   
   input:
     detections_file: ${outputs_dir}/${current_video}/detections_raw.npz
