@@ -52,12 +52,14 @@ def debug_merge_checks(output_dir):
     print(f"\n👤 PERSON #2:")
     print(f"   Frames: {person_2['frame_numbers'][0]} - {person_2['frame_numbers'][-1]}")
     print(f"   Total frames: {len(person_2['frame_numbers'])}")
-    print(f"   Tracklet indices: {person_2.get('group_indices', 'N/A')}")
+    print(f"   Original tracklet IDs: {person_2.get('original_tracklet_ids', 'N/A')}")
+    print(f"   Num tracklets merged: {person_2.get('num_tracklets_merged', 'N/A')}")
     
     print(f"\n👤 PERSON #53:")
     print(f"   Frames: {person_53['frame_numbers'][0]} - {person_53['frame_numbers'][-1]}")
     print(f"   Total frames: {len(person_53['frame_numbers'])}")
-    print(f"   Tracklet indices: {person_53.get('group_indices', 'N/A')}")
+    print(f"   Original tracklet IDs: {person_53.get('original_tracklet_ids', 'N/A')}")
+    print(f"   Num tracklets merged: {person_53.get('num_tracklets_merged', 'N/A')}")
     
     # Now load tracklet stats (the raw data Stage 3b uses)
     stats_file = output_path / 'tracklet_stats.npz'
@@ -76,44 +78,39 @@ def debug_merge_checks(output_dir):
     
     print(f"   Found {len(all_stats)} tracklet statistics")
     
-    # Get tracklet indices for Person #2 and #53
-    indices_2 = person_2.get('group_indices', None)
-    indices_53 = person_53.get('group_indices', None)
+    # Also load the tracklets to map IDs to indices
+    tracklets_file = output_path / 'tracklets_raw.npz'
+    tracklets_data = np.load(tracklets_file, allow_pickle=True)
+    tracklets = tracklets_data['tracklets']
     
-    if indices_2 is None or indices_53 is None:
-        print(f"\n❌ Could not find group_indices in persons!")
-        print(f"   Person #2 keys: {person_2.keys() if hasattr(person_2, 'keys') else person_2.dtype.names}")
-        return
+    print(f"   Found {len(tracklets)} tracklets")
     
-    print(f"\n📋 PERSON #2 TRACKLETS:")
-    if len(indices_2) == 0:
-        print(f"   ⚠️ No tracklets (might be a single tracklet, not a group)")
-        # Find which stat matches Person #2's frame range
-        for idx, stat in enumerate(all_stats):
-            if stat['start_frame'] == person_2['frame_numbers'][0] and \
-               stat['end_frame'] == person_2['frame_numbers'][-1]:
-                indices_2 = [idx]
-                print(f"   Found matching stat at index {idx}")
-                break
+    # Build mapping from tracklet_id to index
+    tracklet_id_to_idx = {}
+    for idx, t in enumerate(tracklets):
+        tracklet_id_to_idx[t['tracklet_id']] = idx
     
-    for idx in indices_2:
-        stat = all_stats[idx]
-        print(f"   [{idx}] Frames {stat['start_frame']}-{stat['end_frame']} ({stat['duration']} frames)")
+    # Get tracklet IDs for Person #2 and #53
+    tracklet_ids_2 = person_2.get('original_tracklet_ids', [])
+    tracklet_ids_53 = person_53.get('original_tracklet_ids', [])
     
-    print(f"\n📋 PERSON #53 TRACKLETS:")
-    if len(indices_53) == 0:
-        print(f"   ⚠️ No tracklets (might be a single tracklet, not a group)")
-        # Find which stat matches Person #53's frame range
-        for idx, stat in enumerate(all_stats):
-            if stat['start_frame'] == person_53['frame_numbers'][0] and \
-               stat['end_frame'] == person_53['frame_numbers'][-1]:
-                indices_53 = [idx]
-                print(f"   Found matching stat at index {idx}")
-                break
+    print(f"\n📋 PERSON #2 TRACKLETS (by ID):")
+    indices_2 = []
+    for tid in tracklet_ids_2:
+        idx = tracklet_id_to_idx.get(tid)
+        if idx is not None:
+            indices_2.append(idx)
+            stat = all_stats[idx]
+            print(f"   Tracklet ID {tid} → Index [{idx}]: Frames {stat['start_frame']}-{stat['end_frame']} ({stat['duration']} frames)")
     
-    for idx in indices_53:
-        stat = all_stats[idx]
-        print(f"   [{idx}] Frames {stat['start_frame']}-{stat['end_frame']} ({stat['duration']} frames)")
+    print(f"\n📋 PERSON #53 TRACKLETS (by ID):")
+    indices_53 = []
+    for tid in tracklet_ids_53:
+        idx = tracklet_id_to_idx.get(tid)
+        if idx is not None:
+            indices_53.append(idx)
+            stat = all_stats[idx]
+            print(f"   Tracklet ID {tid} → Index [{idx}]: Frames {stat['start_frame']}-{stat['end_frame']} ({stat['duration']} frames)")
     
     # Now test if the LAST tracklet of Person #2 can merge with FIRST tracklet of Person #53
     if len(indices_2) == 0 or len(indices_53) == 0:
@@ -125,8 +122,8 @@ def debug_merge_checks(output_dir):
     stat_53 = all_stats[indices_53[0]]  # First tracklet of Person #53
     
     print(f"\n🔬 TESTING MERGE BETWEEN:")
-    print(f"   Last tracklet of Person #2: [{indices_2[-1]}] frames {stat_2['start_frame']}-{stat_2['end_frame']}")
-    print(f"   First tracklet of Person #53: [{indices_53[0]}] frames {stat_53['start_frame']}-{stat_53['end_frame']}")
+    print(f"   Last tracklet of Person #2: Index [{indices_2[-1]}] frames {stat_2['start_frame']}-{stat_2['end_frame']}")
+    print(f"   First tracklet of Person #53: Index [{indices_53[0]}] frames {stat_53['start_frame']}-{stat_53['end_frame']}")
     
     # Load config to get merge criteria
     config_file = Path(__file__).parent.parent / 'configs' / 'pipeline_config.yaml'
