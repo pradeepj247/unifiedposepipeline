@@ -335,8 +335,26 @@ def run_filter(config_path, verbose=True):
     if verbose:
         print(f"\n   💾 Saving crops to: {crops_output.name}")
     
+    # Convert crop_buckets to Stage 4 compatible format (crops_with_quality)
+    crops_with_quality = []
+    for person_id, crops_list in crop_buckets.items():
+        if len(crops_list) > 0:  # Only include persons with crops
+            crops_with_quality.append({
+                'person_id': person_id,
+                'crops': crops_list  # List of dicts with 'crop', 'frame_idx', 'bbox', 'confidence'
+            })
+    
+    # Save in format compatible with Stage 4
+    from datetime import datetime, timezone
+    output_data = {
+        'crops_with_quality': crops_with_quality,
+        'video_source': str(canonical_video),
+        'crops_per_person': 120,  # Max crops collected
+        'timestamp': datetime.now(timezone.utc).isoformat()
+    }
+    
     with open(crops_output, 'wb') as f:
-        pickle.dump(crop_buckets, f, protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump(output_data, f, protocol=pickle.HIGHEST_PROTOCOL)
     
     t_save_crops = time.time() - t_save_start
     crops_size_mb = crops_output.stat().st_size / (1024 * 1024)
