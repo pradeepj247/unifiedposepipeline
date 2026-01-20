@@ -58,20 +58,27 @@ def verify_merge(output_dir):
             if p['frame_numbers'][0] == 0:
                 print(f"   Person {p['person_id']}: frames {p['frame_numbers'][0]}-{p['frame_numbers'][-1]}, tracklets {p.get('original_tracklet_ids', [])}")
     
-    # Also check that Person #2 and #53 no longer exist as separate IDs
+    # Check merge result: Person #2 should exist (as merged person), Person #53 should NOT
     person_ids = [p['person_id'] for p in persons]
     
     print(f"\n📋 PERSON ID CHECK:")
-    if 2 not in person_ids and 53 not in person_ids:
-        print(f"   ✅ Person #2 and #53 no longer exist as separate persons")
+    person_2_exists = 2 in person_ids
+    person_53_exists = 53 in person_ids
+    
+    if person_2_exists and not person_53_exists:
+        print(f"   ✅ Person #2 exists (merged person)")
+        print(f"   ✅ Person #53 absorbed into Person #2")
     else:
-        if 2 in person_ids:
-            print(f"   ⚠️ Person #2 still exists")
-        if 53 in person_ids:
-            print(f"   ⚠️ Person #53 still exists")
+        if not person_2_exists:
+            print(f"   ⚠️ Person #2 does not exist (should be the merged result)")
+        if person_53_exists:
+            print(f"   ⚠️ Person #53 still exists separately (merge failed)")
+    
+    # Successful merge = found merged person + Person #2 exists + Person #53 gone
+    merge_successful = merged_person and person_2_exists and not person_53_exists
     
     print(f"\n" + "=" * 70)
-    print(f"SUMMARY: {'✅ MERGE SUCCESSFUL!' if merged_person and 2 not in person_ids and 53 not in person_ids else '⚠️ MERGE INCOMPLETE'}")
+    print(f"SUMMARY: {'✅ MERGE SUCCESSFUL!' if merge_successful else '⚠️ MERGE INCOMPLETE'}")
     print(f"=" * 70)
 
 
