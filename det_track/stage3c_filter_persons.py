@@ -374,7 +374,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Stage 3c: Filter Persons & Fast Crop Extraction')
     parser.add_argument('--config', type=str, required=True, help='Path to pipeline config YAML')
     parser.add_argument('--verbose', action='store_true', default=True, help='Verbose output')
+    parser.add_argument('--crops-per-person', type=int, default=120, help='Max crops per person (legacy arg, ignored - always 120)')
     
     args = parser.parse_args()
     
+    # Note: --crops-per-person is ignored in the new implementation (always collects up to 120 crops)
+    # It's kept for backward compatibility with run_pipeline.py
     run_filter(args.config, verbose=args.verbose)
