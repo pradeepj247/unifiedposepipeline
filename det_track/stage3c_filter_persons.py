@@ -267,9 +267,14 @@ def filter_top_persons(all_persons, top_n=10, min_duration_frames=150, verbose=T
     return top_persons
 
 
-def run_filter(config_path, verbose=True):
+def run_filter(config_or_path, verbose=True):
     """
     Main entry point for Stage 3c (filter + fast crop extraction)
+    
+    Args:
+        config_or_path: Either a config dict (from run_pipeline_new.py) or 
+                       a path string (from CLI/subprocess)
+        verbose: Print progress messages
     """
     print("\n" + "="*70)
     print("📍 STAGE 3C: FILTER & FAST CROP EXTRACTION")
@@ -277,16 +282,24 @@ def run_filter(config_path, verbose=True):
     
     t_start = time.time()
     
-    # Load config
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
-    
-    # Auto-extract current_video from video_file (needed for path resolution)
-    video_file = config.get('global', {}).get('video_file', '')
-    if video_file:
-        import os
-        video_name = os.path.splitext(os.path.basename(video_file))[0]
-        config['global']['current_video'] = video_name
+    # Handle both dict (from run_pipeline_new) and path string (from CLI)
+    if isinstance(config_or_path, dict):
+        # Already loaded config dict
+        config = config_or_path
+    else:
+        # Config file path - load it
+        with open(config_or_path) as f:
+            config = yaml.safe_load(f)
+        
+        # Auto-extract current_video from video_file (needed for path resolution)
+        video_file = config.get('global', {}).get('video_file', '')
+        if video_file:
+            import os
+            video_name = os.path.splitext(os.path.basename(video_file))[0]
+            config['global']['current_video'] = video_name
+        
+        # Resolve path variables
+        config = resolve_path_variables(config)
     
     config = resolve_path_variables(config)
     
