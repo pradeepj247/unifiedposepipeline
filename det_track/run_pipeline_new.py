@@ -33,7 +33,7 @@ from stage1_detect import run_detection
 from stage2_track import run_tracking
 from stage3a_analyze_tracklets import run_analysis
 from stage3b_group_canonical import run_enhanced_grouping
-from stage3c_filter_persons import run_filter
+from stage3c_filter_persons import run_filter  # NEW: Optimized on-demand crop extraction
 from stage3d_refine_visual import run_refine
 
 
