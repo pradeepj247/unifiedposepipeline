@@ -68,20 +68,32 @@ def analyze_new_split(output_dir):
     
     print(f"\n🔍 TRACKLETS IN THE GAP (frames {person_3['frame_numbers'][-1]}-{person_58['frame_numbers'][0]}):")
     gap_tracklets = []
+    bridge_tracklets = []  # Tracklets that could bridge the gap
+    
     for t in tracklets:
         start = t['frame_numbers'][0]
         end = t['frame_numbers'][-1]
+        tid = t['tracklet_id']
         
-        # Check if tracklet overlaps with gap
-        if start <= person_58['frame_numbers'][0] and end >= person_3['frame_numbers'][-1]:
-            gap_tracklets.append((t['tracklet_id'], start, end, len(t['frame_numbers'])))
-            print(f"   Tracklet {t['tracklet_id']}: frames {start}-{end} ({len(t['frame_numbers'])} frames)")
+        # Check if tracklet could bridge the gap
+        # Bridge = starts near where Person #3 ends OR ends near where Person #58 starts
+        person_3_end = person_3['frame_numbers'][-1]
+        person_58_start = person_58['frame_numbers'][0]
+        
+        # Tracklet starts within 50 frames of Person #3 ending
+        if abs(start - person_3_end) <= 50 and end > person_3_end:
+            bridge_tracklets.append((tid, start, end, len(t['frame_numbers'])))
+            print(f"   🔗 Tracklet {tid}: frames {start}-{end} ({len(t['frame_numbers'])} frames) - BRIDGE CANDIDATE")
+        # General gap tracklet
+        elif start >= person_3_end - 50 and end <= person_58_start + 50:
+            gap_tracklets.append((tid, start, end, len(t['frame_numbers'])))
+            print(f"   Tracklet {tid}: frames {start}-{end} ({len(t['frame_numbers'])} frames)")
     
-    if len(gap_tracklets) == 0:
-        print(f"   ❌ NO TRACKLETS in gap - person completely lost!")
+    if len(bridge_tracklets) == 0:
+        print(f"\n   ❌ NO BRIDGE TRACKLETS found!")
+        print(f"   Person completely lost between frames {person_3_end} and {person_58_start}")
     else:
-        print(f"\n   Found {len(gap_tracklets)} tracklets in gap")
-        print(f"   ⚠️ These should have been grouped with Person #3 or #58!")
+        print(f"\n   Found {len(bridge_tracklets)} potential bridge tracklets")
     
     # Load stats and test merge conditions
     stats_file = output_path / 'tracklet_stats.npz'
@@ -115,22 +127,22 @@ def analyze_new_split(output_dir):
             
             criteria = config['stage3b_group']['grouping']['enhanced_criteria']
             
-            # Test against first tracklet in gap
-            if len(gap_tracklets) > 0:
-                gap_tid = gap_tracklets[0][0]
-                idx_gap = tracklet_id_to_idx.get(gap_tid)
+            # Test against first BRIDGE tracklet (not first in gap)
+            if len(bridge_tracklets) > 0:
+                bridge_tid = bridge_tracklets[0][0]
+                idx_bridge = tracklet_id_to_idx.get(bridge_tid)
                 
-                if idx_gap is not None:
-                    stat_gap = all_stats[idx_gap]
+                if idx_bridge is not None:
+                    stat_bridge = all_stats[idx_bridge]
                     
-                    print(f"\n   vs First tracklet in gap (ID {gap_tid})")
-                    print(f"   Frames: {stat_gap['start_frame']}-{stat_gap['end_frame']}")
-                    print(f"   First bbox: {stat_gap['first_bbox']}")
-                    print(f"   Mean velocity: {stat_gap['mean_velocity']}")
-                    print(f"   Jitter: {stat_gap['center_jitter']:.2f}")
+                    print(f"\n   vs Bridge tracklet (ID {bridge_tid})")
+                    print(f"   Frames: {stat_bridge['start_frame']}-{stat_bridge['end_frame']}")
+                    print(f"   First bbox: {stat_bridge['first_bbox']}")
+                    print(f"   Mean velocity: {stat_bridge['mean_velocity']}")
+                    print(f"   Jitter: {stat_bridge['center_jitter']:.2f}")
                     
                     # Test merge checks
-                    gap = stat_gap['start_frame'] - stat_3['end_frame']
+                    gap = stat_bridge['start_frame'] - stat_3['end_frame']
                     print(f"\n   📋 MERGE CHECKS:")
                     print(f"   1. Temporal gap: {gap} frames (max: {criteria['max_temporal_gap']})")
                     if gap > criteria['max_temporal_gap']:
@@ -139,9 +151,9 @@ def analyze_new_split(output_dir):
                         print(f"      ✅ PASSED")
                     
                     # Spatial distance
-                    last_center_3 = (stat_3['last_bbox'][:2] + stat_3['last_bbox'][2:]) / 2
-                    first_center_gap = (stat_gap['first_bbox'][:2] + stat_gap['first_bbox'][2:]) / 2
-                    distance = np.linalg.norm(last_center_3 - first_center_gap)
+                    last_center_3 = (np.array(stat_3['last_bbox'][:2]) + np.array(stat_3['last_bbox'][2:])) / 2
+                    first_center_bridge = (np.array(stat_bridge['first_bbox'][:2]) + np.array(stat_bridge['first_bbox'][2:])) / 2
+                    distance = np.linalg.norm(last_center_3 - first_center_bridge)
                     
                     print(f"   2. Spatial distance: {distance:.1f} px (max: {criteria['max_spatial_distance']})")
                     if distance > criteria['max_spatial_distance']:
@@ -150,7 +162,7 @@ def analyze_new_split(output_dir):
                         print(f"      ✅ PASSED")
                     
                     # Jitter difference
-                    jitter_diff = abs(stat_3['center_jitter'] - stat_gap['center_jitter'])
+                    jitter_diff = abs(stat_3['center_jitter'] - stat_bridge['center_jitter'])
                     print(f"   3. Jitter difference: {jitter_diff:.2f} (max: {criteria['max_jitter_difference']})")
                     if jitter_diff > criteria['max_jitter_difference']:
                         print(f"      ❌ FAILED - jitter too different")
