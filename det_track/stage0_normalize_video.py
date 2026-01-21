@@ -288,9 +288,11 @@ def normalize_video(input_path, output_path, metadata, config):
     # Video codec and settings
     if use_gpu:
         # NVENC GPU encoding (don't specify pix_fmt, it breaks CUDA pipeline)
+        print("    NVENC Settings: h264_nvenc, preset=p4, CQ=18 (high quality)")
         cmd += [
             '-c:v', 'h264_nvenc',
             '-preset', encoding.get('gpu_preset', 'p4'),  # p1-p7, p4=balanced
+            '-cq', '18',  # CQ=18: High quality for better YOLO detection (lower=better, 18=visually lossless)
         ]
         # All I-frames for optimal seeking (no P/B frames)
         cmd += ['-g', '1', '-bf', '0']
